@@ -20,6 +20,8 @@
       "extensions": ["ada", "adb", "ads", "pad"]
     },
     "Agda": {
+      "quotes": [["\\\"", "\\\""]],
+      "character_literals": [["'", "'"]],
       "nested": true,
       "line_comment": ["--"],
       "multi_line_comments": [["{-", "-}"]],
@@ -263,6 +265,7 @@
       "extensions": ["chpl"]
     },
     "CHeader": {
+      "character_literals": [["'", "'"]],
       "name": "C Header",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -340,6 +343,7 @@
       "extensions": ["v"]
     },
     "Cpp": {
+      "character_literals": [["'", "'"]],
       "name": "C++",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -348,6 +352,7 @@
       "extensions": ["cc", "cpp", "cxx", "c++", "pcc", "tpp"]
     },
     "CppHeader": {
+      "character_literals": [["'", "'"]],
       "name": "C++ Header",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -355,6 +360,7 @@
       "extensions": ["hh", "hpp", "hxx", "inl", "ipp"]
     },
     "CppModule": {
+      "character_literals": [["'", "'"]],
       "name": "C++ Module",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -370,6 +376,7 @@
       "extensions": ["cr"]
     },
     "CSharp": {
+      "character_literals": [["'", "'"]],
       "name": "C#",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -536,6 +543,8 @@
       "extensions": ["ex", "exs"]
     },
     "Elm": {
+      "quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["\\\"", "\\\""]],
+      "character_literals": [["'", "'"]],
       "nested": true,
       "line_comment": ["--"],
       "multi_line_comments": [["{-", "-}"]],
@@ -630,12 +639,14 @@
       "extensions": ["ftl", "ftlh", "ftlx"]
     },
     "FSharp": {
+      "nested": true,
+      "character_literals": [["'", "'"]],
       "comment_exceptions": ["(*)"],
       "name": "F#",
       "line_comment": ["//"],
       "multi_line_comments": [["(*", "*)"]],
       "quotes": [["\\\"", "\\\""]],
-      "verbatim_quotes": [["@\\\"", "\\\""]],
+      "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["@\\\"", "\\\""]],
       "extensions": ["fs", "fsi", "fsx", "fsscript"]
     },
     "Fstar": {
@@ -756,6 +767,8 @@
       "extensions": ["hbs", "handlebars"]
     },
     "Haskell": {
+      "quotes": [["\\\"", "\\\""]],
+      "character_literals": [["'", "'"]],
       "nested": true,
       "line_comment": ["--"],
       "multi_line_comments": [["{-", "-}"]],
@@ -987,10 +1000,12 @@
       "extensions": ["kk"]
     },
     "Kotlin": {
+      "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
+      "character_literals": [["'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "nested": true,
-      "quotes": [["\\\"", "\\\""], ["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
+      "quotes": [["\\\"", "\\\""]],
       "extensions": ["kt", "kts"]
     },
     "Ksh": {
@@ -1062,6 +1077,8 @@
       "extensions": ["ld", "lds"]
     },
     "Lisp": {
+      "quotes": [["\\\"", "\\\""]],
+      "character_literals": [["#\\\\", ""]],
       "name": "Common Lisp",
       "line_comment": [";"],
       "multi_line_comments": [["#|", "|#"]],
@@ -1268,6 +1285,8 @@
       "extensions": ["mm"]
     },
     "OCaml": {
+      "nested": true,
+      "character_literals": [["'", "'"]],
       "quotes": [["\\\"", "\\\""]],
       "multi_line_comments": [["(*", "*)"]],
       "extensions": ["ml", "mli", "re", "rei"]
@@ -1454,7 +1473,9 @@
       "extensions": ["pp"]
     },
     "PureScript": {
-      "nested": true,
+      "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
+      "quotes": [["\\\"", "\\\""]],
+      "character_literals": [["'", "'"]],
       "line_comment": ["--"],
       "multi_line_comments": [["{-", "-}"]],
       "extensions": ["purs"]
@@ -1506,6 +1527,8 @@
       "extensions": ["r"]
     },
     "Racket": {
+      "quotes": [["\\\"", "\\\""]],
+      "character_literals": [["#\\\\", ""]],
       "line_comment": [";"],
       "multi_line_comments": [["#|", "|#"]],
       "nested": true,
@@ -1640,12 +1663,16 @@
       "extensions": ["sass", "scss"]
     },
     "Scala": {
+      "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
+      "character_literals": [["'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""]],
       "extensions": ["sc", "scala"]
     },
     "Scheme": {
+      "quotes": [["\\\"", "\\\""]],
+      "character_literals": [["#\\\\", ""]],
       "line_comment": [";"],
       "multi_line_comments": [["#|", "|#"]],
       "nested": true,
