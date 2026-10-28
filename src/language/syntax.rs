@@ -80,6 +80,7 @@ pub(crate) struct SharedMatchers {
     pub nested_comments: &'static [(&'static str, &'static str)],
     pub string_literals: &'static [(&'static str, &'static str)],
     pub character_literals: &'static [(&'static str, &'static str)],
+    pub comment_exceptions: &'static [&'static str],
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
 }
 
@@ -119,6 +120,7 @@ impl SharedMatchers {
             nested_comments: language.nested_comments(),
             string_literals: language.quotes(),
             character_literals: language.character_literals(),
+            comment_exceptions: language.comment_exceptions(),
             verbatim_string_literals: language.verbatim_quotes(),
         }
     }
@@ -260,6 +262,11 @@ impl SyntaxCounter {
                 continue;
             }
 
+            if let Some(exception) = self.comment_exception(window) {
+                skip!(exception.len());
+                continue;
+            }
+
             if let Some(skip_amount) = self.parse_character_literal(window) {
                 skip!(skip_amount);
                 continue;
@@ -314,17 +321,27 @@ impl SyntaxCounter {
     ) -> bool {
         let trimmed = line.trim();
         let whole_line_is_comment = || {
-            self.shared
-                .line_comments
+            // A line opening with a code token such as PHP's `#[` is not a
+            // comment, whatever comment marker that token starts with.
+            let opens_with_code = self
+                .shared
+                .comment_exceptions
                 .iter()
-                .any(|c| trimmed.starts_with(c.as_bytes()))
-                || self
+                .any(|e| trimmed.starts_with(e.as_bytes()));
+            !opens_with_code
+                && (self
                     .shared
-                    .any_multi_line_comments
+                    .line_comments
                     .iter()
-                    .any(|(start, end)| {
-                        trimmed.starts_with(start.as_bytes()) && trimmed.ends_with(end.as_bytes())
-                    })
+                    .any(|c| trimmed.starts_with(c.as_bytes()))
+                    || self
+                        .shared
+                        .any_multi_line_comments
+                        .iter()
+                        .any(|(start, end)| {
+                            trimmed.starts_with(start.as_bytes())
+                                && trimmed.ends_with(end.as_bytes())
+                        }))
         };
         let starts_with_comment = || {
             let quote = match self.stack.last() {
@@ -605,6 +622,18 @@ impl SyntaxCounter {
         }
 
         None
+    }
+
+    /// The code token starting `window` that only looks like a comment opener.
+    pub(crate) fn comment_exception(&self, window: &[u8]) -> Option<&'static str> {
+        if !self.is_plain_mode() {
+            return None;
+        }
+        self.shared
+            .comment_exceptions
+            .iter()
+            .copied()
+            .find(|e| window.starts_with(e.as_bytes()))
     }
 
     /// Length of the character literal starting `window`: an escape running to

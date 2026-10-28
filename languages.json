@@ -630,6 +630,7 @@
       "extensions": ["ftl", "ftlh", "ftlx"]
     },
     "FSharp": {
+      "comment_exceptions": ["(*)"],
       "name": "F#",
       "line_comment": ["//"],
       "multi_line_comments": [["(*", "*)"]],
@@ -1355,6 +1356,7 @@
       "extensions": ["e","exw"]
     },
     "Php": {
+      "comment_exceptions": ["#["],
       "name": "PHP",
       "line_comment": ["#", "//"],
       "multi_line_comments": [["/*", "*/"]],
