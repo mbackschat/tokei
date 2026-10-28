@@ -18,8 +18,16 @@ use tokei::LanguageType;
 enum Lang {
     Rust,
     C,
+    Cpp,
     Go,
     Java,
+    Kotlin,
+    CSharp,
+    Scala,
+    OCaml,
+    FSharp,
+    Haskell,
+    Php,
     JavaScript,
     TypeScript,
     Python,
@@ -33,8 +41,16 @@ impl Lang {
         Some(match ext {
             "rs" => Lang::Rust,
             "c" | "h" => Lang::C,
+            "cc" | "cpp" | "cxx" | "hh" | "hpp" | "hxx" => Lang::Cpp,
             "go" => Lang::Go,
             "java" => Lang::Java,
+            "kt" | "kts" => Lang::Kotlin,
+            "cs" => Lang::CSharp,
+            "scala" => Lang::Scala,
+            "ml" => Lang::OCaml,
+            "fs" => Lang::FSharp,
+            "hs" => Lang::Haskell,
+            "php" => Lang::Php,
             "js" | "mjs" | "cjs" => Lang::JavaScript,
             "ts" | "mts" | "cts" => Lang::TypeScript,
             "py" => Lang::Python,
@@ -43,26 +59,20 @@ impl Lang {
         })
     }
 
-    fn tokei(self, path: &Path) -> LanguageType {
-        match self {
-            Lang::Rust => LanguageType::Rust,
-            // Tokei counts `.h` as CHeader, which shares C's definition.
-            Lang::C => LanguageType::from_path(path, &tokei::Config::default()).unwrap_or(LanguageType::C),
-            Lang::Go => LanguageType::Go,
-            Lang::Java => LanguageType::Java,
-            Lang::JavaScript => LanguageType::JavaScript,
-            Lang::TypeScript => LanguageType::TypeScript,
-            Lang::Python => LanguageType::Python,
-            Lang::Shell => LanguageType::from_path(path, &tokei::Config::default()).unwrap_or(LanguageType::Sh),
-        }
-    }
-
     fn grammar(self) -> tree_sitter::Language {
         match self {
             Lang::Rust => tree_sitter_rust::LANGUAGE.into(),
             Lang::C => tree_sitter_c::LANGUAGE.into(),
+            Lang::Cpp => tree_sitter_cpp::LANGUAGE.into(),
             Lang::Go => tree_sitter_go::LANGUAGE.into(),
             Lang::Java => tree_sitter_java::LANGUAGE.into(),
+            Lang::Kotlin => tree_sitter_kotlin_ng::LANGUAGE.into(),
+            Lang::CSharp => tree_sitter_c_sharp::LANGUAGE.into(),
+            Lang::Scala => tree_sitter_scala::LANGUAGE.into(),
+            Lang::OCaml => tree_sitter_ocaml::LANGUAGE_OCAML.into(),
+            Lang::FSharp => tree_sitter_fsharp::LANGUAGE_FSHARP.into(),
+            Lang::Haskell => tree_sitter_haskell::LANGUAGE.into(),
+            Lang::Php => tree_sitter_php::LANGUAGE_PHP.into(),
             Lang::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
             Lang::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
             Lang::Python => tree_sitter_python::LANGUAGE.into(),
@@ -70,8 +80,9 @@ impl Lang {
         }
     }
 
-    fn lexer(self, text: &str) -> Vec<Region> {
-        match self {
+    /// The spike's hand-written lexers, which exist only for its first eight languages.
+    fn lexer(self, text: &str) -> Option<Vec<Region>> {
+        Some(match self {
             Lang::Rust => clike::regions(text, clike::Lang::Rust),
             Lang::C => clike::regions(text, clike::Lang::C),
             Lang::Go => clike::regions(text, clike::Lang::Go),
@@ -79,39 +90,32 @@ impl Lang {
             Lang::JavaScript | Lang::TypeScript => clike::regions(text, clike::Lang::Js),
             Lang::Python => hash::python(text),
             Lang::Shell => hash::shell(text),
-        }
+            _ => return None,
+        })
     }
 }
 
-fn fork_lines(lang: Lang, path: &Path, text: &str) -> Counts {
-    use tokei_fork::LanguageType as F;
+fn fork_lines(path: &Path, text: &str) -> Counts {
     let config = tokei_fork::Config::default();
-    let kind = match lang {
-        Lang::Rust => F::Rust,
-        Lang::C => F::from_path(path, &config).unwrap_or(F::C),
-        Lang::Go => F::Go,
-        Lang::Java => F::Java,
-        Lang::JavaScript => F::JavaScript,
-        Lang::TypeScript => F::TypeScript,
-        Lang::Python => F::Python,
-        Lang::Shell => F::from_path(path, &config).unwrap_or(F::Sh),
-    };
+    let kind = tokei_fork::LanguageType::from_path(path, &config).expect("fork language");
     let stats = kind.parse_from_str(text, &config).summarise();
     Counts { code: stats.code as u64, comments: stats.comments as u64, blanks: stats.blanks as u64 }
 }
 
-fn tokei_lines(lang: Lang, path: &Path, text: &str) -> Counts {
-    let stats = lang.tokei(path).parse_from_str(text, &tokei::Config::default()).summarise();
+fn tokei_lines(path: &Path, text: &str) -> Counts {
+    let config = tokei::Config::default();
+    let kind = LanguageType::from_path(path, &config).expect("Tokei language");
+    let stats = kind.parse_from_str(text, &config).summarise();
     Counts { code: stats.code as u64, comments: stats.comments as u64, blanks: stats.blanks as u64 }
 }
 
 /// Tokei's class of each line, read from the counts of growing prefixes.
-fn tokei_per_line(lang: Lang, path: &Path, text: &str) -> Vec<Line> {
-    per_line(text, |prefix| tokei_lines(lang, path, prefix))
+fn tokei_per_line(path: &Path, text: &str) -> Vec<Line> {
+    per_line(text, |prefix| tokei_lines(path, prefix))
 }
 
-fn fork_per_line(lang: Lang, path: &Path, text: &str) -> Vec<Line> {
-    per_line(text, |prefix| fork_lines(lang, path, prefix))
+fn fork_per_line(path: &Path, text: &str) -> Vec<Line> {
+    per_line(text, |prefix| fork_lines(path, prefix))
 }
 
 fn per_line(text: &str, counter: impl Fn(&str) -> Counts) -> Vec<Line> {
@@ -150,21 +154,21 @@ fn count(root: &Path) {
         .filter_map(|(path, lang)| {
             let text = std::fs::read_to_string(path).ok()?;
             let t0 = Instant::now();
-            let tokei = tokei_lines(*lang, path, &text);
+            let tokei = tokei_lines(path, &text);
             let t1 = Instant::now();
             let (ts_regions, ts_error) = ts::regions(&text, &lang.grammar());
             let ts = lines::count(&lines::lines(&text, &ts_regions));
             let t2 = Instant::now();
-            let lex = lines::count(&lines::lines(&text, &lang.lexer(&text)));
+            let lex = lang.lexer(&text).map(|r| json(lines::count(&lines::lines(&text, &r))));
             let t3 = Instant::now();
-            let fork = fork_lines(*lang, path, &text);
+            let fork = fork_lines(path, &text);
             let t4 = Instant::now();
             Some(
                 serde_json::json!({
                     "path": path.strip_prefix(root).unwrap(),
                     "lang": format!("{lang:?}"),
                     "bytes": text.len(),
-                    "tokei": json(tokei), "ts": json(ts), "lex": json(lex), "fork": json(fork),
+                    "tokei": json(tokei), "ts": json(ts), "lex": lex, "fork": json(fork),
                     "ts_error": ts_error,
                     "us": [(t1 - t0).as_micros(), (t2 - t1).as_micros(), (t3 - t2).as_micros(), (t4 - t3).as_micros()],
                 })
@@ -181,9 +185,9 @@ fn show_lines(path: &Path) {
     let lang = Lang::from_path(path).expect("spike language");
     let text = std::fs::read_to_string(path).unwrap();
     let ts = lines::lines(&text, &ts::regions(&text, &lang.grammar()).0);
-    let lex = lines::lines(&text, &lang.lexer(&text));
-    let tok = tokei_per_line(lang, path, &text);
-    let fork = fork_per_line(lang, path, &text);
+    let lex = lang.lexer(&text).map(|r| lines::lines(&text, &r));
+    let tok = tokei_per_line(path, &text);
+    let fork = fork_per_line(path, &text);
     let only_diff = std::env::args().any(|a| a == "--diff");
     let mark = |line: Line| match line {
         Line::Code => 'C',
@@ -191,7 +195,8 @@ fn show_lines(path: &Path) {
         Line::Blank => '.',
     };
     for (n, source) in text.lines().enumerate() {
-        let (t, a, b, f) = (tok[n], ts[n], lex[n], fork[n]);
+        let (t, a, f) = (tok[n], ts[n], fork[n]);
+        let b = lex.as_ref().map_or(a, |lex| lex[n]);
         if only_diff && t == a && a == b && b == f {
             continue;
         }

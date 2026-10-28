@@ -13,7 +13,8 @@ pub fn regions(text: &str, language: &Language) -> (Vec<Region>, bool) {
     'walk: loop {
         let node = cursor.node();
         let kind = node.kind();
-        let class = if kind.contains("comment") {
+        // Haskell pragmas are written as comments and Tokei counts them so.
+        let class = if kind.contains("comment") || matches!(kind, "haddock" | "xml_doc" | "pragma") {
             Some(Class::Comment)
         } else if is_literal(kind) {
             Some(Class::Literal)
@@ -45,10 +46,11 @@ pub fn regions(text: &str, language: &Language) -> (Vec<Region>, bool) {
 }
 
 fn is_literal(kind: &str) -> bool {
-    (kind.contains("string") && !kind.contains("expansion") && !kind.contains("concatenated"))
+    (kind.contains("string")
+        && !kind.contains("expansion")
+        && !kind.contains("concatenated")
+        && !kind.contains("get_expression"))
         || kind.contains("char_literal")
         || kind.contains("character_literal")
-        || kind == "rune_literal"
-        || kind == "heredoc_body"
-        || kind == "regex"
+        || matches!(kind, "char" | "character" | "rune_literal" | "heredoc" | "heredoc_body" | "nowdoc" | "regex")
 }
