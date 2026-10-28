@@ -1,0 +1,110 @@
+diff --git i/src/language/language_type.tera.rs w/src/language/language_type.tera.rs
+index e2eb96c..baf3b2b 100644
+--- i/src/language/language_type.tera.rs
++++ w/src/language/language_type.tera.rs
+@@ -158,6 +158,19 @@ impl LanguageType {
+     /// let lang = LanguageType::CSharp;
+     /// assert_eq!(lang.verbatim_quotes(), &[("@\"", "\"")]);
+     /// ```
++    pub fn character_literals(self) -> &'static [(&'static str, &'static str)] {
++        match self {
++            {% for key, value in languages -%}
++                {{key}} => &[
++                    {%- for items in value.character_literals | default(value=[]) -%}
++                        ({% for item in items %}"{{item}}",{% endfor %}),
++                    {%- endfor -%}
++                ],
++            {% endfor %}
++        }
++    }
++
++    /// Returns the verbatim quotes of a language.
+     pub fn verbatim_quotes(self) -> &'static [(&'static str, &'static str)] {
+         match self {
+             {% for key, value in languages -%}
+@@ -242,6 +255,7 @@ impl LanguageType {
+             {% for key, value in languages -%}
+                 {%- set starting_quotes = value.quotes | default(value=[]) | map(attribute="0") -%}
+                 {%- set starting_doc_quotes = value.doc_quotes | default(value=[]) | map(attribute="0") -%}
++                {%- set starting_verbatim_quotes = value.verbatim_quotes | default(value=[]) | map(attribute="0") -%}
+                 {%- set starting_multi_line_comments = value.multi_line_comments | default(value=[]) | map(attribute="0") -%}
+                 {%- set starting_nested_comments = value.nested_comments | default(value=[]) | map(attribute="0") -%}
+                 {%- set important_syntax = value.important_syntax | default(value=[]) -%}
+@@ -249,6 +263,7 @@ impl LanguageType {
+                 {{key}} => &[
+                     {%- for item in starting_quotes |
+                                    concat(with=starting_doc_quotes) |
++                                   concat(with=starting_verbatim_quotes) |
+                                    concat(with=starting_multi_line_comments) |
+                                    concat(with=starting_nested_comments) |
+                                    concat(with=important_syntax) -%}
+diff --git i/src/language/syntax.rs w/src/language/syntax.rs
+index 95a3186..20df5fe 100644
+--- i/src/language/syntax.rs
++++ w/src/language/syntax.rs
+@@ -79,6 +79,7 @@ pub(crate) struct SharedMatchers {
+     pub multi_line_comments: &'static [(&'static str, &'static str)],
+     pub nested_comments: &'static [(&'static str, &'static str)],
+     pub string_literals: &'static [(&'static str, &'static str)],
++    pub character_literals: &'static [(&'static str, &'static str)],
+     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
+ }
+ 
+@@ -117,6 +118,7 @@ impl SharedMatchers {
+             any_multi_line_comments: language.any_multi_line_comments(),
+             nested_comments: language.nested_comments(),
+             string_literals: language.quotes(),
++            character_literals: language.character_literals(),
+             verbatim_string_literals: language.verbatim_quotes(),
+         }
+     }
+@@ -258,6 +260,11 @@ impl SyntaxCounter {
+                 continue;
+             }
+ 
++            if let Some(skip_amount) = self.parse_character_literal(window) {
++                skip!(skip_amount);
++                continue;
++            }
++
+             if let Some(child) = self.parse_context(lines, i, end, config, &regex_cache) {
+                 return AnalysisReport::ChildLanguage(child);
+             }
+@@ -600,6 +607,37 @@ impl SyntaxCounter {
+         None
+     }
+ 
++    /// Length of the character literal starting `window`: an escape running to
++    /// the closing delimiter on the same line, or exactly one character. Any
++    /// other opener, such as a Rust lifetime `'a`, is not a literal.
++    pub(crate) fn parse_character_literal(&self, window: &[u8]) -> Option<usize> {
++        if !self.is_plain_mode() {
++            return None;
++        }
++        let (start, end) = self
++            .shared
++            .character_literals
++            .iter()
++            .find(|(s, _)| window.starts_with(s.as_bytes()))?;
++        let body = &window[start.len()..];
++        let close = end.as_bytes();
++        let len = match *body.first()? {
++            b'\\' => {
++                2 + body.get(2..)?
++                    .iter()
++                    .take_while(|b| **b != b'\n')
++                    .position(|b| *b == close[0])?
++            }
++            lead if lead < 0x80 => 1,
++            lead if lead >= 0xf0 => 4,
++            lead if lead >= 0xe0 => 3,
++            _ => 2,
++        };
++        body.get(len..)?
++            .starts_with(close)
++            .then_some(start.len() + len + close.len())
++    }
++
+     #[inline]
+     pub(crate) fn parse_end_of_quote(&mut self, window: &[u8]) -> Option<usize> {
+         #[allow(clippy::if_same_then_else)]
