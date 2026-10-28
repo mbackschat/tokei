@@ -262,6 +262,8 @@ impl LanguageType {
             {% for key, value in languages -%}
                 {%- set starting_quotes = value.quotes | default(value=[]) | map(attribute="0") -%}
                 {%- set starting_doc_quotes = value.doc_quotes | default(value=[]) | map(attribute="0") -%}
+                {#- A line that only opens a verbatim quote, such as a Go backtick, must not skip analysis. -#}
+                {%- set starting_verbatim_quotes = value.verbatim_quotes | default(value=[]) | map(attribute="0") -%}
                 {%- set starting_multi_line_comments = value.multi_line_comments | default(value=[]) | map(attribute="0") -%}
                 {%- set starting_nested_comments = value.nested_comments | default(value=[]) | map(attribute="0") -%}
                 {%- set important_syntax = value.important_syntax | default(value=[]) -%}
@@ -269,6 +271,7 @@ impl LanguageType {
                 {{key}} => &[
                     {%- for item in starting_quotes |
                                    concat(with=starting_doc_quotes) |
+                                   concat(with=starting_verbatim_quotes) |
                                    concat(with=starting_multi_line_comments) |
                                    concat(with=starting_nested_comments) |
                                    concat(with=important_syntax) -%}
