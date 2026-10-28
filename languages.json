@@ -209,6 +209,7 @@
       "extensions": ["brs"]
     },
     "C": {
+      "character_literals": [["'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""]],
@@ -1618,6 +1619,7 @@
       "extensions": ["rhtml", "erb"]
     },
     "Rust": {
+      "character_literals": [["'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "nested": true,

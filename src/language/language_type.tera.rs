@@ -152,6 +152,26 @@ impl LanguageType {
         }
     }
 
+    /// Returns the character literals of a language, as opening and closing
+    /// delimiters. An empty closing delimiter marks a literal that is the
+    /// opener followed by exactly one character, such as Lisp's `#\a`.
+    /// ```
+    /// use tokei::LanguageType;
+    /// let lang = LanguageType::C;
+    /// assert_eq!(lang.character_literals(), &[("'", "'")]);
+    /// ```
+    pub fn character_literals(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[
+                    {%- for items in value.character_literals | default(value=[]) -%}
+                        ({% for item in items %}"{{item}}",{% endfor %}),
+                    {%- endfor -%}
+                ],
+            {% endfor %}
+        }
+    }
+
     /// Returns the verbatim quotes of a language.
     /// ```
     /// use tokei::LanguageType;

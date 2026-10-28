@@ -79,6 +79,7 @@ pub(crate) struct SharedMatchers {
     pub multi_line_comments: &'static [(&'static str, &'static str)],
     pub nested_comments: &'static [(&'static str, &'static str)],
     pub string_literals: &'static [(&'static str, &'static str)],
+    pub character_literals: &'static [(&'static str, &'static str)],
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
 }
 
@@ -117,6 +118,7 @@ impl SharedMatchers {
             any_multi_line_comments: language.any_multi_line_comments(),
             nested_comments: language.nested_comments(),
             string_literals: language.quotes(),
+            character_literals: language.character_literals(),
             verbatim_string_literals: language.verbatim_quotes(),
         }
     }
@@ -255,6 +257,11 @@ impl SyntaxCounter {
                 skip!(skip_amount);
                 continue;
             } else if self.quote.is_some() {
+                continue;
+            }
+
+            if let Some(skip_amount) = self.parse_character_literal(window) {
+                skip!(skip_amount);
                 continue;
             }
 
@@ -598,6 +605,46 @@ impl SyntaxCounter {
         }
 
         None
+    }
+
+    /// Length of the character literal starting `window`: an escape running to
+    /// the closing delimiter on the same line, or exactly one character. Any
+    /// other opener, such as a Rust lifetime `'a`, is not a literal and stays
+    /// code, so a literal can never carry string state to the next line.
+    pub(crate) fn parse_character_literal(&self, window: &[u8]) -> Option<usize> {
+        if !self.is_plain_mode() {
+            return None;
+        }
+        let (start, end) = self
+            .shared
+            .character_literals
+            .iter()
+            .find(|(s, _)| window.starts_with(s.as_bytes()))?;
+        let body = &window[start.len()..];
+        let width = match *body.first()? {
+            lead if lead < 0x80 => 1,
+            lead if lead >= 0xf0 => 4,
+            lead if lead >= 0xe0 => 3,
+            _ => 2,
+        };
+        let close = end.as_bytes();
+        let Some(&first_close) = close.first() else {
+            // A literal without a closing delimiter, such as Lisp's `#\"`,
+            // holds exactly one character.
+            return Some(start.len() + width);
+        };
+        let len = if body[0] == b'\\' {
+            2 + body
+                .get(2..)?
+                .iter()
+                .take_while(|b| **b != b'\n')
+                .position(|b| *b == first_close)?
+        } else {
+            width
+        };
+        body.get(len..)?
+            .starts_with(close)
+            .then_some(start.len() + len + close.len())
     }
 
     #[inline]
