@@ -3,3 +3,7 @@ out/
 node_modules/
 .lake/
 leanlines/src/
+csharp/out/
+csharp/obj/
+csharp/bin/
+go/judge-linux
