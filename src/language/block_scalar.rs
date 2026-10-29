@@ -98,5 +98,5 @@ fn min_content_indent(before: &[u8]) -> Option<usize> {
 /// scalars in it (YAML 1.2.2 §9.1.4).
 pub(crate) fn is_document_marker(line: &[u8]) -> bool {
     (line.starts_with(b"---") || line.starts_with(b"..."))
-        && line.get(3).is_none_or(u8::is_ascii_whitespace)
+        && line.get(3).map_or(true, u8::is_ascii_whitespace)
 }

@@ -18,6 +18,7 @@ impl AsciiExt for u8 {
 pub(crate) trait SliceExt {
     fn trim_first_and_last_line_of_whitespace(&self) -> &Self;
     fn trim_start(&self) -> &Self;
+    fn trim_end(&self) -> &Self;
     fn trim(&self) -> &Self;
     fn contains_slice(&self, needle: &Self) -> bool;
 }
@@ -64,6 +65,13 @@ impl SliceExt for [u8] {
         };
 
         &self[start..]
+    }
+
+    fn trim_end(&self) -> &Self {
+        match self.iter().rposition(|c| !c.is_whitespace()) {
+            Some(end) => &self[..=end],
+            None => &[],
+        }
     }
 
     fn trim(&self) -> &Self {
@@ -117,6 +125,13 @@ mod tests {
         assert!(b' '.is_whitespace());
         assert!(b'\r'.is_whitespace());
         assert!(b'\n'.is_whitespace());
+    }
+
+    #[test]
+    fn trim_end() {
+        assert!(b" \r\n".trim_end().is_empty());
+        assert!([].trim_end().is_empty());
+        assert_eq!(b" hi", b" hi \n".trim_end());
     }
 
     #[test]

@@ -85,7 +85,7 @@ fn last_node(line: &[u8]) -> Option<Node> {
             return None;
         }
         match mapping_indicator(rest) {
-            Some(colon) if colon + 1 >= rest.trim_ascii_end().len() => return None,
+            Some(colon) if colon + 1 >= rest.trim_end().len() => return None,
             Some(colon) => {
                 let key_column = line.len() - rest.len();
                 node = Node::Value {
@@ -99,7 +99,7 @@ fn last_node(line: &[u8]) -> Option<Node> {
                 column = line.len() - rest.len()
                     + value
                     + rest[value..].iter().take_while(|b| **b == b' ').count();
-                if column >= line.trim_ascii_end().len() {
+                if column >= line.trim_end().len() {
                     return None;
                 }
             }
@@ -111,8 +111,8 @@ fn last_node(line: &[u8]) -> Option<Node> {
 /// The position of the `:` that ends an implicit key in `text`, one followed
 /// by a space or the end of the line.
 fn mapping_indicator(text: &[u8]) -> Option<usize> {
-    let text = text.trim_ascii_end();
-    (0..text.len()).find(|&i| text[i] == b':' && text.get(i + 1).is_none_or(|b| *b == b' '))
+    let text = text.trim_end();
+    (0..text.len()).find(|&i| text[i] == b':' && text.get(i + 1).map_or(true, |b| *b == b' '))
 }
 
 /// `text` after its anchor and tag properties, such as `&a !tag `.

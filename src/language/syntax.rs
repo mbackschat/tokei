@@ -367,7 +367,7 @@ impl SyntaxCounter {
             .shared
             .end_markers
             .iter()
-            .any(|m| line.trim_ascii_end() == m.as_bytes())
+            .any(|m| line.trim_end() == m.as_bytes())
         {
             trace!("Data section after {:?}", String::from_utf8_lossy(line));
             self.in_data_section = true;
@@ -610,24 +610,6 @@ impl SyntaxCounter {
         AnalysisReport::Normal(ended_with_comments)
     }
 
-    /// Performs a set of heuristics to determine whether a line is a comment or
-    /// not. The procedure is as follows.
-    ///
-    /// - Yes/No: Counted as Comment
-    ///
-    /// 1. Check if we're in string mode
-    ///  1. Check if string literal is a doc string and whether tokei has
-    ///     been configured to treat them as comments.
-    ///     - Yes: When the line starts with the doc string or when we are
-    ///            continuing from a previous line.
-    ///  - No: The string is a normal string literal or tokei isn't
-    ///        configured to count them as comments.
-    /// 2. If we're not in string mode, check if we left it this on this line.
-    ///    - Yes: When we found a doc quote and we started in comments.
-    /// 3. Yes: When the whole line is a comment e.g. `/* hello */`
-    /// 4. Yes: When the previous line started a multi-line comment.
-    /// 5. Yes: When the line starts with a comment.
-    /// 6. No: Any other input.
     /// Whether `text`, read from a position outside any comment or literal,
     /// holds nothing but comments: block comments, each closed before the
     /// next begins, optionally followed by a line comment or by a block
@@ -662,6 +644,24 @@ impl SyntaxCounter {
         }
     }
 
+    /// Performs a set of heuristics to determine whether a line is a comment or
+    /// not. The procedure is as follows.
+    ///
+    /// - Yes/No: Counted as Comment
+    ///
+    /// 1. Check if we're in string mode
+    ///  1. Check if string literal is a doc string and whether tokei has
+    ///     been configured to treat them as comments.
+    ///     - Yes: When the line starts with the doc string or when we are
+    ///            continuing from a previous line.
+    ///  - No: The string is a normal string literal or tokei isn't
+    ///        configured to count them as comments.
+    /// 2. If we're not in string mode, check if we left it this on this line.
+    ///    - Yes: When we found a doc quote and we started in comments.
+    /// 3. Yes: When the whole line is a comment e.g. `/* hello */`
+    /// 4. Yes: When the previous line started a multi-line comment.
+    /// 5. Yes: When the line starts with a comment.
+    /// 6. No: Any other input.
     pub(crate) fn line_is_comment(
         &self,
         line: &[u8],

@@ -6,6 +6,7 @@
 //! a backslash escapes either. The literal may span lines.
 
 use super::regex_literal::RegexContext;
+use crate::utils::ext::SliceExt;
 
 /// Which family of chosen-delimiter literals a language has.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,7 +54,7 @@ fn perl_operator(lines: &[u8], i: usize) -> Option<(usize, usize)> {
         .is_some_and(|b| is_word_byte(*b) || matches!(b, b'$' | b'@' | b'%' | b'&' | b'*' | b'-'))
         || before.ends_with(b"->")
         || before.ends_with(b"::")
-        || before.trim_ascii_end().ends_with(b"sub")
+        || before.trim_end().ends_with(b"sub")
     {
         return None;
     }
