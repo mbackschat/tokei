@@ -108,6 +108,13 @@ fn walk(root: Node, bytes: &[u8], out: &mut Vec<Region>) {
             while end > node.start_byte() && matches!(bytes[end - 1], b'\n' | b'\r') {
                 end -= 1;
             }
+            // POD without `=cut` runs to the end of the file (perlpod), past
+            // the blank lines that tree-sitter leaves outside the node.
+            if kind == "pod" && !bytes[node.start_byte()..end].trim_ascii_end().ends_with(b"=cut")
+                && bytes[end..].iter().all(u8::is_ascii_whitespace)
+            {
+                end = bytes.len();
+            }
             out.push(Region { start: node.start_byte(), end, class: Class::Comment });
         } else if is_literal(kind) {
             out.push(Region { start: literal_start(node, bytes), end: literal_end(node, bytes), class: Class::Literal });
