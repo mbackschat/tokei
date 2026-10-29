@@ -444,6 +444,7 @@ impl SyntaxCounter {
         } else if !self.holes.is_empty()
             || !self.jsx.is_empty()
             || self.in_tag
+            || self.flow_depth > 0
             || self.shared.important_syntax.is_match(line)
         {
             false
