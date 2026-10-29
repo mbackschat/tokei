@@ -1817,7 +1817,7 @@
       "extensions": ["svg"]
     },
     "Swift": {
-      "raw_strings": [{"repeat": "#", "min_repeat": 1, "open": "\\\"\\\"\\\"", "close": "\\\"\\\"\\\"", "escape": "\\\\"}, {"repeat": "#", "min_repeat": 1, "open": "\\\"", "close": "\\\"", "escape": "\\\\"}],
+      "raw_strings": [{"repeat": "#", "min_repeat": 1, "open": "\\\"", "close": "\\\"", "escape": "\\\\", "single_line": true}, {"repeat": "#", "min_repeat": 1, "open": "\\\"\\\"\\\"", "close": "\\\"\\\"\\\"", "escape": "\\\\"}],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["\\\"", "\\\""]],

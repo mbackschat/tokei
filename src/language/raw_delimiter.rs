@@ -24,6 +24,10 @@ pub(crate) struct RawDelimiter {
     /// Text that, followed by the middle and one character, escapes that
     /// character, as `\#"` does in Swift's `#"…"#`; empty without escapes.
     pub(crate) escape: &'static str,
+    /// Whether the literal must close on its opening line, so that an opener
+    /// without a closer there is left to the next delimiter; Swift reads
+    /// `#"""#` as a one-line string holding `"` this way.
+    pub(crate) single_line: bool,
 }
 
 /// An opener found at the start of a window.
@@ -55,9 +59,20 @@ impl RawDelimiter {
             return None;
         }
         let middle = std::str::from_utf8(middle).ok()?;
+        let len = self.start.len() + middle.len() + self.open.len();
+        let closer = [self.close, middle, self.end].concat();
+        if self.single_line {
+            let line = window[len..]
+                .split(|b| *b == b'\n')
+                .next()
+                .unwrap_or_default();
+            if !line.windows(closer.len()).any(|w| w == closer.as_bytes()) {
+                return None;
+            }
+        }
         Some(RawOpening {
-            len: self.start.len() + middle.len() + self.open.len(),
-            closer: [self.close, middle, self.end].concat(),
+            len,
+            closer,
             escape: (!self.escape.is_empty()).then(|| [self.escape, middle].concat()),
         })
     }

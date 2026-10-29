@@ -11,6 +11,7 @@
             close: "{{ raw.close }}",
             end: "{{ raw.end | default(value="") }}",
             escape: "{{ raw.escape | default(value="") }}",
+            single_line: {{ raw.single_line | default(value=false) }},
         },
     {%- endfor -%}
 {%- endmacro raw_delimiters %}
