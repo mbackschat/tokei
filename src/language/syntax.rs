@@ -488,6 +488,39 @@ impl SyntaxCounter {
     /// 4. Yes: When the previous line started a multi-line comment.
     /// 5. Yes: When the line starts with a comment.
     /// 6. No: Any other input.
+    /// Whether `text`, read from a position outside any comment or literal,
+    /// holds nothing but comments: block comments, each closed before the
+    /// next begins, optionally followed by a line comment or by a block
+    /// comment left open, as in `/* a */ // b`.
+    fn holds_only_comments(&self, mut text: &[u8]) -> bool {
+        loop {
+            text = text.trim_start();
+            if text.is_empty()
+                || self
+                    .shared
+                    .line_comments
+                    .iter()
+                    .any(|c| text.starts_with(c.as_bytes()))
+            {
+                return true;
+            }
+            let Some(&(start, end)) = self
+                .shared
+                .any_multi_line_comments
+                .iter()
+                .find(|(start, _)| text.starts_with(start.as_bytes()))
+            else {
+                return false;
+            };
+            let nests =
+                self.shared.allows_nested || self.shared.nested_comments.contains(&(start, end));
+            match block_comment_len(text, start, end, nests) {
+                Some(len) => text = &text[len..],
+                None => return true,
+            }
+        }
+    }
+
     pub(crate) fn line_is_comment(
         &self,
         line: &[u8],
@@ -508,17 +541,12 @@ impl SyntaxCounter {
             !opens_with_code
                 && (self
                     .shared
-                    .line_comments
+                    .any_multi_line_comments
                     .iter()
-                    .any(|c| trimmed.starts_with(c.as_bytes()))
-                    || self
-                        .shared
-                        .any_multi_line_comments
-                        .iter()
-                        .any(|(start, end)| {
-                            trimmed.starts_with(start.as_bytes())
-                                && trimmed.ends_with(end.as_bytes())
-                        }))
+                    .any(|(start, end)| {
+                        trimmed.starts_with(start.as_bytes()) && trimmed.ends_with(end.as_bytes())
+                    })
+                    || self.holds_only_comments(trimmed))
         };
         let starts_with_comment = || {
             let quote = match self.stack.last() {
@@ -1244,4 +1272,27 @@ fn starts_tag(window: &[u8]) -> bool {
         && window
             .get(1)
             .is_some_and(|b| b.is_ascii_alphabetic() || b"/!?".contains(b))
+}
+
+/// The length of the block comment that opens at the start of `text`, up to
+/// and including its closer, or `None` when it does not close in `text`.
+fn block_comment_len(text: &[u8], start: &str, end: &str, nests: bool) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut i = 0;
+    while i < text.len() {
+        let rest = &text[i..];
+        if rest.starts_with(start.as_bytes()) && (depth == 0 || nests) {
+            depth += 1;
+            i += start.len();
+        } else if rest.starts_with(end.as_bytes()) {
+            depth -= 1;
+            i += end.len();
+            if depth == 0 {
+                return Some(i);
+            }
+        } else {
+            i += 1;
+        }
+    }
+    None
 }
