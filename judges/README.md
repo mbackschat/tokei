@@ -1,6 +1,6 @@
 # Language Judges
 
-Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbackschat/locmetry/blob/main/docs/plans/tokei-fork.md): each judge reads files with the language's own lexer or parser, and `judgecmp` compares its verdicts with the fork's [`LanguageType::line_classes`](../src/language/language_type.rs) line by line. A line is a comment when it holds nothing but comments; a line of whitespace takes the class of the comment or literal it lies in, code for a literal, and is blank otherwise; every other line is code. A file the judge rejects is lexically invalid and listed rather than matched. Locmetry's [step 6 record](https://github.com/mbackschat/locmetry/blob/main/docs/research/tokei-fork-step-6.md) holds the measured repositories and results.
+Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbackschat/locmetry/blob/main/docs/plans/tokei-fork.md): each judge reads files with the language's own lexer or parser, and `judgecmp` compares its verdicts with the fork's [`LanguageType::line_classes`](../src/language/language_type.rs) line by line. A line is a comment when it holds nothing but comments; a line of whitespace takes the class of the comment or literal its own bytes lie in, code for a literal, and is blank otherwise; every other line is code. A file the judge rejects is lexically invalid and listed rather than matched. Locmetry's [step 6 record](https://github.com/mbackschat/locmetry/blob/main/docs/research/tokei-fork-step-6.md) holds the measured repositories and results.
 
 | Language | Judge | Run |
 | --- | --- | --- |
@@ -11,6 +11,7 @@ Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbacksch
 | C, C++, Objective-C, Objective-C++ | clang's raw lexer, `clang -cc1 -dump-raw-tokens` (measured with Apple clang 21.0.0); headers lex as C++ | `… \| python3 c/judge.py \| judgecmp stream auto` |
 | Go | the standard library's `go/scanner` (measured with Go 1.25.14) | build with `go build -o judge-linux judge.go` in `go/`, as in the `golang:1.25` image, then `… \| go/judge-linux \| judgecmp stream Go` |
 | C# | Roslyn's parser, `Microsoft.CodeAnalysis.CSharp` 5.9.0; text in inactive `#if` regions parsed on its own | `dotnet build -c Release -o out` in `csharp/`, then `… \| dotnet csharp/out/Judge.dll \| judgecmp stream auto` |
+| Ruby | Prism, `Prism.lex`, Ruby 3.4's default parser (measured with 3.4.12) | `… \| ruby ruby/judge.rb \| judgecmp stream Ruby`, as in the `ruby:3.4` image |
 | Python | CPython's `tokenize` (measured with 3.14) | `… \| python3 python/judge.py \| judgecmp stream Python` |
 | Lean | Lean 4.31.0's own lexer functions | see below |
 

@@ -70,12 +70,10 @@ static void Collect(SyntaxNode root, int offset, List<string> comments, List<str
                 comments.Add($"[{offset + trivia.Span.Start},{offset + trivia.Span.End}]");
                 break;
             // A documentation comment's span leaves out its `///` or `/**`,
-            // the leading trivia of its first token, and takes in the line
-            // break after it, which ends it as it ends a line comment.
+            // the leading trivia of its first token.
             case SyntaxKind.SingleLineDocumentationCommentTrivia:
             case SyntaxKind.MultiLineDocumentationCommentTrivia:
-                var end = trivia.FullSpan.Start + trivia.ToFullString().TrimEnd('\r', '\n').Length;
-                comments.Add($"[{offset + trivia.FullSpan.Start},{offset + end}]");
+                comments.Add($"[{offset + trivia.FullSpan.Start},{offset + trivia.FullSpan.End}]");
                 break;
         }
     }

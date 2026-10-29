@@ -146,9 +146,12 @@ fn line_classes(text: &str, classes: &[u8], whitespace: fn(char) -> bool) -> Vec
         out.push(match (text_seen, only_comments) {
             (true, true) => LineClass::Comment,
             (true, false) => LineClass::Code,
-            (false, _) => match start.checked_sub(1).map(|n| classes[n]) {
-                Some(COMMENT) => LineClass::Comment,
-                Some(LITERAL) => LineClass::Code,
+            // A line of whitespace takes the class of the comment or literal
+            // its own bytes lie in, so a heredoc body's first line is code
+            // and the line after a line comment is blank.
+            (false, _) => match &classes[start..start + line.len()] {
+                bytes if bytes.contains(&COMMENT) => LineClass::Comment,
+                bytes if bytes.contains(&LITERAL) => LineClass::Code,
                 _ => LineClass::Blank,
             },
         });
