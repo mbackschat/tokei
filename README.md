@@ -32,7 +32,7 @@ Engine changes, each with a regression file in `tests/data`:
 | A backslash in a string also escapes the string's own closer and verbatim-quote openers, and closing a verbatim string ends its verbatim mode. | `aaa4c32` | Not offered yet |
 | `quotes_in_tags`: quotes open strings only inside markup tags, so an apostrophe in text is text. | `5dd4fd7` | Not offered yet |
 | `quotes_after`: a quote opens a string only at the start of the line or after one of the listed texts, where a trailing space stands for any whitespace. | `d0f5219` | Not offered yet |
-| `block_scalars`: the lines after a `\|` or `>` indicator that are indented deeper than its node, and at least as deep as the first of them, are text, without the trailing blank lines that the default chomping strips. | `d0f5219`, see below | Not offered yet |
+| `block_scalars`: the lines after a `\|` or `>` indicator that are indented deeper than its node, and at least as deep as the first of them, are text, without the trailing blank lines that the default chomping strips. | `d0f5219`, `b6cf65a` | Not offered yet |
 | `jsx`: JSX elements, whose text between tags is text, whose attribute strings have no escapes and whose `{…}` braces hold code; an element starts only where an expression may and when a closing tag or `/>` follows, so type parameters such as `<T,>` stay code. | `356c845` | Not offered yet |
 
 Declarations in `languages.json`, each grounded in the cited specification or reference lexer:
