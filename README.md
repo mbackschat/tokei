@@ -36,7 +36,7 @@ Engine changes, each with a regression file in `tests/data`:
 | `jsx`: JSX elements, whose text between tags is text, whose attribute strings have no escapes and whose `{…}` braces hold code; an element starts only where an expression may and when a closing tag or `/>` follows, so type parameters such as `<T,>` stay code. | `356c845` | Not offered yet |
 | Rust doc comments are comments: the Markdown re-parse of `///` and `//!` blocks, which dropped their edge lines and counted empty `///` lines as blank, is removed. | `5994462` | Not offered yet |
 | A line holding only comments, such as `/* a */ // b`, is a comment line. | `5399062` | Not offered yet |
-| An embedded script or style counts only the lines between its tags; `type` and `lang` values are read up to their closing quote; tag names match case-insensitively and an end tag's name ends at whitespace, `/` or `>`. | `418dd12`, `44f2a48` | Not offered yet |
+| An embedded script or style counts only the lines between its tags; `type` and `lang` values are read up to their closing quote; tag names match case-insensitively, a `>` inside a quoted attribute value does not end a start tag, and an end tag's name ends at whitespace, `/` or `>`. | `418dd12`, `44f2a48`, `2220fce` | Not offered yet |
 | `line_start_comments`: comment markers that open a comment only at the start of a line. | `de1ab9e` | Not offered yet |
 | YAML-style `block_scalars` languages also read plain scalars that continue on later lines as text, open quotes after `[`, `{` and `,` only inside flow collections, and take no simple-parse prefix. | `a1a1886` | Not offered yet |
 | `quotes_in_tags`: a tag that continues on later lines keeps its quoted attribute values. | `d2b0180` | Not offered yet |
