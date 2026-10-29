@@ -6,6 +6,7 @@ use grep_searcher::LineStep;
 use log::Level::Trace;
 use once_cell::sync::Lazy;
 
+use super::block_scalar::block_scalar_end;
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
     END_TEMPLATE,
@@ -39,8 +40,9 @@ pub(crate) struct SyntaxCounter {
     pub(crate) quote_opener: &'static str,
     /// Strings suspended while the code of their holes is read, innermost last.
     pub(crate) holes: Vec<OpenHole>,
-    /// The end of the last here-document body; lines before it are literal.
-    pub(crate) heredoc_end: usize,
+    /// The end of the last heredoc or block scalar body; lines before it are
+    /// literal.
+    pub(crate) literal_end: usize,
     /// Whether a markup tag is open, in which quotes open strings.
     pub(crate) in_tag: bool,
     pub(crate) quote_is_doc_quote: bool,
@@ -108,6 +110,9 @@ pub(crate) struct SharedMatchers {
     pub line_comments_start_words: bool,
     pub regex_after_line_break: bool,
     pub quotes_in_tags: bool,
+    pub word_delimiters: &'static [u8],
+    pub quotes_after: Option<&'static [&'static str]>,
+    pub block_scalars: bool,
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
@@ -167,6 +172,10 @@ impl SharedMatchers {
         for heredoc in language.heredocs() {
             opener_bytes[usize::from(heredoc.start.as_bytes()[0])] = true;
         }
+        if language.block_scalars() {
+            opener_bytes[usize::from(b'|')] = true;
+            opener_bytes[usize::from(b'>')] = true;
+        }
         if language.quotes_in_tags() {
             opener_bytes[usize::from(b'<')] = true;
             opener_bytes[usize::from(b'>')] = true;
@@ -186,6 +195,13 @@ impl SharedMatchers {
             .map(|text| (*text).to_owned())
             .chain(raw().flat_map(RawDelimiter::important_syntax))
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
+            .chain(
+                language
+                    .block_scalars()
+                    .then(|| ["|".to_owned(), ">".to_owned()])
+                    .into_iter()
+                    .flatten(),
+            )
             .collect();
 
         Self {
@@ -213,6 +229,9 @@ impl SharedMatchers {
             line_comments_start_words: language.line_comments_start_words(),
             regex_after_line_break: language.regex_after_line_break(),
             quotes_in_tags: language.quotes_in_tags(),
+            word_delimiters: language.word_delimiters().as_bytes(),
+            quotes_after: language.quotes_after(),
+            block_scalars: language.block_scalars(),
             opener_bytes,
             hole_bytes,
         }
@@ -239,7 +258,7 @@ impl SyntaxCounter {
             quote_escape: None,
             quote_opener: "",
             holes: Vec::new(),
-            heredoc_end: 0,
+            literal_end: 0,
             in_tag: false,
         }
     }
@@ -270,7 +289,7 @@ impl SyntaxCounter {
         let window = &lines[i..];
         if self.quote.is_some()
             || !self.stack.is_empty()
-            || (self.shared.line_comments_start_words && !starts_word(&lines[..i]))
+            || (self.shared.line_comments_start_words && !self.starts_word(lines, i))
         {
             false
         } else if let Some(comment) = self
@@ -393,6 +412,10 @@ impl SyntaxCounter {
                     skip!(skip_amount);
                     continue;
                 }
+
+                if self.parse_block_scalar(lines, i) {
+                    continue;
+                }
             }
 
             if let Some(child) = self.parse_context(lines, i, end, config, &regex_cache) {
@@ -416,8 +439,10 @@ impl SyntaxCounter {
                 continue;
             }
 
-            let is_quote_or_multi_line = self
-                .parse_quote(window)
+            let may_quote = self.may_open_quote(lines, i);
+            let is_quote_or_multi_line = may_quote
+                .then(|| self.parse_quote(window))
+                .flatten()
                 .or_else(|| self.parse_multi_line_comment(window));
 
             if let Some(skip_amount) = is_quote_or_multi_line {
@@ -977,11 +1002,60 @@ impl SyntaxCounter {
         self.shared.heredocs.iter().find_map(|heredoc| {
             let opening = heredoc.parse_opener(&lines[i..])?;
             let next_line = i + lines[i..].iter().position(|b| *b == b'\n')? + 1;
-            let from = next_line.max(self.heredoc_end);
-            self.heredoc_end = heredoc.closing_line_end(&opening, lines, from)?;
-            trace!("Start heredoc, body ends at {}", self.heredoc_end);
+            let from = next_line.max(self.literal_end);
+            self.literal_end = heredoc.closing_line_end(&opening, lines, from)?;
+            trace!("Start heredoc, body ends at {}", self.literal_end);
             Some(opening.len)
         })
+    }
+
+    /// Marks the content of the block scalar whose indicator is at
+    /// `lines[i]` as literal.
+    fn parse_block_scalar(&mut self, lines: &[u8], i: usize) -> bool {
+        if !self.shared.block_scalars || !self.is_plain_mode() {
+            return false;
+        }
+        let Some(end) = block_scalar_end(lines, i) else {
+            return false;
+        };
+        trace!("Start block scalar, content ends at {}", end);
+        self.literal_end = self.literal_end.max(end);
+        true
+    }
+
+    /// Whether a quote at `lines[i]` can open a string.
+    fn may_open_quote(&self, lines: &[u8], i: usize) -> bool {
+        let Some(after) = self.shared.quotes_after else {
+            return true;
+        };
+        let line_start = lines[..i]
+            .iter()
+            .rposition(|b| *b == b'\n')
+            .map_or(0, |n| n + 1);
+        let before = &lines[line_start..i];
+        let spaces = before
+            .iter()
+            .rev()
+            .take_while(|b| matches!(b, b' ' | b'\t'))
+            .count();
+        let code = &before[..before.len() - spaces];
+        let spaced = spaces > 0;
+        code.is_empty()
+            || after.iter().any(|text| match text.strip_suffix(' ') {
+                Some(indicator) => spaced && code.ends_with(indicator.as_bytes()),
+                None => code.ends_with(text.as_bytes()),
+            })
+    }
+
+    /// Whether a word can start at `lines[i]`: at the start of the text, or
+    /// after whitespace or one of the language's word delimiters, such as a
+    /// shell operator character (POSIX.1-2024, Shell Command Language §2.3,
+    /// rules 6, 8 and 9).
+    fn starts_word(&self, lines: &[u8], i: usize) -> bool {
+        match lines[..i].last() {
+            None => true,
+            Some(b) => b.is_ascii_whitespace() || self.shared.word_delimiters.contains(b),
+        }
     }
 
     fn parse_regex_literal(&self, lines: &[u8], i: usize) -> Option<usize> {
@@ -1065,16 +1139,6 @@ impl SyntaxCounter {
         } else {
             None
         }
-    }
-}
-
-/// Whether a word can start after `before`: at the start of the text, after
-/// whitespace or after a shell operator character (POSIX.1-2024, Shell Command
-/// Language §2.3, rules 6, 8 and 9).
-fn starts_word(before: &[u8]) -> bool {
-    match before.last() {
-        None => true,
-        Some(b) => b.is_ascii_whitespace() || b";&|()<>".contains(b),
     }
 }
 

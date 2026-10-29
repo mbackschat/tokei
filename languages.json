@@ -157,6 +157,7 @@
       "extensions": ["bal"]
     },
     "Bash": {
+      "word_delimiters": ";&|()<>",
       "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
@@ -1026,6 +1027,7 @@
       "extensions": ["kt", "kts"]
     },
     "Ksh": {
+      "word_delimiters": ";&|()<>",
       "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
@@ -1720,6 +1722,7 @@
       "filenames": ["sconstruct", "sconscript"]
     },
     "Sh": {
+      "word_delimiters": ";&|()<>",
       "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
@@ -2160,9 +2163,14 @@
       "extensions": ["xtend"]
     },
     "Yaml": {
+      "doubled_quote_escapes": ["'"],
+      "verbatim_quotes": [["'", "'"]],
+      "quotes_after": ["[", "{", ",", ": ", "- ", "? "],
+      "block_scalars": true,
+      "line_comment_starts_word": true,
       "name": "YAML",
       "line_comment": ["#"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes": [["\\\"", "\\\""]],
       "extensions": ["yaml", "yml"]
     },
     "ZenCode": {
@@ -2184,6 +2192,7 @@
       "extensions": ["zok"]
     },
     "Zsh": {
+      "word_delimiters": ";&|()<>",
       "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],

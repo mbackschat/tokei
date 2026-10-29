@@ -1,3 +1,4 @@
+mod block_scalar;
 mod embedding;
 mod heredoc;
 mod interpolation;

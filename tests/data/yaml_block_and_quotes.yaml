@@ -1,0 +1,22 @@
+# 22 lines 14 code 7 comments 1 blanks
+run: |
+  # not a comment
+  echo "it's"
+
+steps:
+  - name: Don't panic
+    # comment
+    run: >-
+      echo 'a' # still text
+  - url: http://example.com/#anchor
+# comment
+flow: [a, 'b', "c"]
+key: 'it''s'
+# comment
+last: x
+cmd: echo "a" ' b
+# comment
+path: 'C:\'
+# comment
+note: echo ::endgroup::'
+# comment

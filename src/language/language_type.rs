@@ -143,7 +143,7 @@ impl LanguageType {
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
 
         while let Some((start, end)) = stepper.next(lines) {
-            if start < syntax.heredoc_end {
+            if start < syntax.literal_end {
                 stats.code += 1;
                 continue;
             }

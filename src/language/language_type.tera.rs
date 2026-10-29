@@ -286,6 +286,38 @@ impl LanguageType {
         }
     }
 
+    /// Returns the characters besides whitespace after which a word can
+    /// start, for languages whose comments or quotes must start a word.
+    pub(crate) fn word_delimiters(self) -> &'static str {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => "{{ value.word_delimiters | default(value="") }}",
+            {% endfor %}
+        }
+    }
+
+    /// Returns the texts after which a quote can open a string, for
+    /// languages where a quote opens one only at the start of a value, as in
+    /// YAML, where a quote inside a plain scalar is text. A text ending in a
+    /// space needs whitespace before the quote; a quote at the start of a line
+    /// always can open a string.
+    pub(crate) fn quotes_after(self) -> Option<&'static [&'static str]> {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.quotes_after is defined %}Some(&[{% for text in value.quotes_after %}"{{ text }}",{% endfor %}]){% else %}None{% endif %},
+            {% endfor %}
+        }
+    }
+
+    /// Returns whether the language has YAML block scalars, such as `run: |`.
+    pub(crate) fn block_scalars(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.block_scalars | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether quotes open strings only inside markup tags, such as
     /// HTML's `<p class='a'>`, so that an apostrophe in text is text.
     pub(crate) fn quotes_in_tags(self) -> bool {
