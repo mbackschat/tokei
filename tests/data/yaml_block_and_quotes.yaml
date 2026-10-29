@@ -1,4 +1,4 @@
-# 22 lines 14 code 7 comments 1 blanks
+# 26 lines 16 code 9 comments 1 blanks
 run: |
   # not a comment
   echo "it's"
@@ -19,4 +19,8 @@ cmd: echo "a" ' b
 path: 'C:\'
 # comment
 note: echo ::endgroup::'
+# comment
+deep: |
+    it's text
+  # comment, indented less than the text
 # comment

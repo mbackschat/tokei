@@ -1,6 +1,7 @@
 //! YAML block scalars, such as `run: |`, whose content is every following
-//! line indented deeper than the node that holds the scalar (YAML 1.2.2
-//! §8.1). The content is text, so a `#` or a quote in it is not syntax.
+//! line indented at least as deep as its first line, which is deeper than the
+//! node that holds the scalar (YAML 1.2.2 §8.1). The content is text, so a
+//! `#` or a quote in it is not syntax.
 
 use crate::utils::ext::SliceExt;
 
@@ -27,6 +28,7 @@ pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
     if !(rest.is_empty() || (rest.starts_with(b"#") && header[indicators].is_ascii_whitespace())) {
         return None;
     }
+    let mut content_indent = None;
     let mut content_end = None;
     let mut start = line_end + 1;
     while start < lines.len() {
@@ -37,7 +39,11 @@ pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
         let line = &lines[start..end];
         let indent = line.iter().take_while(|b| **b == b' ').count();
         if !line.trim().is_empty() {
-            if indent <= parent_indent {
+            // The first content line sets the indentation of the rest
+            // (YAML 1.2.2 §8.1.1.1), so a less indented line, such as a
+            // comment, ends the scalar.
+            let content_indent = *content_indent.get_or_insert(indent);
+            if indent <= parent_indent || indent < content_indent {
                 break;
             }
             content_end = Some((end + 1).min(lines.len()));
