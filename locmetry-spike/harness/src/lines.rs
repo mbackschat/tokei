@@ -29,14 +29,15 @@ pub enum Line {
     Blank,
 }
 
+/// Classes per byte, painting regions in order so that a region emitted after
+/// an enclosing one wins: the code of an interpolation hole inside a literal,
+/// and the strings and comments inside that hole.
 pub fn paint(len: usize, regions: &[Region]) -> Vec<Class> {
     let mut class = vec![Class::Code; len];
-    for wanted in [Class::Literal, Class::Comment] {
-        for region in regions.iter().filter(|r| r.class == wanted) {
-            let end = region.end.min(len);
-            if region.start < end {
-                class[region.start..end].fill(wanted);
-            }
+    for region in regions {
+        let end = region.end.min(len);
+        if region.start < end {
+            class[region.start..end].fill(region.class);
         }
     }
     class
