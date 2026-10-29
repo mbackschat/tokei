@@ -142,6 +142,10 @@ pub(crate) struct SharedMatchers {
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
+    /// The bytes that can follow each opener byte, so an opener byte such
+    /// as Python's `f` is matched only before a byte some opener continues
+    /// with.
+    pub opener_pairs: OpenerPairs,
     /// Bytes that can begin a blank symbol, so the analysis loop looks for
     /// one only there; looking for Rust's five at every byte cost Tokio
     /// `6470b5e` about 50M of 550M instructions (measured 2026-10-29).
@@ -149,9 +153,18 @@ pub(crate) struct SharedMatchers {
     /// Bytes that can begin a hole, a text that only looks like one or an
     /// escape, so strings skip the hole check at every other position.
     pub hole_bytes: [bool; 256],
+    /// Bytes that begin an interpolating quote, so a string opened by any
+    /// other byte skips the search of the interpolations, which for Python's
+    /// 80 f-string and t-string kinds ran at every escape in a plain string.
+    pub interpolating_quote_bytes: [bool; 256],
     /// Bytes that change nothing outside literals, comments, holes and JSX:
     /// no opener, hole, escape or JSX tag starts at them.
     pub inert_bytes: [bool; 256],
+    /// Bytes that change nothing unless an opener starts at them, so an
+    /// opener byte is inert where no opener pair starts; otherwise each `f`,
+    /// `r` and `t` in Python code would take the full check for its string
+    /// prefixes.
+    pub pair_inert_bytes: [bool; 256],
 }
 
 impl SharedMatchers {
@@ -166,6 +179,23 @@ impl SharedMatchers {
     }
 
     pub fn init(language: LanguageType) -> Self {
+        // A line holding a pattern that contains another holds the other too, on
+        // the same line, so the longer one cannot change which lines are
+        // important; dropping it keeps prefix letters such as Python's `f` in
+        // `f"` out of the search's start bytes.
+        fn without_superstrings(patterns: Vec<String>) -> Vec<String> {
+            patterns
+                .iter()
+                .filter(|long| {
+                    long.contains('\n')
+                        || !patterns
+                            .iter()
+                            .any(|short| short.len() < long.len() && long.contains(short.as_str()))
+                })
+                .cloned()
+                .collect()
+        }
+
         fn init_corasick<P: AsRef<[u8]>>(pattern: &[P]) -> AhoCorasick {
             AhoCorasick::builder()
                 .match_kind(aho_corasick::MatchKind::LeftmostLongest)
@@ -178,6 +208,7 @@ impl SharedMatchers {
 
         let starts = |pairs: &'static [(&'static str, &'static str)]| pairs.iter().map(|(s, _)| *s);
         let mut opener_bytes = [false; 256];
+        let mut opener_pairs = OpenerPairs::default();
         for opener in language
             .line_comments()
             .iter()
@@ -191,48 +222,73 @@ impl SharedMatchers {
             .chain(starts(language.character_literals()))
             .chain(language.code_tokens().iter().copied())
         {
-            match opener.as_bytes().first() {
-                Some(&b) => opener_bytes[usize::from(b)] = true,
-                None => opener_bytes = [true; 256],
+            match *opener.as_bytes() {
+                [] => {
+                    opener_bytes = [true; 256];
+                    opener_pairs = OpenerPairs::any();
+                }
+                [first] => {
+                    opener_bytes[usize::from(first)] = true;
+                    opener_pairs.allow_any(first);
+                }
+                [first, second, ..] => {
+                    opener_bytes[usize::from(first)] = true;
+                    opener_pairs.allow(first, second);
+                }
             }
         }
         let raw = || language.raw_strings().iter().chain(language.raw_comments());
         for b in raw().flat_map(RawDelimiter::first_bytes) {
             opener_bytes[usize::from(b)] = true;
+            opener_pairs.allow_any(b);
         }
         if language.regex_keywords().is_some() {
             opener_bytes[usize::from(b'/')] = true;
+            opener_pairs.allow_any(b'/');
         }
         for heredoc in language.heredocs() {
             opener_bytes[usize::from(heredoc.start.as_bytes()[0])] = true;
+            opener_pairs.allow_any(heredoc.start.as_bytes()[0]);
         }
         if language.block_scalars() {
             opener_bytes[usize::from(b'|')] = true;
+            opener_pairs.allow_any(b'|');
             opener_bytes[usize::from(b'>')] = true;
+            opener_pairs.allow_any(b'>');
         }
         match language.quote_like() {
             Some(QuoteLikeSyntax::Perl) => {
                 for b in *b"qmsty" {
                     opener_bytes[usize::from(b)] = true;
+                    opener_pairs.allow_any(b);
                 }
             }
-            Some(QuoteLikeSyntax::RubyPercent) => opener_bytes[usize::from(b'%')] = true,
+            Some(QuoteLikeSyntax::RubyPercent) => {
+                opener_bytes[usize::from(b'%')] = true;
+                opener_pairs.allow_any(b'%');
+            }
             None => {}
         }
         if language.quotes_after().is_some() {
             for b in *b"[]{}" {
                 opener_bytes[usize::from(b)] = true;
+                opener_pairs.allow_any(b);
             }
         }
         if language.quotes_in_tags() {
             opener_bytes[usize::from(b'<')] = true;
+            opener_pairs.allow_any(b'<');
             opener_bytes[usize::from(b'>')] = true;
+            opener_pairs.allow_any(b'>');
         }
         for (open, _) in language.template_expressions() {
             opener_bytes[usize::from(open.as_bytes()[0])] = true;
+            opener_pairs.allow_any(open.as_bytes()[0]);
         }
         let mut hole_bytes = [false; 256];
+        let mut interpolating_quote_bytes = [false; 256];
         for kind in language.interpolations() {
+            interpolating_quote_bytes[usize::from(kind.quote.as_bytes()[0])] = true;
             for text in kind.literal.iter().chain([&kind.open]) {
                 if let Some(&b) = text.as_bytes().first() {
                     hole_bytes[usize::from(b)] = true;
@@ -240,10 +296,11 @@ impl SharedMatchers {
             }
             hole_bytes[usize::from(b'\\')] = true;
         }
-        let inert_bytes = std::array::from_fn(|i| {
+        let pair_inert_bytes: [bool; 256] = std::array::from_fn(|i| {
             let b = i as u8;
-            !opener_bytes[i] && !hole_bytes[i] && b != b'\\' && !(language.jsx() && b == b'<')
+            !hole_bytes[i] && b != b'\\' && !(language.jsx() && b == b'<')
         });
+        let inert_bytes = std::array::from_fn(|i| pair_inert_bytes[i] && !opener_bytes[i]);
         let important_syntax: Vec<String> = language
             .important_syntax()
             .iter()
@@ -263,6 +320,7 @@ impl SharedMatchers {
             )
             .chain(language.end_markers().iter().map(|m| (*m).to_owned()))
             .collect();
+        let important_syntax = without_superstrings(important_syntax);
 
         Self {
             language,
@@ -304,6 +362,7 @@ impl SharedMatchers {
             block_scalars: language.block_scalars(),
             jsx: language.jsx(),
             opener_bytes,
+            opener_pairs,
             blank_symbol_bytes: std::array::from_fn(|byte| {
                 debug_assert!(language
                     .blank_symbols()
@@ -315,8 +374,41 @@ impl SharedMatchers {
                     .any(|symbol| symbol.as_bytes()[0] == byte as u8)
             }),
             hole_bytes,
+            interpolating_quote_bytes,
             inert_bytes,
+            pair_inert_bytes,
         }
+    }
+}
+
+/// For each first byte of an opener, the second bytes it can continue with,
+/// 256 bits each. An opener byte whose openers are not all texts of two or
+/// more bytes, such as a one-byte quote or a raw-string start, allows any,
+/// so Python's 80 prefixed quotes are tried only where one can start.
+#[derive(Clone, Debug)]
+pub struct OpenerPairs(Box<[[u64; 4]; 256]>);
+
+impl Default for OpenerPairs {
+    fn default() -> Self {
+        Self(Box::new([[0; 4]; 256]))
+    }
+}
+
+impl OpenerPairs {
+    fn any() -> Self {
+        Self(Box::new([[u64::MAX; 4]; 256]))
+    }
+
+    fn allow(&mut self, first: u8, second: u8) {
+        self.0[usize::from(first)][usize::from(second >> 6)] |= 1 << (second & 63);
+    }
+
+    fn allow_any(&mut self, first: u8) {
+        self.0[usize::from(first)] = [u64::MAX; 4];
+    }
+
+    fn allows(&self, first: u8, second: u8) -> bool {
+        self.0[usize::from(first)][usize::from(second >> 6)] & (1 << (second & 63)) != 0
     }
 }
 
@@ -458,7 +550,8 @@ impl SyntaxCounter {
     /// languages. Passing over them cut the instructions for RuboCop
     /// `28b550d` from 1,585M to 1,361M, and for Symfony `5c0e37bf` from
     /// 18,019M to 14,893M (measured 2026-10-29).
-    fn passes_over(&self, byte: u8, embeds: bool) -> bool {
+    fn passes_over(&self, window: &[u8], embeds: bool) -> bool {
+        let byte = window[0];
         if byte == b'\\' || !self.stack.is_empty() {
             return false;
         }
@@ -471,7 +564,11 @@ impl SyntaxCounter {
             }
             None => {
                 !embeds
-                    && self.shared.inert_bytes[usize::from(byte)]
+                    && (self.shared.inert_bytes[usize::from(byte)]
+                        || self.shared.pair_inert_bytes[usize::from(byte)]
+                            && window
+                                .get(1)
+                                .is_some_and(|&next| !self.shared.opener_pairs.allows(byte, next)))
                     && self.quote_escape.is_none()
                     && self.holes.is_empty()
                     && self.jsx.is_empty()
@@ -628,7 +725,7 @@ impl SyntaxCounter {
             pending = Some((window[0], !self.stack.is_empty()));
 
             ended_with_comments = false;
-            if self.passes_over(window[0], embeds) {
+            if self.passes_over(window, embeds) {
                 continue;
             }
             let is_end_of_quote_or_multi_line = self
@@ -653,7 +750,10 @@ impl SyntaxCounter {
                 continue;
             }
 
-            let may_open = self.shared.opener_bytes[usize::from(window[0])];
+            let may_open = self.shared.opener_bytes[usize::from(window[0])]
+                && window.get(1).map_or(true, |&next| {
+                    self.shared.opener_pairs.allows(window[0], next)
+                });
             if may_open {
                 if let Some(token) = self.code_token(window) {
                     skip!(token.len());
@@ -1046,7 +1146,7 @@ impl SyntaxCounter {
             .shared
             .doc_quotes
             .iter()
-            .find(|(s, _)| window.starts_with(s.as_bytes()))
+            .find(|(s, _)| opens_with(window, s))
         {
             trace!("Start Doc {:?}", start);
             self.quote = Some(Cow::Borrowed(end));
@@ -1060,7 +1160,7 @@ impl SyntaxCounter {
             .shared
             .verbatim_string_literals
             .iter()
-            .find(|(s, _)| window.starts_with(s.as_bytes()))
+            .find(|(s, _)| opens_with(window, s))
         {
             trace!("Start verbatim {:?}", start);
             self.quote = Some(Cow::Borrowed(end));
@@ -1074,7 +1174,7 @@ impl SyntaxCounter {
             .shared
             .string_literals
             .iter()
-            .find(|(s, _)| window.starts_with(s.as_bytes()))
+            .find(|(s, _)| opens_with(window, s))
         {
             trace!("Start {:?}", start);
             self.quote = Some(Cow::Borrowed(end));
@@ -1112,7 +1212,7 @@ impl SyntaxCounter {
             .shared
             .character_literals
             .iter()
-            .find(|(s, _)| window.starts_with(s.as_bytes()))?;
+            .find(|(s, _)| opens_with(window, s))?;
         let body = &window[start.len()..];
         let width = match *body.first()? {
             lead if lead < 0x80 => 1,
@@ -1187,7 +1287,7 @@ impl SyntaxCounter {
                 .string_literals
                 .iter()
                 .chain(self.shared.verbatim_string_literals)
-                .any(|(start, _)| window[1..].starts_with(start.as_bytes()))
+                .any(|(start, _)| opens_with(&window[1..], start))
                 || self
                     .quote
                     .as_deref()
@@ -1213,10 +1313,12 @@ impl SyntaxCounter {
     /// Inside an interpolating string, skips text that only looks like a hole
     /// or is escaped, or suspends the string at the start of a hole.
     fn parse_start_of_hole(&mut self, window: &[u8]) -> Option<usize> {
-        if !self.shared.hole_bytes[usize::from(*window.first()?)] {
+        let opener = self.quote_opener;
+        if !self.shared.hole_bytes[usize::from(*window.first()?)]
+            || !self.shared.interpolating_quote_bytes[usize::from(*opener.as_bytes().first()?)]
+        {
             return None;
         }
-        let opener = self.quote_opener;
         let mut kinds = self
             .shared
             .interpolations
@@ -1596,6 +1698,16 @@ impl SyntaxCounter {
             None
         }
     }
+}
+
+/// Whether `window` starts with `text`, comparing the first byte before the
+/// rest, as most of Python's 82 quote openers are compared at every quote
+/// and escaped byte without sharing it.
+fn opens_with(window: &[u8], text: &str) -> bool {
+    text.as_bytes()
+        .first()
+        .map_or(true, |first| window.first() == Some(first))
+        && window.starts_with(text.as_bytes())
 }
 
 /// Whether `window` starts a markup tag: `<` followed by a name, `/`, `!` or
