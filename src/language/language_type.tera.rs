@@ -276,6 +276,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns the family of literals whose delimiters the program chooses,
+    /// such as Perl's `qw(…)` or Ruby's `%w[…]`.
+    pub(crate) fn quote_like(self) -> Option<crate::language::quote_like::QuoteLikeSyntax> {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% else %}None{% endif %},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether a line beginning with `=` and a word starts a Perl POD
     /// block (perlpod).
     pub(crate) fn pod(self) -> bool {

@@ -7,6 +7,7 @@ pub mod language_type;
 pub mod languages;
 mod plain_scalar;
 mod pod;
+mod quote_like;
 mod raw_delimiter;
 mod regex_literal;
 mod syntax;

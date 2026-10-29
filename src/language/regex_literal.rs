@@ -22,7 +22,11 @@ pub(crate) struct RegexContext<'a> {
 /// follows on the same line.
 pub(crate) fn regex_literal_len(lines: &[u8], i: usize, context: &RegexContext) -> Option<usize> {
     let window = &lines[i..];
-    if !window.starts_with(b"/") || matches!(window.get(1), Some(b'/' | b'*') | None) {
+    // The second `/` of `//`, Perl's defined-or operator, starts nothing.
+    if !window.starts_with(b"/")
+        || matches!(window.get(1), Some(b'/' | b'*') | None)
+        || lines[..i].last() == Some(&b'/')
+    {
         return None;
     }
     if !context.expression_may_start(lines, i) {

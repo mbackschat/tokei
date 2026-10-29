@@ -1385,6 +1385,8 @@
     "Perl": {
       "heredocs": [{"start": "<<", "indent_flags": "~", "spacing": "quoted_only", "word": "identifier", "closer": "line"}],
       "pod": true,
+      "quote_like": "perl",
+      "regex_literals": {"after_keywords": ["and", "grep", "if", "map", "not", "or", "return", "split", "unless", "until", "when", "while"]},
       "end_markers": ["__END__", "__DATA__"],
       "shebangs": ["#!/usr/bin/perl"],
       "line_comment": ["#"],
@@ -1669,6 +1671,7 @@
       "regex_literals": {"after_line_break": true, "after_keywords": ["and", "begin", "case", "do", "else", "elsif", "ensure", "if", "in", "not", "or", "rescue", "return", "then", "unless", "until", "when", "while", "yield"]},
       "interpolations": [{"quote": "\\\"", "open": "#{", "close": "}", "nest": "{"}],
       "end_markers": ["__END__"],
+      "quote_like": "ruby_percent",
       "line_comment": ["#"],
       "multi_line_comments": [["=begin", "=end"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],

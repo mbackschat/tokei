@@ -188,6 +188,12 @@ impl LanguageType {
                         LineClass::Blank => stats.blanks += 1,
                     }
                     trace!("{:?} No.{} as a whole line", class, stats.lines());
+                    // A literal that closes inside this line leaves the rest
+                    // of it to be read.
+                    if (start + 1..end).contains(&syntax.literal_end) {
+                        let rest = syntax.literal_end;
+                        syntax.perform_multi_line_analysis(lines, rest, end, config);
+                    }
                     break 'line;
                 }
                 let line = &lines[start..end];

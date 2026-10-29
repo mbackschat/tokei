@@ -15,6 +15,7 @@ use super::interpolation::{Interpolation, OpenHole};
 use super::jsx::{element_starts, is_name_byte, JsxFrame};
 use super::plain_scalar::plain_scalar_end;
 use super::pod::pod_block_end;
+use super::quote_like::{quote_like_len, QuoteLikeSyntax};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{regex_literal_len, RegexContext};
 use crate::LanguageType::LinguaFranca;
@@ -103,6 +104,7 @@ pub(crate) struct SharedMatchers {
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
     pub pod: bool,
+    pub quote_like: Option<QuoteLikeSyntax>,
     pub end_markers: &'static [&'static str],
     pub any_multi_line_comments: &'static [(&'static str, &'static str)],
     pub multi_line_comments: &'static [(&'static str, &'static str)],
@@ -190,6 +192,15 @@ impl SharedMatchers {
             opener_bytes[usize::from(b'|')] = true;
             opener_bytes[usize::from(b'>')] = true;
         }
+        match language.quote_like() {
+            Some(QuoteLikeSyntax::Perl) => {
+                for b in *b"qmsty" {
+                    opener_bytes[usize::from(b)] = true;
+                }
+            }
+            Some(QuoteLikeSyntax::RubyPercent) => opener_bytes[usize::from(b'%')] = true,
+            None => {}
+        }
         if language.quotes_after().is_some() {
             for b in *b"[]{}" {
                 opener_bytes[usize::from(b)] = true;
@@ -216,6 +227,15 @@ impl SharedMatchers {
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
             .chain(language.pod().then(|| "=".to_owned()))
+            .chain(
+                match language.quote_like() {
+                    Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
+                    Some(QuoteLikeSyntax::RubyPercent) => vec!["%"],
+                    None => vec![],
+                }
+                .into_iter()
+                .map(str::to_owned),
+            )
             .chain(language.end_markers().iter().map(|m| (*m).to_owned()))
             .chain(
                 language
@@ -237,6 +257,7 @@ impl SharedMatchers {
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
             pod: language.pod(),
+            quote_like: language.quote_like(),
             end_markers: language.end_markers(),
             multi_line_comments: language.multi_line_comments(),
             any_multi_line_comments: language.any_multi_line_comments(),
@@ -507,6 +528,16 @@ impl SyntaxCounter {
 
                 if let Some(skip_amount) = self.parse_regex_literal(lines, i) {
                     skip!(skip_amount);
+                    continue;
+                }
+
+                if let Some(len) = self.parse_quote_like(lines, i) {
+                    if lines[i..i + len].contains(&b'\n') {
+                        trace!("Start quote-like literal, ends at {}", i + len);
+                        self.literal_end = i + len;
+                        break;
+                    }
+                    skip!(len);
                     continue;
                 }
 
@@ -1182,6 +1213,16 @@ impl SyntaxCounter {
             return None;
         }
         regex_literal_len(lines, i, &self.expression_context()?)
+    }
+
+    /// Length of the literal with chosen delimiters at `lines[i]`, such as
+    /// Perl's `qw(…)` or Ruby's `%w[…]`, in plain mode.
+    fn parse_quote_like(&self, lines: &[u8], i: usize) -> Option<usize> {
+        if !self.is_plain_mode() {
+            return None;
+        }
+        let syntax = self.shared.quote_like?;
+        quote_like_len(lines, i, syntax, self.expression_context().as_ref())
     }
 
     /// The syntax that tells where an expression may start, for languages
