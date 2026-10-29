@@ -23,7 +23,7 @@ Engine changes, each with a regression file in `tests/data`:
 | `code_tokens` (named `comment_exceptions` before 15.0.0+locmetry.3): code tokens that start like a comment or string, also exempt from the line-start comment rule. | `a23b225` | Not offered yet |
 | A line that starts inside a literal is code, even when its text starts with a comment marker. | `801aae6` | Not offered yet |
 | `doubled_quote_escapes`: closing delimiters of verbatim quotes that stand for themselves when written twice. | `b773e13` | Not offered yet |
-| Opener matching runs only at bytes that can start a token, keeping the analysis at upstream speed. | `f8a9a6d` | Not offered yet |
+| Opener matching runs only at bytes that can start a token, and bytes in strings and code that can change nothing are passed over, keeping the analysis faster than upstream. | `f8a9a6d`, `3296611` | Not offered yet |
 | `raw_strings` and `raw_comments`: literals and comments whose closer repeats the delimiter count or label of their opener, optionally with an escape and restricted to one line. | `1926802`, `39610e6` | Not offered yet |
 | `interpolations`: holes in strings whose contents are code and can hold strings, comments and further holes; text that only looks like a hole, such as C#'s `{{`, stays in the string. | `e778ec0`, `d77916d`, `9c039dc` | Not offered yet |
 | `regex_literals`: `/…/` literals, told from division by the previous token or keyword, looking past comments and whitespace, or by a line break where it ends a statement. | `e778ec0`, `d77916d`, `9c039dc`, `785d277` | Not offered yet |
