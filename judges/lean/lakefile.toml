@@ -1,0 +1,7 @@
+name = "leanref"
+defaultTargets = ["leanref"]
+
+[[lean_exe]]
+name = "leanref"
+root = "Main"
+supportInterpreter = true

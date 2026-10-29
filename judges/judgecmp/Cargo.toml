@@ -1,0 +1,12 @@
+[package]
+name = "judgecmp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ra-ap-rustc_lexer = "0.179.0"
+rayon = "1.12.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tokei = { version = "15.0.0", path = "../..", default-features = false }
+walkdir = "2.5.0"
