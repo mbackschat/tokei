@@ -113,6 +113,7 @@ pub(crate) struct SharedMatchers {
     pub string_literals: &'static [(&'static str, &'static str)],
     pub character_literals: &'static [(&'static str, &'static str)],
     pub code_tokens: &'static [&'static str],
+    pub blank_symbols: &'static [&'static str],
     pub doubled_quote_escapes: &'static [&'static str],
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
     pub raw_strings: &'static [RawDelimiter],
@@ -271,6 +272,7 @@ impl SharedMatchers {
             string_literals: language.quotes(),
             character_literals: language.character_literals(),
             code_tokens: language.code_tokens(),
+            blank_symbols: language.blank_symbols(),
             doubled_quote_escapes: language.doubled_quote_escapes(),
             verbatim_string_literals: language.verbatim_quotes(),
             raw_strings: language.raw_strings(),
@@ -654,7 +656,7 @@ impl SyntaxCounter {
     /// comment left open, as in `/* a */ // b`.
     fn holds_only_comments(&self, mut text: &[u8]) -> bool {
         loop {
-            text = text.trim_start();
+            text = self.trim_blank_start(text);
             if text.is_empty()
                 || self
                     .shared
@@ -678,6 +680,22 @@ impl SyntaxCounter {
             match block_comment_len(text, start, end, nests) {
                 Some(len) => text = &text[len..],
                 None => return true,
+            }
+        }
+    }
+
+    /// `text` after its leading whitespace and blank symbols.
+    fn trim_blank_start<'a>(&self, mut text: &'a [u8]) -> &'a [u8] {
+        loop {
+            text = text.trim_start();
+            match self
+                .shared
+                .blank_symbols
+                .iter()
+                .find(|symbol| text.starts_with(symbol.as_bytes()))
+            {
+                Some(symbol) => text = &text[symbol.len()..],
+                None => return text,
             }
         }
     }

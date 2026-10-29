@@ -404,6 +404,21 @@ impl LanguageType {
         }
     }
 
+    /// Returns the symbols that read as blank, as `。` and `、` do in the
+    /// WenYan tokenizer's `IGNORE_SYMBOLS` (src/parser.ts at
+    /// wenyan-lang/wenyan `97f0a4b`).
+    pub(crate) fn blank_symbols(self) -> &'static [&'static str] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[
+                    {%- for item in value.blank_symbols | default(value=[]) -%}
+                        "{{item}}",
+                    {%- endfor -%}
+                ],
+            {% endfor %}
+        }
+    }
+
     /// Returns the tokens of a language that start like a comment or a string
     /// but are code, such as PHP's `#[` attributes, F#'s `(*)` operator or
     /// Ruby's `$'` global.
