@@ -10,7 +10,9 @@ use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
     END_TEMPLATE,
 };
+use super::interpolation::{Interpolation, OpenHole};
 use super::raw_delimiter::RawDelimiter;
+use super::regex_literal::regex_literal_len;
 use crate::LanguageType::LinguaFranca;
 use crate::{stats::CodeStats, utils::ext::SliceExt, Config, LanguageType};
 
@@ -32,6 +34,10 @@ pub(crate) struct SyntaxCounter {
     pub(crate) quote: Option<Cow<'static, str>>,
     /// The escape of the current raw literal, such as Swift's `\#` in `#"…"#`.
     pub(crate) quote_escape: Option<String>,
+    /// The opener of the current literal, which selects its interpolations.
+    pub(crate) quote_opener: &'static str,
+    /// Strings suspended while the code of their holes is read, innermost last.
+    pub(crate) holes: Vec<OpenHole>,
     pub(crate) quote_is_doc_quote: bool,
     pub(crate) stack: Vec<Cow<'static, str>>,
     pub(crate) quote_is_verbatim: bool,
@@ -89,6 +95,10 @@ pub(crate) struct SharedMatchers {
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
     pub raw_strings: &'static [RawDelimiter],
     pub raw_comments: &'static [RawDelimiter],
+    pub interpolations: &'static [Interpolation],
+    /// Keywords after which `/` starts a regular expression, for languages
+    /// that have regular expression literals.
+    pub regex_keywords: Option<&'static [&'static str]>,
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
@@ -139,6 +149,9 @@ impl SharedMatchers {
         for b in raw().flat_map(RawDelimiter::first_bytes) {
             opener_bytes[usize::from(b)] = true;
         }
+        if language.regex_keywords().is_some() {
+            opener_bytes[usize::from(b'/')] = true;
+        }
         let important_syntax: Vec<String> = language
             .important_syntax()
             .iter()
@@ -165,6 +178,8 @@ impl SharedMatchers {
             verbatim_string_literals: language.verbatim_quotes(),
             raw_strings: language.raw_strings(),
             raw_comments: language.raw_comments(),
+            interpolations: language.interpolations(),
+            regex_keywords: language.regex_keywords(),
             opener_bytes,
         }
     }
@@ -188,6 +203,8 @@ impl SyntaxCounter {
             lf_embedded_language: None,
             quote: None,
             quote_escape: None,
+            quote_opener: "",
+            holes: Vec::new(),
         }
     }
 
@@ -236,7 +253,7 @@ impl SyntaxCounter {
         line: &[u8],
         stats: &mut crate::stats::CodeStats,
     ) -> bool {
-        if !self.is_plain_mode() {
+        if !self.is_plain_mode() || !self.holes.is_empty() {
             false
         } else if line.trim().is_empty() {
             stats.blanks += 1;
@@ -307,6 +324,11 @@ impl SyntaxCounter {
                 continue;
             }
 
+            if let Some(skip_amount) = self.parse_end_of_hole(window) {
+                skip!(skip_amount);
+                continue;
+            }
+
             let may_open = self.shared.opener_bytes[usize::from(window[0])];
             if may_open {
                 if let Some(exception) = self.comment_exception(window) {
@@ -315,6 +337,11 @@ impl SyntaxCounter {
                 }
 
                 if let Some(skip_amount) = self.parse_character_literal(window) {
+                    skip!(skip_amount);
+                    continue;
+                }
+
+                if let Some(skip_amount) = self.parse_regex_literal(lines, i) {
                     skip!(skip_amount);
                     continue;
                 }
@@ -641,15 +668,16 @@ impl SyntaxCounter {
             return None;
         }
 
-        if let Some(opening) = self
+        if let Some((raw, opening)) = self
             .shared
             .raw_strings
             .iter()
-            .find_map(|raw| raw.parse_opener(window))
+            .find_map(|raw| raw.parse_opener(window).map(|opening| (raw, opening)))
         {
             trace!("Start raw, closed by {:?}", opening.closer);
             self.quote = Some(Cow::Owned(opening.closer));
             self.quote_escape = opening.escape;
+            self.quote_opener = raw.start;
             self.quote_is_verbatim = true;
             self.quote_is_doc_quote = false;
             return Some(opening.len);
@@ -663,6 +691,7 @@ impl SyntaxCounter {
         {
             trace!("Start Doc {:?}", start);
             self.quote = Some(Cow::Borrowed(end));
+            self.quote_opener = start;
             self.quote_is_verbatim = false;
             self.quote_is_doc_quote = true;
             return Some(start.len());
@@ -676,6 +705,7 @@ impl SyntaxCounter {
         {
             trace!("Start verbatim {:?}", start);
             self.quote = Some(Cow::Borrowed(end));
+            self.quote_opener = start;
             self.quote_is_verbatim = true;
             self.quote_is_doc_quote = false;
             return Some(start.len());
@@ -689,6 +719,7 @@ impl SyntaxCounter {
         {
             trace!("Start {:?}", start);
             self.quote = Some(Cow::Borrowed(end));
+            self.quote_opener = start;
             self.quote_is_verbatim = false;
             self.quote_is_doc_quote = false;
             return Some(start.len());
@@ -767,6 +798,7 @@ impl SyntaxCounter {
             trace!("End {:?}", quote);
             self.quote = None;
             self.quote_escape = None;
+            self.quote_opener = "";
             Some(len)
         } else if let Some(escape) = self
             .quote_escape
@@ -774,6 +806,8 @@ impl SyntaxCounter {
             .filter(|escape| window.starts_with(escape.as_bytes()))
         {
             Some(escape.len() + 1)
+        } else if let Some(skip_amount) = self.parse_start_of_hole(window) {
+            Some(skip_amount)
         } else if !self.quote_is_verbatim && window.starts_with(br"\\") {
             Some(2)
         } else if !self.quote_is_verbatim
@@ -790,6 +824,83 @@ impl SyntaxCounter {
         } else {
             None
         }
+    }
+
+    /// Inside an interpolating string, skips text that only looks like a hole
+    /// or is escaped, or suspends the string at the start of a hole.
+    fn parse_start_of_hole(&mut self, window: &[u8]) -> Option<usize> {
+        let opener = self.quote_opener;
+        let mut kinds = self
+            .shared
+            .interpolations
+            .iter()
+            .filter(|kind| kind.quote == opener)
+            .peekable();
+        kinds.peek()?;
+        let mut hole = None;
+        for kind in kinds {
+            if let Some(literal) = kind
+                .literal
+                .iter()
+                .find(|l| window.starts_with(l.as_bytes()))
+            {
+                return Some(literal.len());
+            }
+            if hole.is_none() && window.starts_with(kind.open.as_bytes()) {
+                hole = Some(kind);
+            }
+        }
+        let Some(kind) = hole else {
+            // An escaped character, such as the `$` of JavaScript's `\${`,
+            // cannot open a hole.
+            return (!self.quote_is_verbatim && window.starts_with(b"\\")).then_some(2);
+        };
+        trace!("Start hole {:?}", kind.open);
+        self.holes.push(OpenHole {
+            quote: self.quote.take(),
+            quote_opener: std::mem::take(&mut self.quote_opener),
+            quote_escape: self.quote_escape.take(),
+            quote_is_verbatim: self.quote_is_verbatim,
+            close: kind.close,
+            nest: kind.nest,
+            depth: 0,
+        });
+        self.quote_is_verbatim = false;
+        Some(kind.open.len())
+    }
+
+    /// Inside a hole, outside its strings and comments, tracks nested brackets
+    /// and resumes the suspended string at the hole's closer.
+    fn parse_end_of_hole(&mut self, window: &[u8]) -> Option<usize> {
+        if !self.stack.is_empty() {
+            return None;
+        }
+        let hole = self.holes.last_mut()?;
+        if hole.depth == 0 && window.starts_with(hole.close.as_bytes()) {
+            let hole = self.holes.pop()?;
+            trace!("End hole {:?}", hole.close);
+            self.quote = hole.quote;
+            self.quote_opener = hole.quote_opener;
+            self.quote_escape = hole.quote_escape;
+            self.quote_is_verbatim = hole.quote_is_verbatim;
+            return Some(hole.close.len());
+        }
+        if window[0] == hole.nest {
+            hole.depth += 1;
+        } else if Some(&window[0]) == hole.close.as_bytes().first() {
+            hole.depth = hole.depth.saturating_sub(1);
+        }
+        None
+    }
+
+    /// Length of the regular expression literal at `lines[i]`, in plain mode
+    /// for languages that have them.
+    fn parse_regex_literal(&self, lines: &[u8], i: usize) -> Option<usize> {
+        let keywords = self.shared.regex_keywords?;
+        if !self.is_plain_mode() {
+            return None;
+        }
+        regex_literal_len(lines, i, keywords)
     }
 
     #[inline]

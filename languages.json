@@ -377,14 +377,15 @@
       "extensions": ["cr"]
     },
     "CSharp": {
-      "raw_strings": [{"start": "\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\""}],
+      "interpolations": [{"quote": "$\\\"", "open": "{", "close": "}", "nest": "{", "literal": ["{{", "}}"]}, {"quote": "$@\\\"", "open": "{", "close": "}", "nest": "{", "literal": ["{{", "}}"]}, {"quote": "@$\\\"", "open": "{", "close": "}", "nest": "{", "literal": ["{{", "}}"]}, {"quote": "$\\\"\\\"\\\"", "open": "{", "close": "}", "nest": "{"}, {"quote": "$$\\\"\\\"\\\"", "open": "{{", "close": "}}", "nest": "{"}, {"quote": "$$$\\\"\\\"\\\"", "open": "{{{", "close": "}}}", "nest": "{"}],
+      "raw_strings": [{"start": "$$$\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\""}, {"start": "$$\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\""}, {"start": "$\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\""}, {"start": "\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\""}],
       "doubled_quote_escapes": ["\\\""],
       "character_literals": [["'", "'"]],
       "name": "C#",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
-      "quotes": [["\\\"", "\\\""]],
-      "verbatim_quotes": [["@\\\"", "\\\""]],
+      "quotes": [["$\\\"", "\\\""], ["\\\"", "\\\""]],
+      "verbatim_quotes": [["$@\\\"", "\\\""], ["@$\\\"", "\\\""], ["@\\\"", "\\\""]],
       "extensions": ["cs", "csx"]
     },
     "CShell": {
@@ -447,6 +448,8 @@
       "extensions": ["daml"]
     },
     "Dart": {
+      "interpolations": [{"quote": "\\\"", "open": "${", "close": "}", "nest": "{"}, {"quote": "'", "open": "${", "close": "}", "nest": "{"}, {"quote": "\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{"}, {"quote": "'''", "open": "${", "close": "}", "nest": "{"}],
+      "verbatim_quotes": [["r\\\"\\\"\\\"", "\\\"\\\"\\\""], ["r'''", "'''"], ["r\\\"", "\\\""], ["r'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [
@@ -894,6 +897,8 @@
       "extensions": ["java"]
     },
     "JavaScript": {
+      "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
+      "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"], ["`", "`"]],
@@ -948,6 +953,8 @@
       "extensions": ["jsonnet", "libsonnet"]
     },
     "Jsx": {
+      "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
+      "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
       "name": "JSX",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -1004,6 +1011,7 @@
       "extensions": ["kk"]
     },
     "Kotlin": {
+      "interpolations": [{"quote": "\\\"", "open": "${", "close": "}", "nest": "{"}, {"quote": "\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{"}],
       "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
       "character_literals": [["'", "'"]],
       "line_comment": ["//"],
@@ -1639,6 +1647,8 @@
       "extensions": ["spec"]
     },
     "Ruby": {
+      "regex_literals": {"after_keywords": ["and", "begin", "case", "do", "else", "elsif", "ensure", "if", "in", "not", "or", "rescue", "return", "then", "unless", "until", "when", "while", "yield"]},
+      "interpolations": [{"quote": "\\\"", "open": "#{", "close": "}", "nest": "{"}],
       "line_comment": ["#"],
       "multi_line_comments": [["=begin", "=end"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
@@ -1669,11 +1679,12 @@
       "extensions": ["sass", "scss"]
     },
     "Scala": {
-      "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
+      "interpolations": [{"quote": "s\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "f\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "raw\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "s\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "f\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "raw\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}],
+      "verbatim_quotes": [["s\\\"\\\"\\\"", "\\\"\\\"\\\""], ["f\\\"\\\"\\\"", "\\\"\\\"\\\""], ["raw\\\"\\\"\\\"", "\\\"\\\"\\\""], ["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
       "character_literals": [["'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
-      "quotes": [["\\\"", "\\\""]],
+      "quotes": [["s\\\"", "\\\""], ["f\\\"", "\\\""], ["raw\\\"", "\\\""], ["\\\"", "\\\""]],
       "extensions": ["sc", "scala"]
     },
     "Scheme": {
@@ -1817,6 +1828,7 @@
       "extensions": ["svg"]
     },
     "Swift": {
+      "interpolations": [{"quote": "\\\"", "open": "\\\\(", "close": ")", "nest": "("}, {"quote": "\\\"\\\"\\\"", "open": "\\\\(", "close": ")", "nest": "("}],
       "raw_strings": [{"repeat": "#", "min_repeat": 1, "open": "\\\"", "close": "\\\"", "escape": "\\\\", "single_line": true}, {"repeat": "#", "min_repeat": 1, "open": "\\\"\\\"\\\"", "close": "\\\"\\\"\\\"", "escape": "\\\\"}],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -1898,6 +1910,8 @@
       "extensions": ["toml"]
     },
     "Tsx": {
+      "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
+      "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
       "name": "TSX",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -1918,6 +1932,8 @@
       "multi_line_comments": [["<!--", "-->"], ["{#", "#}"]]
     },
     "TypeScript": {
+      "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
+      "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"], ["`", "`"]],

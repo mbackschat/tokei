@@ -208,6 +208,40 @@ impl LanguageType {
         }
     }
 
+    /// Returns the holes of a language's strings whose contents are code, such
+    /// as `${…}` in JavaScript template literals.
+    pub(crate) fn interpolations(self) -> &'static [crate::language::interpolation::Interpolation] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[
+                    {%- for hole in value.interpolations | default(value=[]) -%}
+                        crate::language::interpolation::Interpolation {
+                            quote: "{{ hole.quote }}",
+                            open: "{{ hole.open }}",
+                            close: "{{ hole.close }}",
+                            nest: b'{{ hole.nest }}',
+                            literal: &[{% for text in hole.literal | default(value=[]) %}"{{ text }}",{% endfor %}],
+                        },
+                    {%- endfor -%}
+                ],
+            {% endfor %}
+        }
+    }
+
+    /// Returns the keywords after which `/` starts a regular expression, or
+    /// `None` for a language without regular expression literals.
+    pub(crate) fn regex_keywords(self) -> Option<&'static [&'static str]> {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.regex_literals is defined -%}
+                    Some(&[{% for keyword in value.regex_literals.after_keywords | default(value=[]) %}"{{ keyword }}",{% endfor %}])
+                {%- else -%}
+                    None
+                {%- endif %},
+            {% endfor %}
+        }
+    }
+
     /// Returns the tokens of a language that start like a comment but are code,
     /// such as PHP's `#[` attributes or F#'s `(*)` operator.
     /// ```
@@ -251,7 +285,7 @@ impl LanguageType {
     /// ```
     /// use tokei::LanguageType;
     /// let lang = LanguageType::CSharp;
-    /// assert_eq!(lang.verbatim_quotes(), &[("@\"", "\"")]);
+    /// assert!(lang.verbatim_quotes().contains(&("@\"", "\"")));
     /// ```
     pub fn verbatim_quotes(self) -> &'static [(&'static str, &'static str)] {
         match self {
