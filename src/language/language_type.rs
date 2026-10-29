@@ -19,6 +19,7 @@ use grep_searcher::{LineIter, LineStep};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use serde::Serialize;
+use std::ops::Range;
 
 use self::LanguageType::*;
 
@@ -99,7 +100,8 @@ impl LanguageType {
                 "Using Simple Parse on {:?}",
                 String::from_utf8_lossy(skippable_text)
             );
-            let parse_lines = move || self.parse_lines(config, rest, CodeStats::new(), syntax);
+            let parse_lines =
+                move || self.parse_lines(config, rest, CodeStats::new(), syntax, 0..rest.len());
             let simple_parse = move || {
                 LineIter::new(b'\n', skippable_text)
                     .par_bridge()
@@ -128,10 +130,33 @@ impl LanguageType {
             stats.comments += comments;
             stats
         } else {
-            self.parse_lines(config, text, CodeStats::new(), syntax)
+            self.parse_lines(config, text, CodeStats::new(), syntax, 0..text.len())
         }
     }
 
+    /// Parses the text of an element embedded in markup, from the end of its
+    /// opening tag to the start of its closing tag. The host counts the lines
+    /// that hold the tags, so only the lines between them are counted here;
+    /// the rest of the opening tag's line is still read, so a comment or
+    /// string opened there carries on.
+    pub(crate) fn parse_embedded(self, text: &[u8], config: &Config) -> CodeStats {
+        let after_first = text
+            .iter()
+            .position(|b| *b == b'\n')
+            .map_or(text.len(), |n| n + 1);
+        let last_start = text.iter().rposition(|b| *b == b'\n').map_or(0, |n| n + 1);
+        let syntax = SyntaxCounter::new(self);
+        self.parse_lines(
+            config,
+            text,
+            CodeStats::new(),
+            syntax,
+            after_first..last_start,
+        )
+    }
+
+    /// Counts the lines of `lines` that start within `counted`; the others
+    /// are read only for the state they leave.
     #[inline]
     fn parse_lines(
         self,
@@ -139,82 +164,95 @@ impl LanguageType {
         lines: &[u8],
         mut stats: CodeStats,
         mut syntax: SyntaxCounter,
+        mut counted: Range<usize>,
     ) -> CodeStats {
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
 
         while let Some((start, end)) = stepper.next(lines) {
-            if start < syntax.literal_end {
-                stats.code += 1;
-                continue;
-            }
-            let line = &lines[start..end];
-            // FORTRAN has a rule where it only counts as a comment if it's the
-            // first character in the column, so removing starting whitespace
-            // could cause a miscount.
-            let line = if syntax.shared.is_fortran {
-                line
-            } else {
-                line.trim()
-            };
-            trace!("{}", String::from_utf8_lossy(line));
-
-            if syntax.try_perform_single_line_analysis(line, &mut stats) {
-                continue;
-            }
-
-            let started_in_literal = syntax.quote.is_some() || syntax.in_jsx_text();
-            let started_in_comments = !syntax.stack.is_empty()
-                || (config.treat_doc_strings_as_comments == Some(true)
-                    && syntax.quote.is_some()
-                    && syntax.quote_is_doc_quote);
-            let ended_with_comments =
-                match syntax.perform_multi_line_analysis(lines, start, end, config) {
-                    crate::language::syntax::AnalysisReport::Normal(end) => end,
-                    crate::language::syntax::AnalysisReport::ChildLanguage(FileContext {
-                        language,
-                        end,
-                        stats: blob,
-                    }) => {
-                        match language {
-                            LanguageContext::Markdown { balanced, language } => {
-                                // Add the lines for the code fences.
-                                stats.comments += if balanced { 2 } else { 1 };
-                                // Add the code inside the fence to the stats.
-                                *stats.blobs.entry(language).or_default() += blob;
-                            }
-                            LanguageContext::LinguaFranca => {
-                                let child_lang = syntax.get_lf_target_language();
-                                *stats.blobs.entry(child_lang).or_default() += blob;
-                            }
-                            LanguageContext::Html { language } => {
-                                stats.code += 1;
-                                // Add all the markdown blobs.
-                                *stats.blobs.entry(language).or_default() += blob;
-                            }
-                        }
-
-                        // Advance to after the language code and the delimiter..
-                        stepper = LineStep::new(b'\n', end, lines.len());
-                        continue;
-                    }
+            let before = (stats.code, stats.comments, stats.blanks);
+            let is_counted = counted.contains(&start);
+            'line: {
+                if start < syntax.literal_end {
+                    stats.code += 1;
+                    break 'line;
+                }
+                let line = &lines[start..end];
+                // FORTRAN has a rule where it only counts as a comment if it's the
+                // first character in the column, so removing starting whitespace
+                // could cause a miscount.
+                let line = if syntax.shared.is_fortran {
+                    line
+                } else {
+                    line.trim()
                 };
-            trace!("{}", String::from_utf8_lossy(line));
+                trace!("{}", String::from_utf8_lossy(line));
 
-            if syntax.shared.is_literate
-                || syntax.line_is_comment(
-                    line,
-                    config,
-                    ended_with_comments,
-                    started_in_comments,
-                    started_in_literal,
-                )
-            {
-                stats.comments += 1;
-                trace!("Comment No.{}", stats.comments);
-                trace!("Was the Comment stack empty?: {}", !started_in_comments);
-            } else {
-                stats.code += 1;
-                trace!("Code No.{}", stats.code);
+                if syntax.try_perform_single_line_analysis(line, &mut stats) {
+                    break 'line;
+                }
+
+                let started_in_literal = syntax.quote.is_some() || syntax.in_jsx_text();
+                let started_in_comments = !syntax.stack.is_empty()
+                    || (config.treat_doc_strings_as_comments == Some(true)
+                        && syntax.quote.is_some()
+                        && syntax.quote_is_doc_quote);
+                let ended_with_comments =
+                    match syntax.perform_multi_line_analysis(lines, start, end, config) {
+                        crate::language::syntax::AnalysisReport::Normal(end) => end,
+                        crate::language::syntax::AnalysisReport::ChildLanguage(FileContext {
+                            language,
+                            end,
+                            stats: blob,
+                        }) => {
+                            match language {
+                                LanguageContext::Markdown { balanced, language } => {
+                                    // Add the lines for the code fences.
+                                    stats.comments += if balanced { 2 } else { 1 };
+                                    // Add the code inside the fence to the stats.
+                                    *stats.blobs.entry(language).or_default() += blob;
+                                }
+                                LanguageContext::LinguaFranca => {
+                                    let child_lang = syntax.get_lf_target_language();
+                                    *stats.blobs.entry(child_lang).or_default() += blob;
+                                }
+                                LanguageContext::Html { language } => {
+                                    stats.code += 1;
+                                    *stats.blobs.entry(language).or_default() += blob;
+                                    // A closing tag on this line leaves the rest
+                                    // of it, already counted, to be read.
+                                    let opening_line_end = line_end(lines, start);
+                                    if end <= opening_line_end {
+                                        counted.start = counted.start.max(opening_line_end + 1);
+                                    }
+                                }
+                            }
+
+                            // Advance to after the language code and the delimiter..
+                            stepper = LineStep::new(b'\n', end, lines.len());
+                            break 'line;
+                        }
+                    };
+                trace!("{}", String::from_utf8_lossy(line));
+
+                if syntax.shared.is_literate
+                    || syntax.line_is_comment(
+                        line,
+                        config,
+                        ended_with_comments,
+                        started_in_comments,
+                        started_in_literal,
+                    )
+                {
+                    stats.comments += 1;
+                    trace!("Comment No.{}", stats.comments);
+                    trace!("Was the Comment stack empty?: {}", !started_in_comments);
+                } else {
+                    stats.code += 1;
+                    trace!("Code No.{}", stats.code);
+                }
+            }
+            if !is_counted {
+                (stats.code, stats.comments, stats.blanks) = before;
             }
         }
 
@@ -311,6 +349,15 @@ impl LanguageType {
             }
         })
     }
+}
+
+/// The position of the line break that ends the line holding `lines[at]`,
+/// or the end of `lines`.
+fn line_end(lines: &[u8], at: usize) -> usize {
+    lines[at..]
+        .iter()
+        .position(|b| *b == b'\n')
+        .map_or(lines.len(), |n| at + n)
 }
 
 #[cfg(test)]

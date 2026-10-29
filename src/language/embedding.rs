@@ -4,16 +4,22 @@ use crate::LanguageType;
 use once_cell::sync::Lazy;
 use regex::bytes::Regex;
 
-pub static START_SCRIPT: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"<script(?:.*type="(.*)")?.*?>"#).unwrap());
+// The attribute patterns stop at the first quote, space or `>`, so a later
+// attribute such as `id` does not become part of the type, and accept both
+// quote kinds (HTML §13.1.2.3).
+pub static START_SCRIPT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r#"<script\b(?:[^>\n]*?\btype\s*=\s*["']?([^"'\s>]*))?[^>\n]*>"#).unwrap()
+});
 pub static END_SCRIPT: Lazy<Regex> = Lazy::new(|| Regex::new(r#"</script>"#).unwrap());
 
-pub static START_STYLE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"<style(?:.*lang="(.*)")?.*?>"#).unwrap());
+pub static START_STYLE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r#"<style\b(?:[^>\n]*?\blang\s*=\s*["']?([^"'\s>]*))?[^>\n]*>"#).unwrap()
+});
 pub static END_STYLE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"</style>"#).unwrap());
 
-pub static START_TEMPLATE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"<template(?:.*lang="(.*)")?.*?>"#).unwrap());
+pub static START_TEMPLATE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r#"<template\b(?:[^>\n]*?\blang\s*=\s*["']?([^"'\s>]*))?[^>\n]*>"#).unwrap()
+});
 pub static END_TEMPLATE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"</template>"#).unwrap());
 
 pub static STARTING_MARKDOWN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"```\S+\s"#).unwrap());

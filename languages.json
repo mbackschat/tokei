@@ -847,7 +847,7 @@
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "kind": "html",
       "important_syntax": ["<script", "<style"],
-      "mime": ["text/html"],
+      "mime": ["text/html", "text/x-template", "text/template", "text/x-handlebars-template"],
       "extensions": ["html", "htm"]
     },
     "Hy": {

@@ -681,10 +681,7 @@ impl SyntaxCounter {
                         return None;
                     }
 
-                    let stats = language.parse_from_slice(
-                        script_contents.trim_first_and_last_line_of_whitespace(),
-                        config,
-                    );
+                    let stats = language.parse_embedded(script_contents, config);
                     Some(FileContext::new(
                         LanguageContext::Html { language },
                         end_of_code,
@@ -708,10 +705,7 @@ impl SyntaxCounter {
                         return None;
                     }
 
-                    let stats = language.parse_from_slice(
-                        style_contents.trim_first_and_last_line_of_whitespace(),
-                        config,
-                    );
+                    let stats = language.parse_embedded(style_contents, config);
                     Some(FileContext::new(
                         LanguageContext::Html { language },
                         end_of_code,
@@ -735,10 +729,7 @@ impl SyntaxCounter {
                     if template_contents.trim().is_empty() {
                         return None;
                     }
-                    let stats = language.parse_from_slice(
-                        template_contents.trim_first_and_last_line_of_whitespace(),
-                        config,
-                    );
+                    let stats = language.parse_embedded(template_contents, config);
                     Some(FileContext::new(
                         LanguageContext::Html { language },
                         end_of_code,
