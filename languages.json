@@ -1693,10 +1693,11 @@
     "Ruby": {
       "heredocs": [{"start": "<<", "indent_flags": "-~", "spacing": "adjacent", "word": "identifier", "closer": "line"}],
       "code_tokens": ["$'", "$\\\"", "$`"],
-      "regex_literals": {"after_line_break": true, "after_keywords": ["and", "begin", "case", "do", "else", "elsif", "ensure", "if", "in", "not", "or", "rescue", "return", "then", "unless", "until", "when", "while", "yield"]},
+      "regex_literals": {"after_line_break": true, "spans_lines": true, "operator_symbols": true, "command_arguments": true, "after_keywords": ["and", "begin", "case", "do", "else", "elsif", "ensure", "if", "in", "not", "or", "rescue", "return", "then", "unless", "until", "when", "while", "yield"]},
       "interpolations": [{"quote": "\\\"", "open": "#{", "close": "}", "nest": "{"}],
       "end_markers": ["__END__"],
       "quote_like": "ruby_percent",
+      "question_mark_characters": true,
       "line_comment": ["#"],
       "multi_line_comments": [["=begin", "=end"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],

@@ -364,6 +364,46 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether a `:` touching a `/` makes a symbol rather than
+    /// opening a regular expression, as in Ruby.
+    pub(crate) fn regex_operator_symbols(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.regex_literals is defined %}{{ value.regex_literals.operator_symbols | default(value=false) }}{% else %}false{% endif %},
+            {% endfor %}
+        }
+    }
+
+    /// Returns whether a `/` after a method name and a space opens a regular
+    /// expression as its argument, as in Ruby.
+    pub(crate) fn regex_command_arguments(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.regex_literals is defined %}{{ value.regex_literals.command_arguments | default(value=false) }}{% else %}false{% endif %},
+            {% endfor %}
+        }
+    }
+
+    /// Returns whether `?` and one character form a character literal, as in
+    /// Ruby.
+    pub(crate) fn question_mark_characters(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.question_mark_characters | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
+    /// Returns whether a regular expression literal may span lines, as in
+    /// Ruby.
+    pub(crate) fn regex_spans_lines(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.regex_literals is defined %}{{ value.regex_literals.spans_lines | default(value=false) }}{% else %}false{% endif %},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether a `/` that starts a line opens a regular expression,
     /// as in Ruby, where a line break ends the statement before it.
     pub(crate) fn regex_after_line_break(self) -> bool {

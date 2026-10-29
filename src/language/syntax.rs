@@ -17,7 +17,7 @@ use super::interpolation::{Interpolation, OpenHole};
 use super::jsx::{element_starts, is_name_byte, JsxFrame};
 use super::plain_scalar::plain_scalar_end;
 use super::pod::{pod_block_end, PodSyntax};
-use super::quote_like::{quote_like_len, QuoteLikeSyntax};
+use super::quote_like::{quote_like_len, ruby_character_len, QuoteLikeSyntax};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{regex_literal_len, RegexContext};
 use super::shebang::{shebang_len, ShebangSyntax};
@@ -135,6 +135,10 @@ pub(crate) struct SharedMatchers {
     pub regex_keywords: Option<&'static [&'static str]>,
     pub line_comments_start_words: bool,
     pub regex_after_line_break: bool,
+    pub regex_spans_lines: bool,
+    pub regex_operator_symbols: bool,
+    pub regex_command_arguments: bool,
+    pub question_mark_characters: bool,
     pub quotes_in_tags: bool,
     pub template_expressions: &'static [(&'static str, &'static str)],
     pub word_delimiters: &'static [u8],
@@ -240,6 +244,10 @@ impl SharedMatchers {
             opener_bytes[usize::from(b)] = true;
             opener_pairs.allow_any(b);
         }
+        if language.question_mark_characters() {
+            opener_bytes[usize::from(b'?')] = true;
+            opener_pairs.allow_any(b'?');
+        }
         if language.regex_keywords().is_some() {
             opener_bytes[usize::from(b'/')] = true;
             opener_pairs.allow_any(b'/');
@@ -307,6 +315,8 @@ impl SharedMatchers {
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
             .chain(language.pod().is_some().then(|| "=".to_owned()))
+            // A regular expression that spans lines decides the next line.
+            .chain(language.regex_spans_lines().then(|| "/".to_owned()))
             // A line comment that a splice continues decides the next line.
             .chain(language.line_comment_splices().then(|| "\\".to_owned()))
             .chain(
@@ -356,6 +366,10 @@ impl SharedMatchers {
             regex_keywords: language.regex_keywords(),
             line_comments_start_words: language.line_comments_start_words(),
             regex_after_line_break: language.regex_after_line_break(),
+            regex_spans_lines: language.regex_spans_lines(),
+            regex_operator_symbols: language.regex_operator_symbols(),
+            regex_command_arguments: language.regex_command_arguments(),
+            question_mark_characters: language.question_mark_characters(),
             quotes_in_tags: language.quotes_in_tags(),
             template_expressions: language.template_expressions(),
             word_delimiters: language.word_delimiters().as_bytes(),
@@ -754,8 +768,24 @@ impl SyntaxCounter {
                     continue;
                 }
 
-                if let Some(skip_amount) = self.parse_regex_literal(lines, i) {
-                    skip!(skip_amount);
+                if let Some(len) = self
+                    .shared
+                    .question_mark_characters
+                    .then(|| ruby_character_len(lines, i))
+                    .flatten()
+                    .filter(|_| self.is_plain_mode())
+                {
+                    skip!(len);
+                    continue;
+                }
+
+                if let Some(len) = self.parse_regex_literal(lines, i) {
+                    if lines[i..i + len].contains(&b'\n') {
+                        trace!("Start regular expression, ends at {}", i + len);
+                        self.literal_end = i + len;
+                        break;
+                    }
+                    skip!(len);
                     continue;
                 }
 
@@ -1511,6 +1541,9 @@ impl SyntaxCounter {
         Some(RegexContext {
             keywords: self.shared.regex_keywords?,
             after_line_break: self.shared.regex_after_line_break,
+            spans_lines: self.shared.regex_spans_lines,
+            operator_symbols: self.shared.regex_operator_symbols,
+            command_arguments: self.shared.regex_command_arguments,
             line_comments: self.shared.line_comments,
             multi_line_comments: self.shared.any_multi_line_comments,
         })

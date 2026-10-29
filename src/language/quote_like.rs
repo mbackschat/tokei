@@ -5,7 +5,7 @@
 //! its partner and nests; any other delimiter closes at its next occurrence;
 //! a backslash escapes either. The literal may span lines.
 
-use super::regex_literal::RegexContext;
+use super::regex_literal::{starts_command_argument, RegexContext};
 use crate::utils::ext::SliceExt;
 
 /// Which family of chosen-delimiter literals a language has.
@@ -101,7 +101,9 @@ fn ruby_percent(lines: &[u8], i: usize, context: &RegexContext) -> Option<(usize
         return None;
     }
     let after_space = lines[..i].last().is_some_and(|b| *b == b' ' || *b == b'\t');
-    let starts = context.expression_may_start(lines, i) || (typed && after_space);
+    let starts = context.expression_may_start(lines, i)
+        || (typed && after_space)
+        || starts_command_argument(lines, i);
     starts.then_some((open, 1))
 }
 
@@ -152,4 +154,36 @@ fn is_bracket(byte: u8) -> bool {
 
 fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
+/// Length of the Ruby character literal at `lines[i]`, a `?` and one
+/// character or escape sequence, as in `?a`, `?/` or `?\n` (Ruby
+/// `doc/syntax/literals.rdoc`, "Character Literal"). A `?` that ends a name,
+/// such as `include?` or the global `$?`, or follows a closing bracket, or
+/// comes before whitespace is an operator or part of a name; so is one before
+/// two identifier characters, as in `a ?bc : d` (parse.y, `parser_yylex`).
+pub(crate) fn ruby_character_len(lines: &[u8], i: usize) -> Option<usize> {
+    if lines[i] != b'?'
+        || lines[..i]
+            .last()
+            .is_some_and(|b| is_word_byte(*b) || matches!(b, b'$' | b')' | b']' | b'}'))
+    {
+        return None;
+    }
+    let body = &lines[i + 1..];
+    let first = *body.first()?;
+    if first.is_ascii_whitespace()
+        || (is_word_byte(first) && body.get(1).is_some_and(|b| is_word_byte(*b)))
+    {
+        return None;
+    }
+    let escape = usize::from(first == b'\\');
+    let lead = *body.get(escape)?;
+    let width = match lead {
+        lead if lead < 0x80 => 1,
+        lead if lead >= 0xf0 => 4,
+        lead if lead >= 0xe0 => 3,
+        _ => 2,
+    };
+    Some(1 + escape + width)
 }
