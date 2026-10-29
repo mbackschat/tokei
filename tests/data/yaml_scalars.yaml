@@ -1,0 +1,36 @@
+# 36 lines 27 code 5 comments 4 blanks
+key: plain text that
+  continues here
+
+  after an empty line
+
+other: x
+regexp: !ruby/regexp /\A +it ["']/
+# comment
+plain: a, 'b
+# comment
+flow: [a, 'b,
+  c']
+? |
+  complex key
+
+: value
+--- |
+top level
+# not a comment
+
+text
+--- >
+
+ lead
+--- |+
+  kept
+
+...
+# comment
+--- >
+ 
+   
+ # comment
+--- |+
+

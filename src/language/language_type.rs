@@ -82,16 +82,23 @@ impl LanguageType {
             syntax_mut
         };
 
-        if let Some(end) = syntax.shared.important_syntax.find(text).and_then(|m| {
-            // Get the position of the last line before the important
-            // syntax.
-            text[..=m.start()]
-                .iter()
-                .rev()
-                .position(|&c| c == b'\n')
-                .filter(|&p| p != 0)
-                .map(|p| m.start() - p)
-        }) {
+        // A YAML line can continue the plain scalar of the line before it, so
+        // no YAML line can be classified on its own.
+        let simple_prefix = !syntax.shared.block_scalars;
+        if let Some(end) = simple_prefix
+            .then(|| syntax.shared.important_syntax.find(text))
+            .flatten()
+            .and_then(|m| {
+                // Get the position of the last line before the important
+                // syntax.
+                text[..=m.start()]
+                    .iter()
+                    .rev()
+                    .position(|&c| c == b'\n')
+                    .filter(|&p| p != 0)
+                    .map(|p| m.start() - p)
+            })
+        {
             let (skippable_text, rest) = text.split_at(end + 1);
             let is_fortran = syntax.shared.is_fortran;
             let is_literate = syntax.shared.is_literate;
@@ -171,9 +178,11 @@ impl LanguageType {
         while let Some((start, end)) = stepper.next(lines) {
             let before = (stats.code, stats.comments, stats.blanks);
             let is_counted = counted.contains(&start);
+            let reads_line = start >= syntax.literal_end && syntax.quote.is_none();
             'line: {
                 if start < syntax.literal_end {
                     stats.code += 1;
+                    trace!("Code No.{} inside a literal", stats.code);
                     break 'line;
                 }
                 let line = &lines[start..end];
@@ -250,6 +259,9 @@ impl LanguageType {
                     stats.code += 1;
                     trace!("Code No.{}", stats.code);
                 }
+            }
+            if reads_line {
+                syntax.end_line(lines, start);
             }
             if !is_counted {
                 (stats.code, stats.comments, stats.blanks) = before;

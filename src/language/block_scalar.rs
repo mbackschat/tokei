@@ -7,8 +7,9 @@ use crate::utils::ext::SliceExt;
 
 /// The end of the content of the block scalar whose `|` or `>` indicator is
 /// at `lines[i]`, or `None` when the indicator does not start a block scalar
-/// or the scalar is empty. Trailing blank lines are left out of the content,
-/// as YAML's default chomping strips them from the value.
+/// or the scalar is empty. Trailing blank lines belong to the content only
+/// under keep chomping, `+`, as YAML's chomping indicators define
+/// (YAML 1.2.2 §8.1.1.2).
 pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
     if !matches!(lines.get(i), Some(b'|' | b'>')) {
         return None;
@@ -17,7 +18,7 @@ pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
         .iter()
         .rposition(|b| *b == b'\n')
         .map_or(0, |n| n + 1);
-    let parent_indent = parent_indent(&lines[line_start..i])?;
+    let min_indent = min_content_indent(&lines[line_start..i])?;
     let line_end = lines[i..].iter().position(|b| *b == b'\n').map(|n| i + n)?;
     let header = &lines[i + 1..line_end];
     let indicators = header
@@ -28,6 +29,11 @@ pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
     if !(rest.is_empty() || (rest.starts_with(b"#") && header[indicators].is_ascii_whitespace())) {
         return None;
     }
+    let keeps_trailing_lines = header[..indicators].contains(&b'+');
+    // libyaml takes the deepest of the leading empty lines into the content
+    // indentation, which YAML 1.2.2 §8.1.1.1 makes an error, so that a less
+    // indented line after them ends the scalar.
+    let mut leading_empty_indent = 0;
     let mut content_indent = None;
     let mut content_end = None;
     let mut start = line_end + 1;
@@ -38,12 +44,19 @@ pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
             .map_or(lines.len(), |n| start + n);
         let line = &lines[start..end];
         let indent = line.iter().take_while(|b| **b == b' ').count();
-        if !line.trim().is_empty() {
+        if line.trim().is_empty() {
+            if content_indent.is_none() {
+                leading_empty_indent = leading_empty_indent.max(indent);
+            }
+            if keeps_trailing_lines {
+                content_end = Some((end + 1).min(lines.len()));
+            }
+        } else {
             // The first content line sets the indentation of the rest
             // (YAML 1.2.2 §8.1.1.1), so a less indented line, such as a
             // comment, ends the scalar.
-            let content_indent = *content_indent.get_or_insert(indent);
-            if indent <= parent_indent || indent < content_indent {
+            let content_indent = *content_indent.get_or_insert(indent.max(leading_empty_indent));
+            if indent < min_indent || indent < content_indent || is_document_marker(line) {
                 break;
             }
             content_end = Some((end + 1).min(lines.len()));
@@ -53,14 +66,18 @@ pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
     content_end
 }
 
-/// The indentation of the node holding a block scalar whose indicator
-/// follows `before` on its line: the column of the key for `key: |`, or of
-/// the `-` for a sequence entry `- |`.
-fn parent_indent(before: &[u8]) -> Option<usize> {
+/// The least indentation of a block scalar's content, from the text
+/// `before` its indicator: one deeper than the key for `key: |` or `? |`, or
+/// than the `-` for `- |`, and any column for a scalar that is the document,
+/// whose indicator starts the line or follows `---` (YAML 1.2.2 §9.1.3).
+fn min_content_indent(before: &[u8]) -> Option<usize> {
+    let text = before.trim();
+    if text.is_empty() || text == b"---" {
+        return Some(0);
+    }
     if !before.last().is_some_and(|b| *b == b' ' || *b == b'\t') {
         return None;
     }
-    let text = before.trim();
     match text.last() {
         Some(b':') => {
             let mut column = before.iter().take_while(|b| **b == b' ').count();
@@ -70,9 +87,16 @@ fn parent_indent(before: &[u8]) -> Option<usize> {
                     .take_while(|b| **b == b' ')
                     .count();
             }
-            Some(column)
+            Some(column + 1)
         }
-        Some(b'-') => Some(before.len() - before.trim_start().len() + text.len() - 1),
+        Some(b'-' | b'?') => Some(before.len() - before.trim_start().len() + text.len()),
         _ => None,
     }
+}
+
+/// Whether `line` is a `---` or `...` marker, which ends a document and the
+/// scalars in it (YAML 1.2.2 §9.1.4).
+pub(crate) fn is_document_marker(line: &[u8]) -> bool {
+    (line.starts_with(b"---") || line.starts_with(b"..."))
+        && line.get(3).is_none_or(u8::is_ascii_whitespace)
 }

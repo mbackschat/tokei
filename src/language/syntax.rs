@@ -13,6 +13,7 @@ use super::embedding::{
 use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, OpenHole};
 use super::jsx::{element_starts, is_name_byte, JsxFrame};
+use super::plain_scalar::plain_scalar_end;
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{regex_literal_len, RegexContext};
 use crate::LanguageType::LinguaFranca;
@@ -43,6 +44,8 @@ pub(crate) struct SyntaxCounter {
     /// The end of the last heredoc or block scalar body; lines before it are
     /// literal.
     pub(crate) literal_end: usize,
+    /// The YAML flow collections, `[…]` and `{…}`, open at this point.
+    flow_depth: usize,
     /// Whether a markup tag is open, in which quotes open strings.
     pub(crate) in_tag: bool,
     /// The JSX elements and expressions open at this point, innermost last.
@@ -180,6 +183,11 @@ impl SharedMatchers {
             opener_bytes[usize::from(b'|')] = true;
             opener_bytes[usize::from(b'>')] = true;
         }
+        if language.quotes_after().is_some() {
+            for b in *b"[]{}" {
+                opener_bytes[usize::from(b)] = true;
+            }
+        }
         if language.quotes_in_tags() {
             opener_bytes[usize::from(b'<')] = true;
             opener_bytes[usize::from(b'>')] = true;
@@ -266,6 +274,7 @@ impl SyntaxCounter {
             quote_opener: "",
             holes: Vec::new(),
             literal_end: 0,
+            flow_depth: 0,
             in_tag: false,
             jsx: Vec::new(),
         }
@@ -463,6 +472,7 @@ impl SyntaxCounter {
                 continue;
             }
 
+            self.track_flow_collection(lines, i);
             let may_quote = self.may_open_quote(lines, i);
             let is_quote_or_multi_line = may_quote
                 .then(|| self.parse_quote(window))
@@ -1046,11 +1056,43 @@ impl SyntaxCounter {
             .count();
         let code = &before[..before.len() - spaces];
         let spaced = spaces > 0;
+        // `[`, `{` and `,` are flow indicators only inside a flow collection;
+        // in a plain scalar such as `a ["']` they are text.
         code.is_empty()
             || after.iter().any(|text| match text.strip_suffix(' ') {
                 Some(indicator) => spaced && code.ends_with(indicator.as_bytes()),
-                None => code.ends_with(text.as_bytes()),
+                None => self.flow_depth > 0 && code.ends_with(text.as_bytes()),
             })
+    }
+
+    /// Opens a YAML flow collection at a `[` or `{` where a node may start,
+    /// and closes one at `]` or `}` (YAML 1.2.2 §7.4).
+    fn track_flow_collection(&mut self, lines: &[u8], i: usize) {
+        if self.shared.quotes_after.is_none() {
+            return;
+        }
+        match lines[i] {
+            b'[' | b'{' if self.may_open_quote(lines, i) => self.flow_depth += 1,
+            b']' | b'}' => self.flow_depth = self.flow_depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+
+    /// Reads the end of a YAML line that did not start inside a literal: when
+    /// it ends in a plain scalar that continues on the next lines, those
+    /// lines are its text.
+    pub(crate) fn end_line(&mut self, lines: &[u8], start: usize) {
+        if !self.shared.block_scalars
+            || self.flow_depth > 0
+            || !self.is_plain_mode()
+            || self.literal_end > start
+        {
+            return;
+        }
+        if let Some(scalar_end) = plain_scalar_end(lines, start) {
+            trace!("Plain scalar continues to {}", scalar_end);
+            self.literal_end = scalar_end;
+        }
     }
 
     /// Whether a word can start at `lines[i]`: at the start of the text, or
