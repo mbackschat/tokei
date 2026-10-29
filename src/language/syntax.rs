@@ -207,7 +207,7 @@ impl SharedMatchers {
             .map(|text| (*text).to_owned())
             .chain(raw().flat_map(RawDelimiter::important_syntax))
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
-            .chain(language.jsx().then(|| "<".to_owned()))
+            .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
             .chain(
                 language
                     .block_scalars()
