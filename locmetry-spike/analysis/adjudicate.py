@@ -1,7 +1,7 @@
 """Collect lines where Tokei, tree-sitter and the lexer disagree, per language.
 
 Usage: adjudicate.py HARNESS RESULTS CORPORA LANG [MAX_FILES]
-Prints a bucket summary (Rust doc-comment lines separated) and sample lines."""
+Prints a bucket summary (Rust doc-comment lines separated) and writes sample lines to samples-LANG.json."""
 import collections, glob, json, os, re, subprocess, sys
 harness, results, corpora, lang = sys.argv[1:5]
 cap = int(sys.argv[5]) if len(sys.argv) > 5 else 60
@@ -25,4 +25,4 @@ for _, repo, r in files[:cap]:
         if len(samples[key]) < 400: samples[key].append(f"{repo}/{r['path']}:{n}: {src[:110]}")
 print(f"{lang}: {len(files)} files differ; inspected {min(cap, len(files))}")
 for k, v in buckets.most_common(): print(f"  {v:6} lines  {k}")
-json.dump(samples, open(f"/private/tmp/claude-501/-Users-mbackschat-Projects-locmetry/85a7e0be-58fe-4309-b128-e0a0a7d08a6e/scratchpad/samples-{lang}.json", "w"), indent=0)
+json.dump(samples, open(f"samples-{lang}.json", "w"), indent=0)
