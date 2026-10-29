@@ -93,6 +93,7 @@ pub(crate) struct SharedMatchers {
     pub is_fortran: bool,
     pub is_literate: bool,
     pub line_comments: &'static [&'static str],
+    pub line_start_comments: &'static [&'static str],
     pub any_multi_line_comments: &'static [(&'static str, &'static str)],
     pub multi_line_comments: &'static [(&'static str, &'static str)],
     pub nested_comments: &'static [(&'static str, &'static str)],
@@ -150,6 +151,7 @@ impl SharedMatchers {
         for opener in language
             .line_comments()
             .iter()
+            .chain(language.line_start_comments())
             .copied()
             .chain(starts(language.multi_line_comments()))
             .chain(starts(language.nested_comments()))
@@ -216,6 +218,7 @@ impl SharedMatchers {
             important_syntax: init_corasick(&important_syntax),
             any_comments: language.any_comments(),
             line_comments: language.line_comments(),
+            line_start_comments: language.line_start_comments(),
             multi_line_comments: language.multi_line_comments(),
             any_multi_line_comments: language.any_multi_line_comments(),
             nested_comments: language.nested_comments(),
@@ -305,6 +308,15 @@ impl SyntaxCounter {
         {
             trace!("Start {:?}", comment);
             true
+        } else if let Some(comment) = self
+            .shared
+            .line_start_comments
+            .iter()
+            .find(|c| window.starts_with(c.as_bytes()))
+            .filter(|_| starts_line(lines, i))
+        {
+            trace!("Start {:?} at the start of a line", comment);
+            true
         } else {
             false
         }
@@ -337,6 +349,7 @@ impl SyntaxCounter {
                     .shared
                     .line_comments
                     .iter()
+                    .chain(self.shared.line_start_comments)
                     .any(|c| line.starts_with(c.as_bytes()))
             {
                 stats.comments += 1;
@@ -500,6 +513,7 @@ impl SyntaxCounter {
                     .shared
                     .line_comments
                     .iter()
+                    .chain(self.shared.line_start_comments)
                     .any(|c| text.starts_with(c.as_bytes()))
             {
                 return true;
@@ -1263,6 +1277,15 @@ fn starts_tag(window: &[u8]) -> bool {
         && window
             .get(1)
             .is_some_and(|b| b.is_ascii_alphabetic() || b"/!?".contains(b))
+}
+
+/// Whether only whitespace precedes `lines[i]` on its line.
+fn starts_line(lines: &[u8], i: usize) -> bool {
+    lines[..i]
+        .iter()
+        .rev()
+        .take_while(|b| **b != b'\n')
+        .all(u8::is_ascii_whitespace)
 }
 
 /// The length of the block comment that opens at the start of `text`, up to

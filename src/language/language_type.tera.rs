@@ -276,6 +276,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns the line comment markers that open a comment only at the start
+    /// of a line, as JavaScript's `-->` does (ECMA-262 Annex B.1.1).
+    pub(crate) fn line_start_comments(self) -> &'static [&'static str] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[{% for item in value.line_start_comments | default(value=[]) %}"{{ item }}",{% endfor %}],
+            {% endfor %}
+        }
+    }
+
     /// Returns whether a `/` that starts a line opens a regular expression,
     /// as in Ruby, where a line break ends the statement before it.
     pub(crate) fn regex_after_line_break(self) -> bool {

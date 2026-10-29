@@ -906,7 +906,8 @@
       "jsx": true,
       "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
       "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
-      "line_comment": ["//"],
+      "line_comment": ["//", "<!--"],
+      "line_start_comments": ["-->"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"], ["`", "`"]],
       "mime": [
