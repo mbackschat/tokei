@@ -103,6 +103,9 @@ pub(crate) struct SharedMatchers {
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
+    /// Bytes that can begin a hole, a text that only looks like one or an
+    /// escape, so strings skip the hole check at every other position.
+    pub hole_bytes: [bool; 256],
 }
 
 impl SharedMatchers {
@@ -153,6 +156,15 @@ impl SharedMatchers {
         if language.regex_keywords().is_some() {
             opener_bytes[usize::from(b'/')] = true;
         }
+        let mut hole_bytes = [false; 256];
+        for kind in language.interpolations() {
+            for text in kind.literal.iter().chain([&kind.open]) {
+                if let Some(&b) = text.as_bytes().first() {
+                    hole_bytes[usize::from(b)] = true;
+                }
+            }
+            hole_bytes[usize::from(b'\\')] = true;
+        }
         let important_syntax: Vec<String> = language
             .important_syntax()
             .iter()
@@ -183,6 +195,7 @@ impl SharedMatchers {
             regex_keywords: language.regex_keywords(),
             line_comments_start_words: language.line_comments_start_words(),
             opener_bytes,
+            hole_bytes,
         }
     }
 }
@@ -843,6 +856,9 @@ impl SyntaxCounter {
     /// Inside an interpolating string, skips text that only looks like a hole
     /// or is escaped, or suspends the string at the start of a hole.
     fn parse_start_of_hole(&mut self, window: &[u8]) -> Option<usize> {
+        if !self.shared.hole_bytes[usize::from(*window.first()?)] {
+            return None;
+        }
         let opener = self.quote_opener;
         let mut kinds = self
             .shared

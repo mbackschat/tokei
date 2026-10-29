@@ -52,14 +52,21 @@ impl RegexContext<'_> {
     /// close just before it and lines that are wholly line comments. A comment
     /// that follows code on its line is not skipped, since telling its marker
     /// from one inside a string would take the line's lexing state.
+    ///
+    /// Only an earlier line can be a line comment, so the look-back seeks a
+    /// line start only after crossing a newline; seeking it for every `/`
+    /// would be quadratic in the length of a minified line.
     fn code_end(&self, lines: &[u8], i: usize) -> usize {
         let mut end = i;
         loop {
-            end -= lines[..end]
-                .iter()
-                .rev()
-                .take_while(|b| b.is_ascii_whitespace())
-                .count();
+            let code_end = end
+                - lines[..end]
+                    .iter()
+                    .rev()
+                    .take_while(|b| b.is_ascii_whitespace())
+                    .count();
+            let crossed_line = lines[code_end..end].contains(&b'\n');
+            end = code_end;
             let before = &lines[..end];
             if let Some(start) = self.multi_line_comments.iter().find_map(|(open, close)| {
                 let inner = before.strip_suffix(close.as_bytes())?;
@@ -69,6 +76,9 @@ impl RegexContext<'_> {
             }) {
                 end = start;
                 continue;
+            }
+            if !crossed_line {
+                return end;
             }
             let line_start = before
                 .iter()
