@@ -1314,6 +1314,7 @@
       "extensions": ["nu"]
     },
     "ObjectiveC": {
+      "character_literals": [["'", "'"]],
       "blank_symbols": ["\\\\"],
       "line_comment_splices": true,
       "name": "Objective-C",
@@ -1323,6 +1324,8 @@
       "extensions": ["m"]
     },
     "ObjectiveCpp": {
+      "raw_strings": [{"start": "R\\\"", "label": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{}[]#<>%:;.?*+-/^&|~!=,'$@`\\\"", "max_label": 16, "open": "(", "close": ")", "end": "\\\""}],
+      "character_literals": [["'", "'"]],
       "blank_symbols": ["\\\\"],
       "line_comment_splices": true,
       "name": "Objective-C++",
