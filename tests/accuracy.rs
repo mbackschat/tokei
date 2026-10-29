@@ -85,4 +85,52 @@ mod config {
     }
 }
 
+mod line_classes {
+    use tokei::{Config, LanguageType, LineClass};
+
+    #[test]
+    fn classes_each_line_in_order() {
+        let text =
+            "fn main() {\n    // c\n\n    /* a */ let b = \"/*\"; /* c */\n    /* d */ // e\n}\n";
+        let classes = LanguageType::Rust.line_classes(text.as_bytes(), &Config::default());
+        use LineClass::*;
+        assert_eq!(
+            classes,
+            Some(vec![Code, Comment, Blank, Code, Comment, Code])
+        );
+    }
+
+    /// The fork's own counts are the oracle: wherever `line_classes` answers,
+    /// its classes must tally to them on every fixture.
+    #[test]
+    fn classes_tally_to_the_counts_of_every_fixture() {
+        let config = Config::default();
+        let mut checked = 0;
+        for entry in std::fs::read_dir("tests/data").unwrap() {
+            let path = entry.unwrap().path();
+            let Some(language) = LanguageType::from_path(&path, &config) else {
+                continue;
+            };
+            let text = std::fs::read(&path).unwrap();
+            let Some(classes) = language.line_classes(&text, &config) else {
+                continue;
+            };
+            let stats = language.parse_from_slice(&text, &config);
+            let tally = |class| classes.iter().filter(|c| **c == class).count();
+            assert_eq!(
+                (
+                    tally(LineClass::Code),
+                    tally(LineClass::Comment),
+                    tally(LineClass::Blank)
+                ),
+                (stats.code, stats.comments, stats.blanks),
+                "{}",
+                path.display()
+            );
+            checked += 1;
+        }
+        assert!(checked > 250, "only {checked} fixtures classified");
+    }
+}
+
 include!(concat!(env!("OUT_DIR"), "/tests.rs"));

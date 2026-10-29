@@ -14,7 +14,7 @@ mod syntax;
 
 use std::{collections::BTreeMap, mem, ops::AddAssign};
 
-pub use self::{language_type::*, languages::Languages};
+pub use self::{language_type::*, languages::Languages, syntax::LineClass};
 
 use crate::{sort::Sort, stats::Report};
 

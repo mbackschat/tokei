@@ -107,8 +107,16 @@ impl LanguageType {
                 "Using Simple Parse on {:?}",
                 String::from_utf8_lossy(skippable_text)
             );
-            let parse_lines =
-                move || self.parse_lines(config, rest, CodeStats::new(), syntax, 0..rest.len());
+            let parse_lines = move || {
+                self.parse_lines(
+                    config,
+                    rest,
+                    CodeStats::new(),
+                    syntax,
+                    0..rest.len(),
+                    &mut |_| {},
+                )
+            };
             let simple_parse = move || {
                 LineIter::new(b'\n', skippable_text)
                     .par_bridge()
@@ -137,8 +145,47 @@ impl LanguageType {
             stats.comments += comments;
             stats
         } else {
-            self.parse_lines(config, text, CodeStats::new(), syntax, 0..text.len())
+            self.parse_lines(
+                config,
+                text,
+                CodeStats::new(),
+                syntax,
+                0..text.len(),
+                &mut |_| {},
+            )
         }
+    }
+
+    /// The class of each line of `text`, in order, as `parse_from_slice`
+    /// counts it, so that a reference lexer can be compared with it line by
+    /// line.
+    ///
+    /// `None` when lines are counted elsewhere: for Jupyter notebooks, and for
+    /// a text that embeds another language, such as a Markdown code block or
+    /// an HTML script, whose lines that language counts.
+    pub fn line_classes(self, text: &[u8], config: &Config) -> Option<Vec<LineClass>> {
+        if self == Jupyter {
+            return None;
+        }
+        let mut syntax = SyntaxCounter::new(self);
+        if self == LinguaFranca {
+            syntax.lf_embedded_language = self.find_lf_target_language(text);
+        }
+        let mut classes = Some(Vec::new());
+        // The simple parse of the lines before the first important syntax is
+        // a shortcut that counts them as this full parse does.
+        self.parse_lines(
+            config,
+            text,
+            CodeStats::new(),
+            syntax,
+            0..text.len(),
+            &mut |class| match (classes.as_mut(), class) {
+                (Some(list), Some(class)) => list.push(class),
+                _ => classes = None,
+            },
+        );
+        classes
     }
 
     /// Parses the text of an element embedded in markup, from the end of its
@@ -159,11 +206,13 @@ impl LanguageType {
             CodeStats::new(),
             syntax,
             after_first..last_start,
+            &mut |_| {},
         )
     }
 
     /// Counts the lines of `lines` that start within `counted`; the others
-    /// are read only for the state they leave.
+    /// are read only for the state they leave. `on_line` receives the class
+    /// of each counted line, or `None` for lines an embedded language counts.
     #[inline]
     fn parse_lines(
         self,
@@ -172,11 +221,13 @@ impl LanguageType {
         mut stats: CodeStats,
         mut syntax: SyntaxCounter,
         mut counted: Range<usize>,
+        on_line: &mut impl FnMut(Option<LineClass>),
     ) -> CodeStats {
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
 
         while let Some((start, end)) = stepper.next(lines) {
             let before = (stats.code, stats.comments, stats.blanks);
+            let mut embedded = false;
             let is_counted = counted.contains(&start);
             let whole_line = syntax.whole_line_class(lines, start, end);
             let reads_line = whole_line.is_none() && syntax.quote.is_none();
@@ -249,6 +300,7 @@ impl LanguageType {
                                 }
                             }
 
+                            embedded = true;
                             // Advance to after the language code and the delimiter..
                             stepper = LineStep::new(b'\n', end, lines.len());
                             break 'line;
@@ -278,6 +330,20 @@ impl LanguageType {
             }
             if !is_counted {
                 (stats.code, stats.comments, stats.blanks) = before;
+            } else {
+                on_line(
+                    match (
+                        stats.code - before.0,
+                        stats.comments - before.1,
+                        stats.blanks - before.2,
+                        embedded,
+                    ) {
+                        (1, 0, 0, false) => Some(LineClass::Code),
+                        (0, 1, 0, false) => Some(LineClass::Comment),
+                        (0, 0, 1, false) => Some(LineClass::Blank),
+                        _ => None,
+                    },
+                );
             }
         }
 

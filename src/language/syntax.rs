@@ -300,9 +300,13 @@ impl SharedMatchers {
 
 /// The class a line is counted in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum LineClass {
+pub enum LineClass {
+    /// A line holding code or text outside comments.
     Code,
+    /// A line holding nothing but comments.
     Comment,
+    /// A line holding only whitespace that starts outside every comment and
+    /// literal; one inside them takes their class.
     Blank,
 }
 
