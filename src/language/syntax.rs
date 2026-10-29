@@ -13,6 +13,7 @@ use super::embedding::{
 };
 use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, OpenHole};
+use super::jsx::{element_starts, is_name_byte, JsxFrame};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{regex_literal_len, RegexContext};
 use crate::LanguageType::LinguaFranca;
@@ -45,6 +46,8 @@ pub(crate) struct SyntaxCounter {
     pub(crate) literal_end: usize,
     /// Whether a markup tag is open, in which quotes open strings.
     pub(crate) in_tag: bool,
+    /// The JSX elements and expressions open at this point, innermost last.
+    pub(crate) jsx: Vec<JsxFrame>,
     pub(crate) quote_is_doc_quote: bool,
     pub(crate) stack: Vec<Cow<'static, str>>,
     pub(crate) quote_is_verbatim: bool,
@@ -113,6 +116,7 @@ pub(crate) struct SharedMatchers {
     pub word_delimiters: &'static [u8],
     pub quotes_after: Option<&'static [&'static str]>,
     pub block_scalars: bool,
+    pub jsx: bool,
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
@@ -195,6 +199,7 @@ impl SharedMatchers {
             .map(|text| (*text).to_owned())
             .chain(raw().flat_map(RawDelimiter::important_syntax))
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
+            .chain(language.jsx().then(|| "<".to_owned()))
             .chain(
                 language
                     .block_scalars()
@@ -232,6 +237,7 @@ impl SharedMatchers {
             word_delimiters: language.word_delimiters().as_bytes(),
             quotes_after: language.quotes_after(),
             block_scalars: language.block_scalars(),
+            jsx: language.jsx(),
             opener_bytes,
             hole_bytes,
         }
@@ -260,6 +266,7 @@ impl SyntaxCounter {
             holes: Vec::new(),
             literal_end: 0,
             in_tag: false,
+            jsx: Vec::new(),
         }
     }
 
@@ -319,6 +326,7 @@ impl SyntaxCounter {
             trace!("Blank No.{}", stats.blanks);
             true
         } else if !self.holes.is_empty()
+            || !self.jsx.is_empty()
             || self.in_tag
             || self.shared.important_syntax.is_match(line)
         {
@@ -387,6 +395,11 @@ impl SyntaxCounter {
             }
 
             if let Some(skip_amount) = self.parse_end_of_hole(window) {
+                skip!(skip_amount);
+                continue;
+            }
+
+            if let Some(skip_amount) = self.parse_jsx(lines, i) {
                 skip!(skip_amount);
                 continue;
             }
@@ -990,8 +1003,6 @@ impl SyntaxCounter {
         None
     }
 
-    /// Length of the regular expression literal at `lines[i]`, in plain mode
-    /// for languages that have them.
     /// Opens the here-document starting at `lines[i]`, whose body begins on
     /// the next line or after the bodies of here-documents opened before it
     /// on this line.
@@ -1058,18 +1069,139 @@ impl SyntaxCounter {
         }
     }
 
+    /// Length of the regular expression literal at `lines[i]`, in plain mode
+    /// for languages that have them.
     fn parse_regex_literal(&self, lines: &[u8], i: usize) -> Option<usize> {
-        let keywords = self.shared.regex_keywords?;
         if !self.is_plain_mode() {
             return None;
         }
-        let context = RegexContext {
-            keywords,
+        regex_literal_len(lines, i, &self.expression_context()?)
+    }
+
+    /// The syntax that tells where an expression may start, for languages
+    /// with regular expression literals.
+    fn expression_context(&self) -> Option<RegexContext<'static>> {
+        Some(RegexContext {
+            keywords: self.shared.regex_keywords?,
             after_line_break: self.shared.regex_after_line_break,
             line_comments: self.shared.line_comments,
             multi_line_comments: self.shared.any_multi_line_comments,
-        };
-        regex_literal_len(lines, i, &context)
+        })
+    }
+
+    /// Reads JSX at `lines[i]`: the text and attributes of open elements,
+    /// the braces of their expressions, and the start of a new element.
+    /// Returns the bytes consumed, or `None` to lex the position as code.
+    fn parse_jsx(&mut self, lines: &[u8], i: usize) -> Option<usize> {
+        if !self.shared.jsx || !self.stack.is_empty() {
+            return None;
+        }
+        let window = &lines[i..];
+        let holes = self.holes.len();
+        match self.jsx.last_mut() {
+            Some(&mut JsxFrame::Tag { angles }) => self.parse_jsx_tag(window, angles),
+            Some(JsxFrame::Children) => Some(self.parse_jsx_children(window)),
+            Some(JsxFrame::Expression { depth, holes: open }) if *open == holes => {
+                match window[0] {
+                    b'{' => *depth += 1,
+                    b'}' if *depth == 0 => {
+                        self.jsx.pop();
+                        return Some(1);
+                    }
+                    b'}' => *depth -= 1,
+                    b'<' => return self.open_jsx_element(lines, i),
+                    _ => {}
+                }
+                None
+            }
+            Some(JsxFrame::Expression { .. }) => None,
+            None if window[0] == b'<' => self.open_jsx_element(lines, i),
+            None => None,
+        }
+    }
+
+    fn open_jsx_element(&mut self, lines: &[u8], i: usize) -> Option<usize> {
+        let context = self.expression_context()?;
+        if !context.expression_may_start(lines, i) || !element_starts(lines, i) {
+            return None;
+        }
+        trace!("Start JSX element");
+        self.jsx.push(JsxFrame::Tag { angles: 0 });
+        Some(1)
+    }
+
+    /// Reads an opening tag, where quotes open attribute strings without
+    /// escapes and comments may stand between attributes; `angles` counts the
+    /// type-argument brackets still open.
+    fn parse_jsx_tag(&mut self, window: &[u8], angles: usize) -> Option<usize> {
+        if window.starts_with(b"//") || window.starts_with(b"/*") {
+            return None;
+        }
+        Some(match window[0] {
+            b'"' | b'\'' => {
+                let quote = if window[0] == b'"' { "\"" } else { "'" };
+                self.quote = Some(Cow::Borrowed(quote));
+                self.quote_opener = quote;
+                self.quote_is_verbatim = true;
+                1
+            }
+            b'{' => {
+                self.push_jsx_expression();
+                1
+            }
+            b'/' if window.get(1) == Some(&b'>') => {
+                self.jsx.pop();
+                2
+            }
+            b'<' => {
+                *self.jsx.last_mut().expect("open tag") = JsxFrame::Tag { angles: angles + 1 };
+                1
+            }
+            b'>' => {
+                *self.jsx.last_mut().expect("open tag") = match angles.checked_sub(1) {
+                    Some(angles) => JsxFrame::Tag { angles },
+                    None => JsxFrame::Children,
+                };
+                1
+            }
+            _ => 1,
+        })
+    }
+
+    /// Reads the text between tags, which holds only expressions, elements
+    /// and the closing tag.
+    fn parse_jsx_children(&mut self, window: &[u8]) -> usize {
+        match window {
+            [b'{', ..] => {
+                self.push_jsx_expression();
+                1
+            }
+            [b'<', b'/', ..] => {
+                self.jsx.pop();
+                window
+                    .iter()
+                    .position(|b| *b == b'>')
+                    .map_or(window.len(), |n| n + 1)
+            }
+            [b'<', next, ..] if *next == b'>' || is_name_byte(*next) => {
+                self.jsx.push(JsxFrame::Tag { angles: 0 });
+                1
+            }
+            _ => 1,
+        }
+    }
+
+    fn push_jsx_expression(&mut self) {
+        self.jsx.push(JsxFrame::Expression {
+            depth: 0,
+            holes: self.holes.len(),
+        });
+    }
+
+    /// Whether the line starting here starts inside JSX text, which is not a
+    /// comment even when it starts with a comment marker.
+    pub(crate) fn in_jsx_text(&self) -> bool {
+        matches!(self.jsx.last(), Some(JsxFrame::Children))
     }
 
     #[inline]

@@ -25,9 +25,7 @@ pub(crate) fn regex_literal_len(lines: &[u8], i: usize, context: &RegexContext) 
     if !window.starts_with(b"/") || matches!(window.get(1), Some(b'/' | b'*') | None) {
         return None;
     }
-    let code_end = context.code_end(lines, i);
-    let starts_line = context.after_line_break && lines[code_end..i].contains(&b'\n');
-    if !starts_line && !regex_allowed_after(&lines[..code_end], context.keywords) {
+    if !context.expression_may_start(lines, i) {
         return None;
     }
     let mut in_class = false;
@@ -53,6 +51,14 @@ pub(crate) fn regex_literal_len(lines: &[u8], i: usize, context: &RegexContext) 
 }
 
 impl RegexContext<'_> {
+    /// Whether an expression, such as a regular expression or a JSX element,
+    /// may start at `lines[i]`, judged by the code before it.
+    pub(crate) fn expression_may_start(&self, lines: &[u8], i: usize) -> bool {
+        let code_end = self.code_end(lines, i);
+        (self.after_line_break && lines[code_end..i].contains(&b'\n'))
+            || regex_allowed_after(&lines[..code_end], self.keywords)
+    }
+
     /// The end of the code before `i`, skipping whitespace, comments that
     /// close just before it and lines that are wholly line comments. A comment
     /// that follows code on its line is not skipped, since telling its marker

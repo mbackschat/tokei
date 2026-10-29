@@ -903,6 +903,7 @@
       "extensions": ["java"]
     },
     "JavaScript": {
+      "jsx": true,
       "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
       "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
       "line_comment": ["//"],
@@ -959,6 +960,7 @@
       "extensions": ["jsonnet", "libsonnet"]
     },
     "Jsx": {
+      "jsx": true,
       "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
       "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
       "name": "JSX",
@@ -1933,6 +1935,7 @@
       "extensions": ["toml"]
     },
     "Tsx": {
+      "jsx": true,
       "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
       "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
       "name": "TSX",

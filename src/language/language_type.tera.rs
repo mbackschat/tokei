@@ -318,6 +318,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether the language has JSX elements, whose text between tags
+    /// is not code.
+    pub(crate) fn jsx(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.jsx | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether quotes open strings only inside markup tags, such as
     /// HTML's `<p class='a'>`, so that an apostrophe in text is text.
     pub(crate) fn quotes_in_tags(self) -> bool {

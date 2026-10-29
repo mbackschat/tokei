@@ -162,7 +162,7 @@ impl LanguageType {
                 continue;
             }
 
-            let started_in_literal = syntax.quote.is_some();
+            let started_in_literal = syntax.quote.is_some() || syntax.in_jsx_text();
             let started_in_comments = !syntax.stack.is_empty()
                 || (config.treat_doc_strings_as_comments == Some(true)
                     && syntax.quote.is_some()

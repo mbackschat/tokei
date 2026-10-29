@@ -2,6 +2,7 @@ mod block_scalar;
 mod embedding;
 mod heredoc;
 mod interpolation;
+mod jsx;
 pub mod language_type;
 pub mod languages;
 mod raw_delimiter;
