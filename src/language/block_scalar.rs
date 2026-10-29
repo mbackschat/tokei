@@ -21,14 +21,7 @@ pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
     let min_indent = min_content_indent(&lines[line_start..i])?;
     let line_end = lines[i..].iter().position(|b| *b == b'\n').map(|n| i + n)?;
     let header = &lines[i + 1..line_end];
-    let indicators = header
-        .iter()
-        .take_while(|b| matches!(b, b'-' | b'+' | b'0'..=b'9'))
-        .count();
-    let rest = header[indicators..].trim_start();
-    if !(rest.is_empty() || (rest.starts_with(b"#") && header[indicators].is_ascii_whitespace())) {
-        return None;
-    }
+    let indicators = header_indicators(header)?;
     let keeps_trailing_lines = header[..indicators].contains(&b'+');
     // libyaml takes the deepest of the leading empty lines into the content
     // indentation, which YAML 1.2.2 §8.1.1.1 makes an error, so that a less
@@ -64,6 +57,29 @@ pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
         start = end + 1;
     }
     content_end
+}
+
+/// Whether a block scalar may start on `line`: a `|` or `>` that ends the
+/// line, apart from its header, where a node may start. The content that
+/// follows decides whether it does; a `>` elsewhere, as in `<strong>`, is
+/// text, so such lines keep the per-line fast path.
+pub(crate) fn may_start_block_scalar(line: &[u8]) -> bool {
+    memchr::memchr2_iter(b'|', b'>', line).any(|i| {
+        header_indicators(&line[i + 1..]).is_some() && min_content_indent(&line[..i]).is_some()
+    })
+}
+
+/// The length of the indentation and chomping indicators that start the
+/// `header` after a `|` or `>`, when only a comment follows them
+/// (YAML 1.2.2 §8.1.1).
+fn header_indicators(header: &[u8]) -> Option<usize> {
+    let indicators = header
+        .iter()
+        .take_while(|b| matches!(b, b'-' | b'+' | b'0'..=b'9'))
+        .count();
+    let rest = header[indicators..].trim_start();
+    (rest.is_empty() || (rest.starts_with(b"#") && header[indicators].is_ascii_whitespace()))
+        .then_some(indicators)
 }
 
 /// The least indentation of a block scalar's content, from the text

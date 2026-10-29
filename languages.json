@@ -2181,7 +2181,6 @@
       "doubled_quote_escapes": ["'"],
       "verbatim_quotes": [["'", "'"]],
       "quotes_after": ["[", "{", ",", ": ", "- ", "? "],
-      "important_syntax": ["[", "{"],
       "block_scalars": true,
       "line_comment_starts_word": true,
       "name": "YAML",

@@ -1404,6 +1404,7 @@ dependencies = [
  "ignore",
  "json5",
  "log",
+ "memchr",
  "num-format",
  "once_cell",
  "parking_lot",

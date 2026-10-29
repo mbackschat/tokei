@@ -1,0 +1,8 @@
+# 8 lines 6 code 2 comments 0 blanks
+list:
+  - |
+    # text
+  - key: >2 # comment
+      # text
+html: <b>bold</b> | text >
+# comment

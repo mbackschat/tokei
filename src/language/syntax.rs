@@ -5,7 +5,7 @@ use dashmap::DashMap;
 use log::Level::Trace;
 use once_cell::sync::Lazy;
 
-use super::block_scalar::block_scalar_end;
+use super::block_scalar::{block_scalar_end, may_start_block_scalar};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
     END_TEMPLATE,
@@ -242,13 +242,6 @@ impl SharedMatchers {
                 .map(str::to_owned),
             )
             .chain(language.end_markers().iter().map(|m| (*m).to_owned()))
-            .chain(
-                language
-                    .block_scalars()
-                    .then(|| ["|".to_owned(), ">".to_owned()])
-                    .into_iter()
-                    .flatten(),
-            )
             .collect();
 
         Self {
@@ -446,6 +439,8 @@ impl SyntaxCounter {
             || self.in_tag
             || self.flow_depth > 0
             || self.shared.important_syntax.is_match(line)
+            || self.opens_flow_collection(line)
+            || (self.shared.block_scalars && may_start_block_scalar(line))
         {
             false
         } else {
@@ -1174,10 +1169,7 @@ impl SyntaxCounter {
         let Some(after) = self.shared.quotes_after else {
             return true;
         };
-        let line_start = lines[..i]
-            .iter()
-            .rposition(|b| *b == b'\n')
-            .map_or(0, |n| n + 1);
+        let line_start = memchr::memrchr(b'\n', &lines[..i]).map_or(0, |n| n + 1);
         let before = &lines[line_start..i];
         let spaces = before
             .iter()
@@ -1193,6 +1185,14 @@ impl SyntaxCounter {
                 Some(indicator) => spaced && code.ends_with(indicator.as_bytes()),
                 None => self.flow_depth > 0 && code.ends_with(text.as_bytes()),
             })
+    }
+
+    /// Whether a YAML flow collection opens on `line`. A `[` or `{` elsewhere,
+    /// as in a plain scalar such as `Followers of %{name}`, is text, so such
+    /// lines keep the per-line fast path.
+    fn opens_flow_collection(&self, line: &[u8]) -> bool {
+        self.shared.quotes_after.is_some()
+            && memchr::memchr2_iter(b'[', b'{', line).any(|i| self.may_open_quote(line, i))
     }
 
     /// Opens a YAML flow collection at a `[` or `{` where a node may start,
