@@ -1283,7 +1283,7 @@
     "NotQuitePerl": {
       "name": "Not Quite Perl",
       "line_comment": ["#"],
-      "multi_line_comments": [["=begin", "=end"]],
+      "pod": "nqp",
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["nqp"]
     },
@@ -1389,7 +1389,7 @@
     "Perl": {
       "backslash_operator": true,
       "heredocs": [{"start": "<<", "indent_flags": "~", "spacing": "quoted_only", "word": "identifier", "closer": "line"}],
-      "pod": true,
+      "pod": "perl",
       "quote_like": "perl",
       "regex_literals": {"after_keywords": ["and", "grep", "if", "map", "not", "or", "return", "split", "unless", "until", "when", "while"]},
       "end_markers": ["__END__", "__DATA__"],

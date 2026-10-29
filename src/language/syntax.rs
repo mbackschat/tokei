@@ -14,7 +14,7 @@ use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, OpenHole};
 use super::jsx::{element_starts, is_name_byte, JsxFrame};
 use super::plain_scalar::plain_scalar_end;
-use super::pod::pod_block_end;
+use super::pod::{pod_block_end, PodSyntax};
 use super::quote_like::{quote_like_len, QuoteLikeSyntax};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{regex_literal_len, RegexContext};
@@ -103,7 +103,7 @@ pub(crate) struct SharedMatchers {
     pub is_literate: bool,
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
-    pub pod: bool,
+    pub pod: Option<PodSyntax>,
     pub backslash_operator: bool,
     pub quote_like: Option<QuoteLikeSyntax>,
     pub end_markers: &'static [&'static str],
@@ -238,7 +238,7 @@ impl SharedMatchers {
             .chain(raw().flat_map(RawDelimiter::important_syntax))
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
-            .chain(language.pod().then(|| "=".to_owned()))
+            .chain(language.pod().is_some().then(|| "=".to_owned()))
             .chain(
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
@@ -351,8 +351,8 @@ impl SyntaxCounter {
         if !self.is_plain_mode() {
             return None;
         }
-        if self.shared.pod {
-            if let Some(pod_end) = pod_block_end(lines, start) {
+        if let Some(syntax) = self.shared.pod {
+            if let Some(pod_end) = pod_block_end(lines, start, syntax) {
                 trace!("Start POD, ends at {}", pod_end);
                 self.comment_end = pod_end;
                 return Some(LineClass::Comment);

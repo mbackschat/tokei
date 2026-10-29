@@ -312,12 +312,12 @@ impl LanguageType {
         }
     }
 
-    /// Returns whether a line beginning with `=` and a word starts a Perl POD
-    /// block (perlpod).
-    pub(crate) fn pod(self) -> bool {
+    /// Returns whose rules decide where a POD block of whole lines starts and
+    /// ends: Perl's (perlpod) or NQP's (its grammar's `pod_comment`).
+    pub(crate) fn pod(self) -> Option<crate::language::pod::PodSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {{ value.pod | default(value=false) }},
+                {{key}} => {% if value.pod is defined and value.pod == "perl" %}Some(crate::language::pod::PodSyntax::Perl){% elif value.pod is defined and value.pod == "nqp" %}Some(crate::language::pod::PodSyntax::Nqp){% else %}None{% endif %},
             {% endfor %}
         }
     }
