@@ -60,6 +60,9 @@ pub(crate) struct SyntaxCounter {
     pub(crate) stack: Vec<Cow<'static, str>>,
     pub(crate) quote_is_verbatim: bool,
     pub(crate) lf_embedded_language: Option<LanguageType>,
+    /// Whether a non-blank byte of the line being read lies outside every
+    /// comment, which makes the line code.
+    pub(crate) line_has_code: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -329,6 +332,7 @@ impl SyntaxCounter {
             flow_depth: 0,
             in_tag: false,
             jsx: Vec::new(),
+            line_has_code: false,
         }
     }
 
@@ -450,7 +454,9 @@ impl SyntaxCounter {
             .line_start_comments
             .iter()
             .find(|c| window.starts_with(c.as_bytes()))
-            .filter(|_| starts_line(lines, i))
+            // Only comments may come before it on the line, as before an
+            // HTML-like `-->` (ECMA-262 Annex B.1.1, HTMLCloseComment).
+            .filter(|_| !self.line_has_code)
         {
             trace!("Start {:?} at the start of a line", comment);
             true
@@ -521,17 +527,43 @@ impl SyntaxCounter {
         let regex_cache = RegexCache::build(self.shared.language, lines, start, end);
         let embeds = regex_cache.family().is_some();
 
+        // The byte last read, and whether a comment was open before it: it is
+        // comment when one was open before or after it, and code otherwise.
+        let mut pending: Option<(u8, bool)> = None;
+        macro_rules! settle {
+            () => {{
+                if let Some((byte, in_comment)) = pending.take() {
+                    if !byte.is_ascii_whitespace() && !in_comment && self.stack.is_empty() {
+                        self.line_has_code = true;
+                    }
+                }
+            }};
+        }
+
         for i in start..end {
             if skip != 0 {
                 skip -= 1;
                 continue;
             }
+            settle!();
 
             let window = &lines[i..];
 
             if window.trim().is_empty() {
                 break;
             }
+            if self.is_plain_mode() {
+                if let Some(symbol) = self
+                    .shared
+                    .blank_symbols
+                    .iter()
+                    .find(|symbol| window.starts_with(symbol.as_bytes()))
+                {
+                    skip!(symbol.len());
+                    continue;
+                }
+            }
+            pending = Some((window[0], !self.stack.is_empty()));
 
             ended_with_comments = false;
             if self.passes_over(window[0], embeds) {
@@ -642,10 +674,12 @@ impl SyntaxCounter {
             }
 
             if self.parse_line_comment(lines, i) {
+                pending = None;
                 ended_with_comments = true;
                 break;
             }
         }
+        settle!();
 
         AnalysisReport::Normal(ended_with_comments)
     }
@@ -714,10 +748,10 @@ impl SyntaxCounter {
     ///        configured to count them as comments.
     /// 2. If we're not in string mode, check if we left it this on this line.
     ///    - Yes: When we found a doc quote and we started in comments.
-    /// 3. Yes: When the whole line is a comment e.g. `/* hello */`
-    /// 4. Yes: When the previous line started a multi-line comment.
-    /// 5. Yes: When the line starts with a comment.
-    /// 6. No: Any other input.
+    /// 3. No: When the line starts inside a literal.
+    /// 4. Yes: When the line holds nothing but comments, so that code between
+    ///    or after comments makes it code; PlantUML, whose block comments are
+    ///    whole lines, keeps Tokei's text rules for them.
     pub(crate) fn line_is_comment(
         &self,
         line: &[u8],
@@ -780,12 +814,14 @@ impl SyntaxCounter {
             // The line's first characters belong to a literal, so a comment
             // marker they spell, as in a raw string's `// …` line, is text.
             false
-        } else if (whole_line_is_comment)() {
-            true
-        } else if started_in_comments {
-            true
+        } else if self.shared.language == LanguageType::PlantUml {
+            // PlantUML's block comments are whole lines, so a line opening
+            // with `/'` and ending with `'/` is one, whatever lies between.
+            (whole_line_is_comment)() || started_in_comments || (starts_with_comment)()
         } else {
-            (starts_with_comment)()
+            // A line is a comment only when it holds nothing but comments, as
+            // the owner decided on 2026-10-29.
+            !self.line_has_code
         }
     }
 
@@ -1530,15 +1566,6 @@ fn template_expression_len(window: &[u8], expressions: &[(&str, &str)]) -> Optio
         .windows(close.len())
         .position(|w| w == close.as_bytes())?;
     Some(open.len() + end + close.len())
-}
-
-/// Whether only whitespace precedes `lines[i]` on its line.
-fn starts_line(lines: &[u8], i: usize) -> bool {
-    lines[..i]
-        .iter()
-        .rev()
-        .take_while(|b| **b != b'\n')
-        .all(u8::is_ascii_whitespace)
 }
 
 /// The length of the block comment that opens at the start of `text`, up to

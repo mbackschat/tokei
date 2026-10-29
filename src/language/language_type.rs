@@ -191,6 +191,7 @@ impl LanguageType {
                     // A literal that closes inside this line leaves the rest
                     // of it to be read.
                     if (start + 1..end).contains(&syntax.literal_end) {
+                        syntax.line_has_code = true;
                         let rest = syntax.literal_end;
                         syntax.perform_multi_line_analysis(lines, rest, end, config);
                     }
@@ -211,6 +212,7 @@ impl LanguageType {
                     break 'line;
                 }
 
+                syntax.line_has_code = false;
                 let started_in_literal = syntax.quote.is_some() || syntax.in_jsx_text();
                 let started_in_comments = !syntax.stack.is_empty()
                     || (config.treat_doc_strings_as_comments == Some(true)
