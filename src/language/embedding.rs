@@ -14,19 +14,19 @@ use regex::bytes::Regex;
 // element (HTML Living Standard, "Script data end tag name state" and
 // "RAWTEXT end tag name state").
 pub static START_SCRIPT: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?i)<script\b(?:(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*?\btype\s*=\s*["']?([^"'\s>]*))?(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*>"#).unwrap()
+    Regex::new(r#"(?i)<script\b(?:(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*?\btype\s*=\s*["']?([^"'\s>]*)["']?)?(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*>"#).unwrap()
 });
 pub static END_SCRIPT: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)</script[\t\n\x0C\r />]"#).unwrap());
 
 pub static START_STYLE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?i)<style\b(?:(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*?\blang\s*=\s*["']?([^"'\s>]*))?(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*>"#).unwrap()
+    Regex::new(r#"(?i)<style\b(?:(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*?\blang\s*=\s*["']?([^"'\s>]*)["']?)?(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*>"#).unwrap()
 });
 pub static END_STYLE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)</style[\t\n\x0C\r />]"#).unwrap());
 
 pub static START_TEMPLATE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?i)<template\b(?:(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*?\blang\s*=\s*["']?([^"'\s>]*))?(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*>"#).unwrap()
+    Regex::new(r#"(?i)<template\b(?:(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*?\blang\s*=\s*["']?([^"'\s>]*)["']?)?(?:[^>"'\n]|"[^"\n]*"|'[^'\n]*')*>"#).unwrap()
 });
 pub static END_TEMPLATE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)</template[\t\n\x0C\r />]"#).unwrap());
