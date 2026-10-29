@@ -276,6 +276,26 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether a line beginning with `=` and a word starts a Perl POD
+    /// block (perlpod).
+    pub(crate) fn pod(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.pod | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
+    /// Returns the lines, such as Perl's `__END__`, after which the text is
+    /// data rather than code.
+    pub(crate) fn end_markers(self) -> &'static [&'static str] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[{% for item in value.end_markers | default(value=[]) %}"{{ item }}",{% endfor %}],
+            {% endfor %}
+        }
+    }
+
     /// Returns the line comment markers that open a comment only at the start
     /// of a line, as JavaScript's `-->` does (ECMA-262 Annex B.1.1).
     pub(crate) fn line_start_comments(self) -> &'static [&'static str] {

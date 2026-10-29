@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     config::Config,
-    language::syntax::{FileContext, LanguageContext, SyntaxCounter},
+    language::syntax::{FileContext, LanguageContext, LineClass, SyntaxCounter},
     stats::{CodeStats, Report},
     utils::{ext::SliceExt, fs as fsutils},
 };
@@ -178,11 +178,16 @@ impl LanguageType {
         while let Some((start, end)) = stepper.next(lines) {
             let before = (stats.code, stats.comments, stats.blanks);
             let is_counted = counted.contains(&start);
-            let reads_line = start >= syntax.literal_end && syntax.quote.is_none();
+            let whole_line = syntax.whole_line_class(lines, start, end);
+            let reads_line = whole_line.is_none() && syntax.quote.is_none();
             'line: {
-                if start < syntax.literal_end {
-                    stats.code += 1;
-                    trace!("Code No.{} inside a literal", stats.code);
+                if let Some(class) = whole_line {
+                    match class {
+                        LineClass::Code => stats.code += 1,
+                        LineClass::Comment => stats.comments += 1,
+                        LineClass::Blank => stats.blanks += 1,
+                    }
+                    trace!("{:?} No.{} as a whole line", class, stats.lines());
                     break 'line;
                 }
                 let line = &lines[start..end];

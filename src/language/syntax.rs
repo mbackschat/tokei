@@ -14,6 +14,7 @@ use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, OpenHole};
 use super::jsx::{element_starts, is_name_byte, JsxFrame};
 use super::plain_scalar::plain_scalar_end;
+use super::pod::pod_block_end;
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{regex_literal_len, RegexContext};
 use crate::LanguageType::LinguaFranca;
@@ -44,6 +45,10 @@ pub(crate) struct SyntaxCounter {
     /// The end of the last heredoc or block scalar body; lines before it are
     /// literal.
     pub(crate) literal_end: usize,
+    /// The end of the comment lines of a Perl POD block being read.
+    comment_end: usize,
+    /// Whether an end marker such as `__END__` has made the rest data.
+    in_data_section: bool,
     /// The YAML flow collections, `[…]` and `{…}`, open at this point.
     flow_depth: usize,
     /// Whether a markup tag is open, in which quotes open strings.
@@ -97,6 +102,8 @@ pub(crate) struct SharedMatchers {
     pub is_literate: bool,
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
+    pub pod: bool,
+    pub end_markers: &'static [&'static str],
     pub any_multi_line_comments: &'static [(&'static str, &'static str)],
     pub multi_line_comments: &'static [(&'static str, &'static str)],
     pub nested_comments: &'static [(&'static str, &'static str)],
@@ -208,6 +215,8 @@ impl SharedMatchers {
             .chain(raw().flat_map(RawDelimiter::important_syntax))
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
+            .chain(language.pod().then(|| "=".to_owned()))
+            .chain(language.end_markers().iter().map(|m| (*m).to_owned()))
             .chain(
                 language
                     .block_scalars()
@@ -227,6 +236,8 @@ impl SharedMatchers {
             any_comments: language.any_comments(),
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
+            pod: language.pod(),
+            end_markers: language.end_markers(),
             multi_line_comments: language.multi_line_comments(),
             any_multi_line_comments: language.any_multi_line_comments(),
             nested_comments: language.nested_comments(),
@@ -253,6 +264,14 @@ impl SharedMatchers {
     }
 }
 
+/// The class a line is counted in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LineClass {
+    Code,
+    Comment,
+    Blank,
+}
+
 #[derive(Debug)]
 pub(crate) enum AnalysisReport {
     /// No child languages were found, contains a boolean representing whether
@@ -274,6 +293,8 @@ impl SyntaxCounter {
             quote_opener: "",
             holes: Vec::new(),
             literal_end: 0,
+            comment_end: 0,
+            in_data_section: false,
             flow_depth: 0,
             in_tag: false,
             jsx: Vec::new(),
@@ -281,6 +302,54 @@ impl SyntaxCounter {
     }
 
     /// Returns whether the syntax is currently in plain mode.
+    /// The class of the line at `lines[start..end]` when a region of whole
+    /// lines decides it before any lexing: a line that starts inside a
+    /// literal, such as a heredoc body, is code; a line of a Perl POD block is
+    /// a comment (perlpod); and a line after an end marker such as `__END__`
+    /// is data, so code or blank (perldata, "Special Literals").
+    pub(crate) fn whole_line_class(
+        &mut self,
+        lines: &[u8],
+        start: usize,
+        end: usize,
+    ) -> Option<LineClass> {
+        if start < self.literal_end {
+            return Some(LineClass::Code);
+        }
+        if start < self.comment_end {
+            return Some(LineClass::Comment);
+        }
+        if !self.is_plain_mode() {
+            return None;
+        }
+        if self.shared.pod {
+            if let Some(pod_end) = pod_block_end(lines, start) {
+                trace!("Start POD, ends at {}", pod_end);
+                self.comment_end = pod_end;
+                return Some(LineClass::Comment);
+            }
+        }
+        let line = &lines[start..end];
+        if self.in_data_section {
+            return Some(if line.trim().is_empty() {
+                LineClass::Blank
+            } else {
+                LineClass::Code
+            });
+        }
+        if self
+            .shared
+            .end_markers
+            .iter()
+            .any(|m| line.trim_ascii_end() == m.as_bytes())
+        {
+            trace!("Data section after {:?}", String::from_utf8_lossy(line));
+            self.in_data_section = true;
+            return Some(LineClass::Code);
+        }
+        None
+    }
+
     pub(crate) fn is_plain_mode(&self) -> bool {
         self.quote.is_none() && self.stack.is_empty()
     }

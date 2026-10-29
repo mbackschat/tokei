@@ -1384,9 +1384,10 @@
     },
     "Perl": {
       "heredocs": [{"start": "<<", "indent_flags": "~", "spacing": "quoted_only", "word": "identifier", "closer": "line"}],
+      "pod": true,
+      "end_markers": ["__END__", "__DATA__"],
       "shebangs": ["#!/usr/bin/perl"],
       "line_comment": ["#"],
-      "multi_line_comments": [["=pod", "=cut"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["pl", "pm"]
     },
@@ -1667,6 +1668,7 @@
       "code_tokens": ["$'", "$\\\"", "$`"],
       "regex_literals": {"after_line_break": true, "after_keywords": ["and", "begin", "case", "do", "else", "elsif", "ensure", "if", "in", "not", "or", "rescue", "return", "then", "unless", "until", "when", "while", "yield"]},
       "interpolations": [{"quote": "\\\"", "open": "#{", "close": "}", "nest": "{"}],
+      "end_markers": ["__END__"],
       "line_comment": ["#"],
       "multi_line_comments": [["=begin", "=end"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
