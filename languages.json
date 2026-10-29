@@ -376,6 +376,7 @@
       "extensions": ["cr"]
     },
     "CSharp": {
+      "doubled_quote_escapes": ["\\\""],
       "character_literals": [["'", "'"]],
       "name": "C#",
       "line_comment": ["//"],
@@ -639,6 +640,7 @@
       "extensions": ["ftl", "ftlh", "ftlx"]
     },
     "FSharp": {
+      "doubled_quote_escapes": ["\\\""],
       "nested": true,
       "character_literals": [["'", "'"]],
       "comment_exceptions": ["(*)"],

@@ -81,6 +81,7 @@ pub(crate) struct SharedMatchers {
     pub string_literals: &'static [(&'static str, &'static str)],
     pub character_literals: &'static [(&'static str, &'static str)],
     pub comment_exceptions: &'static [&'static str],
+    pub doubled_quote_escapes: &'static [&'static str],
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
 }
 
@@ -121,6 +122,7 @@ impl SharedMatchers {
             string_literals: language.quotes(),
             character_literals: language.character_literals(),
             comment_exceptions: language.comment_exceptions(),
+            doubled_quote_escapes: language.doubled_quote_escapes(),
             verbatim_string_literals: language.verbatim_quotes(),
         }
     }
@@ -685,7 +687,14 @@ impl SyntaxCounter {
     pub(crate) fn parse_end_of_quote(&mut self, window: &[u8]) -> Option<usize> {
         #[allow(clippy::if_same_then_else)]
         if self._is_string_mode() && window.starts_with(self.quote?.as_bytes()) {
-            let quote = self.quote.take().unwrap();
+            let quote = self.quote?;
+            if self.quote_is_verbatim
+                && self.shared.doubled_quote_escapes.contains(&quote)
+                && window[quote.len()..].starts_with(quote.as_bytes())
+            {
+                return Some(quote.len() * 2);
+            }
+            self.quote = None;
             trace!("End {:?}", quote);
             Some(quote.len())
         } else if !self.quote_is_verbatim && window.starts_with(br"\\") {

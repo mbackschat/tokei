@@ -152,6 +152,25 @@ impl LanguageType {
         }
     }
 
+    /// Returns the closing delimiters of a language's verbatim quotes that stand
+    /// for themselves when written twice, as in C#'s `@"say ""hi"""`.
+    /// ```
+    /// use tokei::LanguageType;
+    /// let lang = LanguageType::CSharp;
+    /// assert_eq!(lang.doubled_quote_escapes(), &["\""]);
+    /// ```
+    pub fn doubled_quote_escapes(self) -> &'static [&'static str] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[
+                    {%- for item in value.doubled_quote_escapes | default(value=[]) -%}
+                        "{{item}}",
+                    {%- endfor -%}
+                ],
+            {% endfor %}
+        }
+    }
+
     /// Returns the tokens of a language that start like a comment but are code,
     /// such as PHP's `#[` attributes or F#'s `(*)` operator.
     /// ```
