@@ -286,6 +286,21 @@ impl LanguageType {
         }
     }
 
+    /// Returns the delimiters of a template language's expressions and tags,
+    /// such as Twig's `{{ "{%" }} … %}`, which can sit inside a markup tag and hold a
+    /// `>` that does not end it.
+    pub(crate) fn template_expressions(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[
+                    {%- for items in value.template_expressions | default(value=[]) -%}
+                        ({% for item in items %}"{{item}}",{% endfor %}),
+                    {%- endfor -%}
+                ],
+            {% endfor %}
+        }
+    }
+
     /// Returns whether a line beginning with `=` and a word starts a Perl POD
     /// block (perlpod).
     pub(crate) fn pod(self) -> bool {

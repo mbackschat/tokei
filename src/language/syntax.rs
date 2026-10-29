@@ -124,6 +124,7 @@ pub(crate) struct SharedMatchers {
     pub line_comments_start_words: bool,
     pub regex_after_line_break: bool,
     pub quotes_in_tags: bool,
+    pub template_expressions: &'static [(&'static str, &'static str)],
     pub word_delimiters: &'static [u8],
     pub quotes_after: Option<&'static [&'static str]>,
     pub block_scalars: bool,
@@ -210,6 +211,9 @@ impl SharedMatchers {
             opener_bytes[usize::from(b'<')] = true;
             opener_bytes[usize::from(b'>')] = true;
         }
+        for (open, _) in language.template_expressions() {
+            opener_bytes[usize::from(open.as_bytes()[0])] = true;
+        }
         let mut hole_bytes = [false; 256];
         for kind in language.interpolations() {
             for text in kind.literal.iter().chain([&kind.open]) {
@@ -275,6 +279,7 @@ impl SharedMatchers {
             line_comments_start_words: language.line_comments_start_words(),
             regex_after_line_break: language.regex_after_line_break(),
             quotes_in_tags: language.quotes_in_tags(),
+            template_expressions: language.template_expressions(),
             word_delimiters: language.word_delimiters().as_bytes(),
             quotes_after: language.quotes_after(),
             block_scalars: language.block_scalars(),
@@ -567,9 +572,21 @@ impl SyntaxCounter {
                 }
                 continue;
             }
-            if self.in_tag && window[0] == b'>' {
-                self.in_tag = false;
-                continue;
+            if self.in_tag {
+                if let Some(len) = template_expression_len(window, self.shared.template_expressions)
+                {
+                    if window[..len].contains(&b'\n') {
+                        trace!("Start template expression, ends at {}", i + len);
+                        self.literal_end = i + len;
+                        break;
+                    }
+                    skip!(len);
+                    continue;
+                }
+                if window[0] == b'>' {
+                    self.in_tag = false;
+                    continue;
+                }
             }
 
             self.track_flow_collection(lines, i);
@@ -1429,6 +1446,19 @@ fn starts_tag(window: &[u8]) -> bool {
         && window
             .get(1)
             .is_some_and(|b| b.is_ascii_alphabetic() || b"/!?".contains(b))
+}
+
+/// The length of the template expression that starts `window`, such as
+/// `{{ $a->b }}`, up to its closer, or `None` when none starts or closes there.
+fn template_expression_len(window: &[u8], expressions: &[(&str, &str)]) -> Option<usize> {
+    let (open, close) = expressions
+        .iter()
+        .find(|(open, _)| window.starts_with(open.as_bytes()))?;
+    let body = &window[open.len()..];
+    let end = body
+        .windows(close.len())
+        .position(|w| w == close.as_bytes())?;
+    Some(open.len() + end + close.len())
 }
 
 /// Whether only whitespace precedes `lines[i]` on its line.

@@ -198,6 +198,8 @@
       "extensions": ["bb", "bbclass", "bbappend", "inc"]
     },
     "Blade": {
+      "quotes_in_tags": true,
+      "template_expressions": [["{{", "}}"], ["{!!", "!!}"]],
       "name": "Blade",
       "multi_line_comments": [["{{--", "--}}"], ["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
@@ -774,6 +776,8 @@
       "extensions": ["y", "ly"]
     },
     "Handlebars": {
+      "quotes_in_tags": true,
+      "template_expressions": [["{{", "}}"]],
       "multi_line_comments": [["<!--", "-->"], ["{{!", "}}"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["hbs", "handlebars"]
@@ -1957,6 +1961,8 @@
       "extensions": ["ttcn", "ttcn3", "ttcnpp"]
     },
     "Twig": {
+      "quotes_in_tags": true,
+      "template_expressions": [["{{", "}}"], ["{%", "%}"]],
       "name": "Twig",
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["twig"],
