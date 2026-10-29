@@ -79,8 +79,10 @@ fn runs_as_javascript(script: Node, bytes: &[u8]) -> bool {
             _ => String::new(),
         },
     };
+    // Babel standalone transpiles `text/babel` and `text/jsx` scripts as
+    // JavaScript (babeljs.io/docs/babel-standalone).
     essence.is_empty()
-        || essence == "module"
+        || matches!(essence.as_str(), "module" | "text/babel" | "text/jsx")
         || matches!(
             essence.as_str(),
             "application/ecmascript" | "application/javascript" | "application/x-ecmascript" | "application/x-javascript"
@@ -194,6 +196,8 @@ fn is_literal(kind: &str) -> bool {
         || kind.contains("char_literal")
         || kind.contains("character_literal")
         || matches!(kind, "char" | "character" | "rune_literal" | "heredoc" | "heredoc_body" | "heredoc_content" | "nowdoc" | "regex" | "block_scalar" | "double_quote_scalar" | "single_quote_scalar")
+        // HTML attribute values in quotes (HTML §13.2.5.36 and §13.2.5.37).
+        || kind == "quoted_attribute_value"
         // Perl's quote-like operators (perlop, "Quote and Quote-like Operators").
         || matches!(kind, "quoted_word_list" | "match_regexp" | "quoted_regexp" | "substitution_regexp" | "transliteration_expression")
 }
