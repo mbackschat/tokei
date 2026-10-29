@@ -5,6 +5,7 @@ use dashmap::DashMap;
 use log::Level::Trace;
 use once_cell::sync::Lazy;
 
+use super::blank_symbols::BlankSymbols;
 use super::block_scalar::{block_scalar_end, may_start_block_scalar};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
@@ -110,6 +111,7 @@ pub(crate) struct SharedMatchers {
     pub line_start_comments: &'static [&'static str],
     pub pod: Option<PodSyntax>,
     pub frontmatter: bool,
+    pub line_comment_splices: bool,
     pub shebang: Option<ShebangSyntax>,
     pub run_closers: &'static [&'static str],
     pub backslash_operator: bool,
@@ -121,7 +123,7 @@ pub(crate) struct SharedMatchers {
     pub string_literals: &'static [(&'static str, &'static str)],
     pub character_literals: &'static [(&'static str, &'static str)],
     pub code_tokens: &'static [&'static str],
-    pub blank_symbols: &'static [&'static str],
+    pub blank_symbols: BlankSymbols,
     pub doubled_quote_escapes: &'static [&'static str],
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
     pub raw_strings: &'static [RawDelimiter],
@@ -146,10 +148,6 @@ pub(crate) struct SharedMatchers {
     /// as Python's `f` is matched only before a byte some opener continues
     /// with.
     pub opener_pairs: OpenerPairs,
-    /// Bytes that can begin a blank symbol, so the analysis loop looks for
-    /// one only there; looking for Rust's five at every byte cost Tokio
-    /// `6470b5e` about 50M of 550M instructions (measured 2026-10-29).
-    pub blank_symbol_bytes: [bool; 256],
     /// Bytes that can begin a hole, a text that only looks like one or an
     /// escape, so strings skip the hole check at every other position.
     pub hole_bytes: [bool; 256],
@@ -309,6 +307,8 @@ impl SharedMatchers {
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
             .chain(language.pod().is_some().then(|| "=".to_owned()))
+            // A line comment that a splice continues decides the next line.
+            .chain(language.line_comment_splices().then(|| "\\".to_owned()))
             .chain(
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
@@ -334,6 +334,7 @@ impl SharedMatchers {
             line_start_comments: language.line_start_comments(),
             pod: language.pod(),
             frontmatter: language.frontmatter(),
+            line_comment_splices: language.line_comment_splices(),
             shebang: language.shebang(),
             run_closers: language.run_closers(),
             backslash_operator: language.backslash_operator(),
@@ -345,7 +346,7 @@ impl SharedMatchers {
             string_literals: language.quotes(),
             character_literals: language.character_literals(),
             code_tokens: language.code_tokens(),
-            blank_symbols: language.blank_symbols(),
+            blank_symbols: BlankSymbols::new(language.blank_symbols()),
             doubled_quote_escapes: language.doubled_quote_escapes(),
             verbatim_string_literals: language.verbatim_quotes(),
             raw_strings: language.raw_strings(),
@@ -363,16 +364,6 @@ impl SharedMatchers {
             jsx: language.jsx(),
             opener_bytes,
             opener_pairs,
-            blank_symbol_bytes: std::array::from_fn(|byte| {
-                debug_assert!(language
-                    .blank_symbols()
-                    .iter()
-                    .all(|symbol| !symbol.as_bytes()[0].is_ascii()));
-                language
-                    .blank_symbols()
-                    .iter()
-                    .any(|symbol| symbol.as_bytes()[0] == byte as u8)
-            }),
             hole_bytes,
             interpolating_quote_bytes,
             inert_bytes,
@@ -633,7 +624,7 @@ impl SyntaxCounter {
     ) -> bool {
         if !self.is_plain_mode() {
             false
-        } else if trim_blank_start(line, self.shared.blank_symbols).is_empty() {
+        } else if self.shared.blank_symbols.trim_start(line).is_empty() {
             stats.blanks += 1;
             trace!("Blank No.{}", stats.blanks);
             true
@@ -711,16 +702,14 @@ impl SyntaxCounter {
             if window.trim().is_empty() {
                 break;
             }
-            if self.shared.blank_symbol_bytes[usize::from(window[0])] && self.is_plain_mode() {
-                if let Some(symbol) = self
-                    .shared
-                    .blank_symbols
-                    .iter()
-                    .find(|symbol| window.starts_with(symbol.as_bytes()))
-                {
-                    skip!(symbol.len());
-                    continue;
-                }
+            if let Some(symbol) = self
+                .shared
+                .blank_symbols
+                .at(window)
+                .filter(|_| self.is_plain_mode())
+            {
+                skip!(symbol.len());
+                continue;
             }
             pending = Some((window[0], !self.stack.is_empty()));
 
@@ -836,6 +825,9 @@ impl SyntaxCounter {
             }
 
             if self.parse_line_comment(lines, i) {
+                if self.shared.line_comment_splices {
+                    self.comment_end = self.comment_end.max(spliced_lines_end(lines, i));
+                }
                 pending = None;
                 ended_with_comments = true;
                 break;
@@ -852,7 +844,7 @@ impl SyntaxCounter {
     /// comment left open, as in `/* a */ // b`.
     fn holds_only_comments(&self, mut text: &[u8]) -> bool {
         loop {
-            text = trim_blank_start(text, self.shared.blank_symbols);
+            text = self.shared.blank_symbols.trim_start(text);
             if text.is_empty()
                 || self
                     .shared
@@ -1700,6 +1692,21 @@ impl SyntaxCounter {
     }
 }
 
+/// The end of the line holding `from` and of each following line that a
+/// backslash before the newline splices to it (C23 §5.1.1.2, translation
+/// phase 2); like GCC and Clang, whitespace may follow the backslash.
+fn spliced_lines_end(text: &[u8], mut from: usize) -> usize {
+    loop {
+        let Some(newline) = memchr::memchr(b'\n', &text[from..]).map(|n| from + n) else {
+            return text.len();
+        };
+        if !text[from..newline].trim().ends_with(b"\\") {
+            return newline;
+        }
+        from = newline + 1;
+    }
+}
+
 /// Whether `window` starts with `text`, comparing the first byte before the
 /// rest, as most of Python's 82 quote openers are compared at every quote
 /// and escaped byte without sharing it.
@@ -1731,26 +1738,6 @@ fn template_expression_len(window: &[u8], expressions: &[(&str, &str)]) -> Optio
         .windows(close.len())
         .position(|w| w == close.as_bytes())?;
     Some(open.len() + end + close.len())
-}
-
-/// `text` after its leading whitespace and `blank_symbols`.
-pub(crate) fn trim_blank_start<'a>(mut text: &'a [u8], blank_symbols: &[&str]) -> &'a [u8] {
-    loop {
-        text = text.trim_start();
-        // Blank symbols start with a byte beyond ASCII, as ASCII whitespace
-        // is blank already; checking every line for Rust's cost Tokio
-        // `6470b5e` 29M of 503M instructions (measured 2026-10-29).
-        if text.first().map_or(true, u8::is_ascii) {
-            return text;
-        }
-        match blank_symbols
-            .iter()
-            .find(|symbol| text.starts_with(symbol.as_bytes()))
-        {
-            Some(symbol) => text = &text[symbol.len()..],
-            None => return text,
-        }
-    }
 }
 
 /// The length of the block comment that opens at the start of `text`, up to

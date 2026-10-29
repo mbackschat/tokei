@@ -1070,7 +1070,7 @@ dependencies = [
 
 [[package]]
 name = "tokei"
-version = "15.0.0+locmetry.13"
+version = "15.0.0+locmetry.14"
 dependencies = [
  "aho-corasick",
  "arbitrary",

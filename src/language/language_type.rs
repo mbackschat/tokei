@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     config::Config,
-    language::syntax::{trim_blank_start, FileContext, LanguageContext, LineClass, SyntaxCounter},
+    language::syntax::{FileContext, LanguageContext, LineClass, SyntaxCounter},
     stats::{CodeStats, Report},
     utils::{ext::SliceExt, fs as fsutils},
 };
@@ -127,7 +127,7 @@ impl LanguageType {
                         // first character in the column, so removing starting whitespace
                         // could cause a miscount.
                         let line = if is_fortran { line } else { line.trim() };
-                        if trim_blank_start(line, blank_symbols).is_empty() {
+                        if blank_symbols.trim_start(line).is_empty() {
                             (1, 0, 0)
                         } else if is_literate
                             || comments.iter().any(|c| line.starts_with(c.as_bytes()))

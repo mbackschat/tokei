@@ -396,6 +396,17 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether a backslash before a newline splices the lines, so a
+    /// line comment ending in one continues on the next line, as in C
+    /// (C23 §5.1.1.2, translation phase 2).
+    pub(crate) fn line_comment_splices(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.line_comment_splices | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether a file may open with a frontmatter, a manifest between
     /// fences of dashes that counts as a literal, as Rust's may.
     pub(crate) fn frontmatter(self) -> bool {

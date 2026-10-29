@@ -8,6 +8,7 @@ Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbacksch
 | Java | javac's scanner from the running JDK (measured with 27.0.1) | `find … -name '*.java' \| java/run.sh \| judgecmp stream Java` |
 | Kotlin | `KotlinLexer` from `kotlin-compiler-embeddable` 2.4.0 | `… \| kotlin/run.sh \| judgecmp stream Kotlin` |
 | JavaScript, JSX, TypeScript, TSX | Babel 7.28.5 with JSX, Flow and proposal plugins, then Hermes 0.36.1; the TypeScript 6.0.3 parser for TypeScript, TSX and JavaScript no other parser accepts | `pnpm install` in `js/`, then `… \| node js/judge.mjs \| judgecmp stream auto` |
+| C, C++, Objective-C, Objective-C++ | clang's raw lexer, `clang -cc1 -dump-raw-tokens` (measured with Apple clang 21.0.0); headers lex as C++ | `… \| python3 c/judge.py \| judgecmp stream auto` |
 | Python | CPython's `tokenize` (measured with 3.14) | `… \| python3 python/judge.py \| judgecmp stream Python` |
 | Lean | Lean 4.31.0's own lexer functions | see below |
 

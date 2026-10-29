@@ -48,13 +48,9 @@ fn main() {
         }
         _ => panic!("usage: judgecmp rust ROOT... | judgecmp stream LANGUAGE"),
     };
-    let whitespace: fn(char) -> bool = match language.unwrap_or(LanguageType::Text) {
-        LanguageType::Rust => ra_ap_rustc_lexer::is_whitespace,
-        _ => |c: char| c.is_ascii_whitespace() || c == '\u{000B}',
-    };
     let outcomes: Vec<Outcome> = judgements
         .into_par_iter()
-        .filter_map(|j| compare(language, j, whitespace))
+        .filter_map(|j| compare(language, j))
         .collect();
     report(&outcomes);
 }
@@ -92,9 +88,25 @@ fn report(outcomes: &[Outcome]) {
     );
 }
 
-fn compare(language: Option<LanguageType>, judgement: Judgement, whitespace: fn(char) -> bool) -> Option<Outcome> {
+/// The characters each language's lexer skips between tokens.
+fn whitespace(language: LanguageType) -> fn(char) -> bool {
+    use LanguageType::*;
+    match language {
+        Rust => ra_ap_rustc_lexer::is_whitespace,
+        // Translation phase 2 deletes each backslash before a newline (C23
+        // §5.1.1.2), and the clang judge leaves these splices outside its
+        // tokens; elsewhere in valid code a backslash occurs only in literals.
+        C | CHeader | Cpp | CppHeader | ObjectiveC | ObjectiveCpp => {
+            |c: char| c.is_ascii_whitespace() || c == '\u{000B}' || c == '\\'
+        }
+        _ => |c: char| c.is_ascii_whitespace() || c == '\u{000B}',
+    }
+}
+
+fn compare(language: Option<LanguageType>, judgement: Judgement) -> Option<Outcome> {
     let text = read(&judgement.path)?;
     let language = language.or_else(|| LanguageType::from_path(&judgement.path, &Config::default()))?;
+    let whitespace = whitespace(language);
     let fork = language.line_classes(text.as_bytes(), &Config::default())?;
     let judged = line_classes(&text, &judgement.classes, whitespace);
     let mark = |c: LineClass| match c {

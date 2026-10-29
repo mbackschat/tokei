@@ -1,3 +1,4 @@
+mod blank_symbols;
 mod block_scalar;
 mod embedding;
 mod frontmatter;
