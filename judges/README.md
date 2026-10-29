@@ -8,6 +8,7 @@ Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbacksch
 | Java | javac's scanner from the running JDK (measured with 27.0.1) | `find … -name '*.java' \| java/run.sh \| judgecmp stream Java` |
 | Kotlin | `KotlinLexer` from `kotlin-compiler-embeddable` 2.4.0 | `… \| kotlin/run.sh \| judgecmp stream Kotlin` |
 | JavaScript, JSX, TypeScript, TSX | Babel 7.28.5 with JSX, Flow and proposal plugins, then Hermes 0.36.1; the TypeScript 6.0.3 parser for TypeScript, TSX and JavaScript no other parser accepts | `pnpm install` in `js/`, then `… \| node js/judge.mjs \| judgecmp stream auto` |
+| Python | CPython's `tokenize` (measured with 3.14) | `… \| python3 python/judge.py \| judgecmp stream Python` |
 | Lean | Lean 4.31.0's own lexer functions | see below |
 
 Judges read paths on stdin and print one JSON object per file: `path`, `comments` and `literals` as `[start, end]` offsets after a byte order mark, `units` (`bytes` or `utf16`) and `errors`. `judgecmp stream LANGUAGE` reads them, `auto` takes each file's language from its path, and `JUDGE_LIST_INVALID=1` also lists the invalid files. Build `judgecmp` with `cargo build --release` in `judgecmp/`; it builds this repository as its `tokei`.
