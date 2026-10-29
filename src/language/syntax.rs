@@ -41,6 +41,8 @@ pub(crate) struct SyntaxCounter {
     pub(crate) holes: Vec<OpenHole>,
     /// The end of the last here-document body; lines before it are literal.
     pub(crate) heredoc_end: usize,
+    /// Whether a markup tag is open, in which quotes open strings.
+    pub(crate) in_tag: bool,
     pub(crate) quote_is_doc_quote: bool,
     pub(crate) stack: Vec<Cow<'static, str>>,
     pub(crate) quote_is_verbatim: bool,
@@ -105,6 +107,7 @@ pub(crate) struct SharedMatchers {
     pub regex_keywords: Option<&'static [&'static str]>,
     pub line_comments_start_words: bool,
     pub regex_after_line_break: bool,
+    pub quotes_in_tags: bool,
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
@@ -164,6 +167,10 @@ impl SharedMatchers {
         for heredoc in language.heredocs() {
             opener_bytes[usize::from(heredoc.start.as_bytes()[0])] = true;
         }
+        if language.quotes_in_tags() {
+            opener_bytes[usize::from(b'<')] = true;
+            opener_bytes[usize::from(b'>')] = true;
+        }
         let mut hole_bytes = [false; 256];
         for kind in language.interpolations() {
             for text in kind.literal.iter().chain([&kind.open]) {
@@ -205,6 +212,7 @@ impl SharedMatchers {
             regex_keywords: language.regex_keywords(),
             line_comments_start_words: language.line_comments_start_words(),
             regex_after_line_break: language.regex_after_line_break(),
+            quotes_in_tags: language.quotes_in_tags(),
             opener_bytes,
             hole_bytes,
         }
@@ -232,6 +240,7 @@ impl SyntaxCounter {
             quote_opener: "",
             holes: Vec::new(),
             heredoc_end: 0,
+            in_tag: false,
         }
     }
 
@@ -290,7 +299,10 @@ impl SyntaxCounter {
             stats.blanks += 1;
             trace!("Blank No.{}", stats.blanks);
             true
-        } else if !self.holes.is_empty() || self.shared.important_syntax.is_match(line) {
+        } else if !self.holes.is_empty()
+            || self.in_tag
+            || self.shared.important_syntax.is_match(line)
+        {
             false
         } else {
             trace!("^ Skippable");
@@ -388,6 +400,19 @@ impl SyntaxCounter {
             }
 
             if !may_open {
+                continue;
+            }
+
+            if self.shared.quotes_in_tags && !self.in_tag {
+                if let Some(skip_amount) = self.parse_multi_line_comment(window) {
+                    skip!(skip_amount);
+                } else if starts_tag(window) {
+                    self.in_tag = true;
+                }
+                continue;
+            }
+            if self.in_tag && window[0] == b'>' {
+                self.in_tag = false;
                 continue;
             }
 
@@ -1051,4 +1076,14 @@ fn starts_word(before: &[u8]) -> bool {
         None => true,
         Some(b) => b.is_ascii_whitespace() || b";&|()<>".contains(b),
     }
+}
+
+/// Whether `window` starts a markup tag: `<` followed by a name, `/`, `!` or
+/// `?`, as in `<p`, `</p`, `<!DOCTYPE` or `<?xml`, not by a space, as in
+/// `a < b`.
+fn starts_tag(window: &[u8]) -> bool {
+    window.first() == Some(&b'<')
+        && window
+            .get(1)
+            .is_some_and(|b| b.is_ascii_alphabetic() || b"/!?".contains(b))
 }

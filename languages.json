@@ -840,6 +840,7 @@
       "extensions": ["HC", "hc","ZC","zc"]
     },
     "Html": {
+      "quotes_in_tags": true,
       "name": "HTML",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
@@ -1668,6 +1669,7 @@
       "extensions": ["rb"]
     },
     "RubyHtml": {
+      "quotes_in_tags": true,
       "name": "Ruby HTML",
       "multi_line_comments": [["<!--", "-->"]],
       "important_syntax": ["<script", "<style"],
@@ -1831,12 +1833,14 @@
       "extensions": ["styl"]
     },
     "Svelte": {
+      "quotes_in_tags": true,
       "multi_line_comments": [["<!--", "-->"]],
       "important_syntax": ["<script", "<style"],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["svelte"]
     },
     "Svg": {
+      "quotes_in_tags": true,
       "name": "SVG",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
@@ -2095,6 +2099,7 @@
       "extensions": ["vim"]
     },
     "Vue": {
+      "quotes_in_tags": true,
       "name": "Vue",
       "line_comment": ["//"],
       "multi_line_comments": [["<!--", "-->"], ["/*", "*/"]],
@@ -2123,6 +2128,7 @@
       "extensions": ["nb", "wl"]
     },
     "Xaml": {
+      "quotes_in_tags": true,
       "name": "XAML",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
@@ -2135,6 +2141,7 @@
       "extensions": ["xcconfig"]
     },
     "Xml": {
+      "quotes_in_tags": true,
       "name": "XML",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],

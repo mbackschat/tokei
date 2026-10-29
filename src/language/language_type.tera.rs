@@ -286,6 +286,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether quotes open strings only inside markup tags, such as
+    /// HTML's `<p class='a'>`, so that an apostrophe in text is text.
+    pub(crate) fn quotes_in_tags(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.quotes_in_tags | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns the tokens of a language that start like a comment or a string
     /// but are code, such as PHP's `#[` attributes, F#'s `(*)` operator or
     /// Ruby's `$'` global.

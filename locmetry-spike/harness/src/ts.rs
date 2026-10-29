@@ -21,7 +21,7 @@ fn walk(root: Node, bytes: &[u8], out: &mut Vec<Region>) {
         let node = cursor.node();
         let kind = node.kind();
         // Haskell pragmas are written as comments and Tokei counts them so.
-        if kind.contains("comment") || matches!(kind, "haddock" | "xml_doc" | "pragma") {
+        if kind.contains("comment") || matches!(kind, "Comment" | "haddock" | "xml_doc" | "pragma") {
             let mut end = node.end_byte();
             // Line comment tokens of some grammars include their newline.
             while end > node.start_byte() && matches!(bytes[end - 1], b'\n' | b'\r') {

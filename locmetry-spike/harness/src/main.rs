@@ -38,6 +38,9 @@ enum Lang {
     Python,
     Shell,
     Perl,
+    Html,
+    Xml,
+    Yaml,
 }
 
 impl Lang {
@@ -67,6 +70,9 @@ impl Lang {
             "py" => Lang::Python,
             "sh" | "bash" => Lang::Shell,
             "pl" | "pm" => Lang::Perl,
+            "html" | "htm" => Lang::Html,
+            "xml" | "svg" | "xaml" => Lang::Xml,
+            "yaml" | "yml" => Lang::Yaml,
             _ => return None,
         })
     }
@@ -95,6 +101,9 @@ impl Lang {
             Lang::Python => tree_sitter_python::LANGUAGE.into(),
             Lang::Shell => tree_sitter_bash::LANGUAGE.into(),
             Lang::Perl => ts_parser_perl::LANGUAGE.into(),
+            Lang::Html => tree_sitter_html::LANGUAGE.into(),
+            Lang::Xml => tree_sitter_xml::LANGUAGE_XML.into(),
+            Lang::Yaml => tree_sitter_yaml::LANGUAGE.into(),
         }
     }
 
