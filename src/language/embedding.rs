@@ -6,21 +6,28 @@ use regex::bytes::Regex;
 
 // The attribute patterns stop at the first quote, space or `>`, so a later
 // attribute such as `id` does not become part of the type, and accept both
-// quote kinds (HTML §13.1.2.3).
+// quote kinds (HTML §13.1.2.3). Tag names match ASCII case-insensitively, and
+// an end tag's name ends at whitespace, `/` or `>`, so `</style >` and
+// `</script type="…">`, whose attributes are a parse error, still end the
+// element (HTML Living Standard, "Script data end tag name state" and
+// "RAWTEXT end tag name state").
 pub static START_SCRIPT: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"<script\b(?:[^>\n]*?\btype\s*=\s*["']?([^"'\s>]*))?[^>\n]*>"#).unwrap()
+    Regex::new(r#"(?i)<script\b(?:[^>\n]*?\btype\s*=\s*["']?([^"'\s>]*))?[^>\n]*>"#).unwrap()
 });
-pub static END_SCRIPT: Lazy<Regex> = Lazy::new(|| Regex::new(r#"</script>"#).unwrap());
+pub static END_SCRIPT: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?i)</script[\t\n\x0C\r />]"#).unwrap());
 
 pub static START_STYLE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"<style\b(?:[^>\n]*?\blang\s*=\s*["']?([^"'\s>]*))?[^>\n]*>"#).unwrap()
+    Regex::new(r#"(?i)<style\b(?:[^>\n]*?\blang\s*=\s*["']?([^"'\s>]*))?[^>\n]*>"#).unwrap()
 });
-pub static END_STYLE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"</style>"#).unwrap());
+pub static END_STYLE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?i)</style[\t\n\x0C\r />]"#).unwrap());
 
 pub static START_TEMPLATE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"<template\b(?:[^>\n]*?\blang\s*=\s*["']?([^"'\s>]*))?[^>\n]*>"#).unwrap()
+    Regex::new(r#"(?i)<template\b(?:[^>\n]*?\blang\s*=\s*["']?([^"'\s>]*))?[^>\n]*>"#).unwrap()
 });
-pub static END_TEMPLATE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"</template>"#).unwrap());
+pub static END_TEMPLATE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?i)</template[\t\n\x0C\r />]"#).unwrap());
 
 pub static STARTING_MARKDOWN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"```\S+\s"#).unwrap());
 pub static ENDING_MARKDOWN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"```\s?"#).unwrap());
