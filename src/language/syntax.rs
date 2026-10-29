@@ -104,6 +104,7 @@ pub(crate) struct SharedMatchers {
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
     pub pod: bool,
+    pub backslash_operator: bool,
     pub quote_like: Option<QuoteLikeSyntax>,
     pub end_markers: &'static [&'static str],
     pub any_multi_line_comments: &'static [(&'static str, &'static str)],
@@ -261,6 +262,7 @@ impl SharedMatchers {
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
             pod: language.pod(),
+            backslash_operator: language.backslash_operator(),
             quote_like: language.quote_like(),
             end_markers: language.end_markers(),
             multi_line_comments: language.multi_line_comments(),
@@ -1031,6 +1033,8 @@ impl SyntaxCounter {
             Some(escape.len() + 1)
         } else if let Some(skip_amount) = self.parse_start_of_hole(window) {
             Some(skip_amount)
+        } else if !self.escapes_here() {
+            None
         } else if !self.quote_is_verbatim && window.starts_with(br"\\") {
             Some(2)
         } else if !self.quote_is_verbatim
@@ -1053,6 +1057,14 @@ impl SyntaxCounter {
         } else {
             None
         }
+    }
+
+    /// Whether a backslash at the current position escapes the next byte:
+    /// inside a literal, and outside one unless the language makes it an
+    /// operator. Outside a literal it is the shells' quoting of a single
+    /// character (POSIX Shell Command Language, 2.2.1).
+    fn escapes_here(&self) -> bool {
+        self.quote.is_some() || !self.shared.backslash_operator
     }
 
     /// Inside an interpolating string, skips text that only looks like a hole

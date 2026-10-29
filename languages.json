@@ -1387,6 +1387,7 @@
       "extensions": ["pas"]
     },
     "Perl": {
+      "backslash_operator": true,
       "heredocs": [{"start": "<<", "indent_flags": "~", "spacing": "quoted_only", "word": "identifier", "closer": "line"}],
       "pod": true,
       "quote_like": "perl",

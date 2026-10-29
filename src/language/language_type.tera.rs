@@ -301,6 +301,17 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether a backslash outside a literal is an operator, such as
+    /// Perl's reference constructor in `\"text"` (perlref, "Making
+    /// References"), rather than an escape of the quote after it.
+    pub(crate) fn backslash_operator(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.backslash_operator | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether a line beginning with `=` and a word starts a Perl POD
     /// block (perlpod).
     pub(crate) fn pod(self) -> bool {
