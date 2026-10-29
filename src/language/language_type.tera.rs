@@ -375,6 +375,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether a file may open with a frontmatter, a manifest between
+    /// fences of dashes that counts as a literal, as Rust's may.
+    pub(crate) fn frontmatter(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.frontmatter | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether the language has YAML block scalars, such as `run: |`.
     pub(crate) fn block_scalars(self) -> bool {
         match self {
@@ -404,9 +414,10 @@ impl LanguageType {
         }
     }
 
-    /// Returns the symbols that read as blank, as `。` and `、` do in the
-    /// WenYan tokenizer's `IGNORE_SYMBOLS` (src/parser.ts at
-    /// wenyan-lang/wenyan `97f0a4b`).
+    /// Returns the texts beyond ASCII whitespace that read as blank, as `。`
+    /// and `、` do in the WenYan tokenizer's `IGNORE_SYMBOLS` (src/parser.ts
+    /// at wenyan-lang/wenyan `97f0a4b`), and as the rest of Unicode
+    /// Pattern_White_Space does in Rust.
     pub(crate) fn blank_symbols(self) -> &'static [&'static str] {
         match self {
             {% for key, value in languages -%}

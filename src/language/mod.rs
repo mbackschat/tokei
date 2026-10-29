@@ -1,5 +1,6 @@
 mod block_scalar;
 mod embedding;
+mod frontmatter;
 mod heredoc;
 mod interpolation;
 mod jsx;

@@ -1697,8 +1697,10 @@
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "nested": true,
+      "frontmatter": true,
+      "blank_symbols": ["\u0085", "\u200e", "\u200f", "\u2028", "\u2029"],
       "extensions": ["rs"],
-      "quotes": [["\\\"", "\\\""], ["#\\\"", "\\\"#"]]
+      "quotes": [["\\\"", "\\\""]]
     },
     "Sass": {
       "line_comment": ["//"],

@@ -10,6 +10,7 @@ use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
     END_TEMPLATE,
 };
+use super::frontmatter::frontmatter_end;
 use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, OpenHole};
 use super::jsx::{element_starts, is_name_byte, JsxFrame};
@@ -107,6 +108,7 @@ pub(crate) struct SharedMatchers {
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
     pub pod: Option<PodSyntax>,
+    pub frontmatter: bool,
     pub backslash_operator: bool,
     pub quote_like: Option<QuoteLikeSyntax>,
     pub end_markers: &'static [&'static str],
@@ -243,6 +245,7 @@ impl SharedMatchers {
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
             .chain(language.pod().is_some().then(|| "=".to_owned()))
+            .chain(language.frontmatter().then(|| "---".to_owned()))
             .chain(
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
@@ -266,6 +269,7 @@ impl SharedMatchers {
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
             pod: language.pod(),
+            frontmatter: language.frontmatter(),
             backslash_operator: language.backslash_operator(),
             quote_like: language.quote_like(),
             end_markers: language.end_markers(),
@@ -343,9 +347,10 @@ impl SyntaxCounter {
     /// Returns whether the syntax is currently in plain mode.
     /// The class of the line at `lines[start..end]` when a region of whole
     /// lines decides it before any lexing: a line that starts inside a
-    /// literal, such as a heredoc body, is code; a line of a Perl POD block is
-    /// a comment (perlpod); and a line after an end marker such as `__END__`
-    /// is data, so code or blank (perldata, "Special Literals").
+    /// literal, such as a heredoc body or a Rust frontmatter, is code; a line
+    /// of a Perl POD block is a comment (perlpod); and a line after an end
+    /// marker such as `__END__` is data, so code or blank (perldata, "Special
+    /// Literals").
     pub(crate) fn whole_line_class(
         &mut self,
         lines: &[u8],
@@ -360,6 +365,13 @@ impl SyntaxCounter {
         }
         if !self.is_plain_mode() {
             return None;
+        }
+        if self.shared.frontmatter {
+            if let Some(frontmatter_end) = frontmatter_end(lines, start) {
+                trace!("Start frontmatter, ends at {}", frontmatter_end);
+                self.literal_end = frontmatter_end;
+                return Some(LineClass::Code);
+            }
         }
         if let Some(syntax) = self.shared.pod {
             if let Some(pod_end) = pod_block_end(lines, start, syntax) {
@@ -478,7 +490,7 @@ impl SyntaxCounter {
     ) -> bool {
         if !self.is_plain_mode() {
             false
-        } else if line.trim().is_empty() {
+        } else if trim_blank_start(line, self.shared.blank_symbols).is_empty() {
             stats.blanks += 1;
             trace!("Blank No.{}", stats.blanks);
             true
@@ -694,7 +706,7 @@ impl SyntaxCounter {
     /// comment left open, as in `/* a */ // b`.
     fn holds_only_comments(&self, mut text: &[u8]) -> bool {
         loop {
-            text = self.trim_blank_start(text);
+            text = trim_blank_start(text, self.shared.blank_symbols);
             if text.is_empty()
                 || self
                     .shared
@@ -718,22 +730,6 @@ impl SyntaxCounter {
             match block_comment_len(text, start, end, nests) {
                 Some(len) => text = &text[len..],
                 None => return true,
-            }
-        }
-    }
-
-    /// `text` after its leading whitespace and blank symbols.
-    fn trim_blank_start<'a>(&self, mut text: &'a [u8]) -> &'a [u8] {
-        loop {
-            text = text.trim_start();
-            match self
-                .shared
-                .blank_symbols
-                .iter()
-                .find(|symbol| text.starts_with(symbol.as_bytes()))
-            {
-                Some(symbol) => text = &text[symbol.len()..],
-                None => return text,
             }
         }
     }
@@ -1570,6 +1566,20 @@ fn template_expression_len(window: &[u8], expressions: &[(&str, &str)]) -> Optio
         .windows(close.len())
         .position(|w| w == close.as_bytes())?;
     Some(open.len() + end + close.len())
+}
+
+/// `text` after its leading whitespace and `blank_symbols`.
+pub(crate) fn trim_blank_start<'a>(mut text: &'a [u8], blank_symbols: &[&str]) -> &'a [u8] {
+    loop {
+        text = text.trim_start();
+        match blank_symbols
+            .iter()
+            .find(|symbol| text.starts_with(symbol.as_bytes()))
+        {
+            Some(symbol) => text = &text[symbol.len()..],
+            None => return text,
+        }
+    }
 }
 
 /// The length of the block comment that opens at the start of `text`, up to

@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     config::Config,
-    language::syntax::{FileContext, LanguageContext, LineClass, SyntaxCounter},
+    language::syntax::{trim_blank_start, FileContext, LanguageContext, LineClass, SyntaxCounter},
     stats::{CodeStats, Report},
     utils::{ext::SliceExt, fs as fsutils},
 };
@@ -103,6 +103,7 @@ impl LanguageType {
             let is_fortran = syntax.shared.is_fortran;
             let is_literate = syntax.shared.is_literate;
             let comments = syntax.shared.line_comments;
+            let blank_symbols = syntax.shared.blank_symbols;
             trace!(
                 "Using Simple Parse on {:?}",
                 String::from_utf8_lossy(skippable_text)
@@ -125,7 +126,7 @@ impl LanguageType {
                         // first character in the column, so removing starting whitespace
                         // could cause a miscount.
                         let line = if is_fortran { line } else { line.trim() };
-                        if line.trim().is_empty() {
+                        if trim_blank_start(line, blank_symbols).is_empty() {
                             (1, 0, 0)
                         } else if is_literate
                             || comments.iter().any(|c| line.starts_with(c.as_bytes()))
