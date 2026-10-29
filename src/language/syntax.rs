@@ -344,7 +344,6 @@ impl SyntaxCounter {
         }
     }
 
-    /// Returns whether the syntax is currently in plain mode.
     /// The class of the line at `lines[start..end]` when a region of whole
     /// lines decides it before any lexing: a line that starts inside a
     /// literal, such as a heredoc body or a Rust frontmatter, is code; a line
@@ -401,6 +400,8 @@ impl SyntaxCounter {
         None
     }
 
+    /// Returns whether the syntax is currently in plain mode, outside every
+    /// literal and comment.
     pub(crate) fn is_plain_mode(&self) -> bool {
         self.quote.is_none() && self.stack.is_empty()
     }
