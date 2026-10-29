@@ -907,6 +907,7 @@
       "extensions": ["java"]
     },
     "JavaScript": {
+      "shebang": "plain",
       "jsx": true,
       "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
       "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
@@ -965,6 +966,7 @@
       "extensions": ["jsonnet", "libsonnet"]
     },
     "Jsx": {
+      "shebang": "plain",
       "jsx": true,
       "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
       "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
@@ -1950,6 +1952,7 @@
       "extensions": ["toml"]
     },
     "Tsx": {
+      "shebang": "plain",
       "jsx": true,
       "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
       "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
@@ -1975,6 +1978,7 @@
       "multi_line_comments": [["<!--", "-->"], ["{#", "#}"]]
     },
     "TypeScript": {
+      "shebang": "plain",
       "regex_literals": {"after_keywords": ["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]},
       "interpolations": [{"quote": "`", "open": "${", "close": "}", "nest": "{"}],
       "line_comment": ["//"],
