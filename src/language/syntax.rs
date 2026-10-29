@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use aho_corasick::AhoCorasick;
 use dashmap::DashMap;
@@ -10,6 +10,7 @@ use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
     END_TEMPLATE,
 };
+use super::raw_delimiter::RawDelimiter;
 use crate::LanguageType::LinguaFranca;
 use crate::{stats::CodeStats, utils::ext::SliceExt, Config, LanguageType};
 
@@ -27,9 +28,12 @@ use crate::{stats::CodeStats, utils::ext::SliceExt, Config, LanguageType};
 #[derive(Clone, Debug)]
 pub(crate) struct SyntaxCounter {
     pub(crate) shared: Arc<SharedMatchers>,
-    pub(crate) quote: Option<&'static str>,
+    /// The closer of the current literal; owned when computed from a raw opener.
+    pub(crate) quote: Option<Cow<'static, str>>,
+    /// The escape of the current raw literal, such as Swift's `\#` in `#"…"#`.
+    pub(crate) quote_escape: Option<String>,
     pub(crate) quote_is_doc_quote: bool,
-    pub(crate) stack: Vec<&'static str>,
+    pub(crate) stack: Vec<Cow<'static, str>>,
     pub(crate) quote_is_verbatim: bool,
     pub(crate) lf_embedded_language: Option<LanguageType>,
 }
@@ -83,6 +87,8 @@ pub(crate) struct SharedMatchers {
     pub comment_exceptions: &'static [&'static str],
     pub doubled_quote_escapes: &'static [&'static str],
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
+    pub raw_strings: &'static [RawDelimiter],
+    pub raw_comments: &'static [RawDelimiter],
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
@@ -100,7 +106,7 @@ impl SharedMatchers {
     }
 
     pub fn init(language: LanguageType) -> Self {
-        fn init_corasick(pattern: &[&'static str]) -> AhoCorasick {
+        fn init_corasick<P: AsRef<[u8]>>(pattern: &[P]) -> AhoCorasick {
             AhoCorasick::builder()
                 .match_kind(aho_corasick::MatchKind::LeftmostLongest)
                 .start_kind(aho_corasick::StartKind::Unanchored)
@@ -129,6 +135,16 @@ impl SharedMatchers {
                 None => opener_bytes = [true; 256],
             }
         }
+        let raw = || language.raw_strings().iter().chain(language.raw_comments());
+        for b in raw().flat_map(RawDelimiter::first_bytes) {
+            opener_bytes[usize::from(b)] = true;
+        }
+        let important_syntax: Vec<String> = language
+            .important_syntax()
+            .iter()
+            .map(|text| (*text).to_owned())
+            .chain(raw().flat_map(RawDelimiter::important_syntax))
+            .collect();
 
         Self {
             language,
@@ -136,7 +152,7 @@ impl SharedMatchers {
             doc_quotes: language.doc_quotes(),
             is_fortran: language.is_fortran(),
             is_literate: language.is_literate(),
-            important_syntax: init_corasick(language.important_syntax()),
+            important_syntax: init_corasick(&important_syntax),
             any_comments: language.any_comments(),
             line_comments: language.line_comments(),
             multi_line_comments: language.multi_line_comments(),
@@ -147,6 +163,8 @@ impl SharedMatchers {
             comment_exceptions: language.comment_exceptions(),
             doubled_quote_escapes: language.doubled_quote_escapes(),
             verbatim_string_literals: language.verbatim_quotes(),
+            raw_strings: language.raw_strings(),
+            raw_comments: language.raw_comments(),
             opener_bytes,
         }
     }
@@ -169,6 +187,7 @@ impl SyntaxCounter {
             stack: Vec::with_capacity(1),
             lf_embedded_language: None,
             quote: None,
+            quote_escape: None,
         }
     }
 
@@ -386,14 +405,16 @@ impl SyntaxCounter {
             self.shared
                 .any_multi_line_comments
                 .iter()
-                .any(|(start, end)| end == quote && trimmed.starts_with(start.as_bytes()))
+                .any(|(start, end)| *end == quote.as_ref() && trimmed.starts_with(start.as_bytes()))
         };
 
         // `Some(true)` in order to respect the current configuration.
         #[allow(clippy::if_same_then_else)]
         if self.quote.is_some() {
             if self.quote_is_doc_quote && config.treat_doc_strings_as_comments == Some(true) {
-                self.quote.map_or(false, |q| line.starts_with(q.as_bytes()))
+                self.quote
+                    .as_deref()
+                    .map_or(false, |q| line.starts_with(q.as_bytes()))
                     || (self.quote.is_some())
             } else {
                 false
@@ -620,6 +641,20 @@ impl SyntaxCounter {
             return None;
         }
 
+        if let Some(opening) = self
+            .shared
+            .raw_strings
+            .iter()
+            .find_map(|raw| raw.parse_opener(window))
+        {
+            trace!("Start raw, closed by {:?}", opening.closer);
+            self.quote = Some(Cow::Owned(opening.closer));
+            self.quote_escape = opening.escape;
+            self.quote_is_verbatim = true;
+            self.quote_is_doc_quote = false;
+            return Some(opening.len);
+        }
+
         if let Some((start, end)) = self
             .shared
             .doc_quotes
@@ -627,7 +662,7 @@ impl SyntaxCounter {
             .find(|(s, _)| window.starts_with(s.as_bytes()))
         {
             trace!("Start Doc {:?}", start);
-            self.quote = Some(end);
+            self.quote = Some(Cow::Borrowed(end));
             self.quote_is_verbatim = false;
             self.quote_is_doc_quote = true;
             return Some(start.len());
@@ -640,7 +675,7 @@ impl SyntaxCounter {
             .find(|(s, _)| window.starts_with(s.as_bytes()))
         {
             trace!("Start verbatim {:?}", start);
-            self.quote = Some(end);
+            self.quote = Some(Cow::Borrowed(end));
             self.quote_is_verbatim = true;
             self.quote_is_doc_quote = false;
             return Some(start.len());
@@ -653,7 +688,7 @@ impl SyntaxCounter {
             .find(|(s, _)| window.starts_with(s.as_bytes()))
         {
             trace!("Start {:?}", start);
-            self.quote = Some(end);
+            self.quote = Some(Cow::Borrowed(end));
             self.quote_is_verbatim = false;
             self.quote_is_doc_quote = false;
             return Some(start.len());
@@ -717,17 +752,28 @@ impl SyntaxCounter {
     #[inline]
     pub(crate) fn parse_end_of_quote(&mut self, window: &[u8]) -> Option<usize> {
         #[allow(clippy::if_same_then_else)]
-        if self._is_string_mode() && window.starts_with(self.quote?.as_bytes()) {
-            let quote = self.quote?;
+        if let Some(quote) = self
+            .quote
+            .as_deref()
+            .filter(|quote| window.starts_with(quote.as_bytes()))
+        {
+            let len = quote.len();
             if self.quote_is_verbatim
                 && self.shared.doubled_quote_escapes.contains(&quote)
-                && window[quote.len()..].starts_with(quote.as_bytes())
+                && window[len..].starts_with(quote.as_bytes())
             {
-                return Some(quote.len() * 2);
+                return Some(len * 2);
             }
-            self.quote = None;
             trace!("End {:?}", quote);
-            Some(quote.len())
+            self.quote = None;
+            self.quote_escape = None;
+            Some(len)
+        } else if let Some(escape) = self
+            .quote_escape
+            .as_deref()
+            .filter(|escape| window.starts_with(escape.as_bytes()))
+        {
+            Some(escape.len() + 1)
         } else if !self.quote_is_verbatim && window.starts_with(br"\\") {
             Some(2)
         } else if !self.quote_is_verbatim
@@ -752,6 +798,19 @@ impl SyntaxCounter {
             return None;
         }
 
+        if self.stack.is_empty() || self.shared.allows_nested {
+            if let Some(opening) = self
+                .shared
+                .raw_comments
+                .iter()
+                .find_map(|raw| raw.parse_opener(window))
+            {
+                trace!("Start raw comment, closed by {:?}", opening.closer);
+                self.stack.push(Cow::Owned(opening.closer));
+                return Some(opening.len);
+            }
+        }
+
         let iter = self
             .shared
             .multi_line_comments
@@ -763,7 +822,7 @@ impl SyntaxCounter {
                     || self.shared.allows_nested
                     || self.shared.nested_comments.contains(&(start, end))
                 {
-                    self.stack.push(end);
+                    self.stack.push(Cow::Borrowed(end));
 
                     if log_enabled!(Trace) && self.shared.allows_nested {
                         trace!("Start nested {:?}", start);

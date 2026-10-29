@@ -1,3 +1,19 @@
+{% macro raw_delimiters(items) -%}
+    {%- for raw in items -%}
+        crate::language::raw_delimiter::RawDelimiter {
+            start: "{{ raw.start | default(value="") }}",
+            middle: {% if raw.repeat is defined -%}
+                crate::language::raw_delimiter::RawMiddle::Repeat { byte: b'{{ raw.repeat }}', min: {{ raw.min_repeat | default(value=0) }} }
+            {%- else -%}
+                crate::language::raw_delimiter::RawMiddle::Label { chars: "{{ raw.label }}", max: {% if raw.max_label is defined %}{{ raw.max_label }}{% else %}usize::MAX{% endif %} }
+            {%- endif %},
+            open: "{{ raw.open | default(value="") }}",
+            close: "{{ raw.close }}",
+            end: "{{ raw.end | default(value="") }}",
+            escape: "{{ raw.escape | default(value="") }}",
+        },
+    {%- endfor -%}
+{%- endmacro raw_delimiters %}
 use arbitrary::Arbitrary;
 
 /// Represents a individual programming language. Can be used to provide
@@ -167,6 +183,26 @@ impl LanguageType {
                         "{{item}}",
                     {%- endfor -%}
                 ],
+            {% endfor %}
+        }
+    }
+
+    /// Returns the literals of a language whose closer repeats a variable part
+    /// of the opener, such as Rust's `r#"…"#`; the first matching one wins.
+    pub(crate) fn raw_strings(self) -> &'static [crate::language::raw_delimiter::RawDelimiter] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[{{ self::raw_delimiters(items=value.raw_strings | default(value=[])) }}],
+            {% endfor %}
+        }
+    }
+
+    /// Returns the comments of a language whose closer repeats a variable part
+    /// of the opener, such as Lua's `--[==[…]==]`; the first matching one wins.
+    pub(crate) fn raw_comments(self) -> &'static [crate::language::raw_delimiter::RawDelimiter] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[{{ self::raw_delimiters(items=value.raw_comments | default(value=[])) }}],
             {% endfor %}
         }
     }
