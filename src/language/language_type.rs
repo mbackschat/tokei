@@ -83,8 +83,9 @@ impl LanguageType {
         };
 
         // A YAML line can continue the plain scalar of the line before it, so
-        // no YAML line can be classified on its own.
-        let simple_prefix = !syntax.shared.block_scalars;
+        // no YAML line can be classified on its own; a shebang or frontmatter
+        // is read by the full parse only.
+        let simple_prefix = !syntax.shared.block_scalars && !syntax.opens_with_whole_lines(text);
         if let Some(end) = simple_prefix
             .then(|| syntax.shared.important_syntax.find(text))
             .flatten()

@@ -142,6 +142,10 @@ pub(crate) struct SharedMatchers {
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
+    /// Bytes that can begin a blank symbol, so the analysis loop looks for
+    /// one only there; looking for Rust's five at every byte cost Tokio
+    /// `6470b5e` about 50M of 550M instructions (measured 2026-10-29).
+    pub blank_symbol_bytes: [bool; 256],
     /// Bytes that can begin a hole, a text that only looks like one or an
     /// escape, so strings skip the hole check at every other position.
     pub hole_bytes: [bool; 256],
@@ -248,8 +252,6 @@ impl SharedMatchers {
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
             .chain(language.pod().is_some().then(|| "=".to_owned()))
-            .chain(language.frontmatter().then(|| "---".to_owned()))
-            .chain(language.shebang().is_some().then(|| "#!".to_owned()))
             .chain(
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
@@ -302,6 +304,16 @@ impl SharedMatchers {
             block_scalars: language.block_scalars(),
             jsx: language.jsx(),
             opener_bytes,
+            blank_symbol_bytes: std::array::from_fn(|byte| {
+                debug_assert!(language
+                    .blank_symbols()
+                    .iter()
+                    .all(|symbol| !symbol.as_bytes()[0].is_ascii()));
+                language
+                    .blank_symbols()
+                    .iter()
+                    .any(|symbol| symbol.as_bytes()[0] == byte as u8)
+            }),
             hole_bytes,
             inert_bytes,
         }
@@ -412,6 +424,25 @@ impl SyntaxCounter {
             return Some(LineClass::Code);
         }
         None
+    }
+
+    /// Whether `text` opens with a shebang or a frontmatter, whole lines
+    /// that only the full parse reads. They open a file only, so they are
+    /// not important syntax, which every line is searched for: as such,
+    /// they cost Tokio `6470b5e` 42M of 503M instructions (measured
+    /// 2026-10-29).
+    pub(crate) fn opens_with_whole_lines(&self, text: &[u8]) -> bool {
+        let first_line = text.iter().position(|b| !b.is_ascii_whitespace()).map(|n| {
+            text[..n]
+                .iter()
+                .rposition(|b| *b == b'\n')
+                .map_or(0, |m| m + 1)
+        });
+        self.shared
+            .shebang
+            .is_some_and(|syntax| shebang_len(text, syntax).is_some())
+            || (self.shared.frontmatter
+                && first_line.is_some_and(|start| frontmatter_end(text, start).is_some()))
     }
 
     /// Returns whether the syntax is currently in plain mode, outside every
@@ -583,7 +614,7 @@ impl SyntaxCounter {
             if window.trim().is_empty() {
                 break;
             }
-            if self.is_plain_mode() {
+            if self.shared.blank_symbol_bytes[usize::from(window[0])] && self.is_plain_mode() {
                 if let Some(symbol) = self
                     .shared
                     .blank_symbols
@@ -1594,6 +1625,12 @@ fn template_expression_len(window: &[u8], expressions: &[(&str, &str)]) -> Optio
 pub(crate) fn trim_blank_start<'a>(mut text: &'a [u8], blank_symbols: &[&str]) -> &'a [u8] {
     loop {
         text = text.trim_start();
+        // Blank symbols start with a byte beyond ASCII, as ASCII whitespace
+        // is blank already; checking every line for Rust's cost Tokio
+        // `6470b5e` 29M of 503M instructions (measured 2026-10-29).
+        if text.first().map_or(true, u8::is_ascii) {
+            return text;
+        }
         match blank_symbols
             .iter()
             .find(|symbol| text.starts_with(symbol.as_bytes()))
