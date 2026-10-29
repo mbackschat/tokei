@@ -242,18 +242,19 @@ impl LanguageType {
         }
     }
 
-    /// Returns the tokens of a language that start like a comment but are code,
-    /// such as PHP's `#[` attributes or F#'s `(*)` operator.
+    /// Returns the tokens of a language that start like a comment or a string
+    /// but are code, such as PHP's `#[` attributes, F#'s `(*)` operator or
+    /// Ruby's `$'` global.
     /// ```
     /// use tokei::LanguageType;
     /// let lang = LanguageType::Php;
-    /// assert_eq!(lang.comment_exceptions(), &["#["]);
+    /// assert_eq!(lang.code_tokens(), &["#["]);
     /// ```
-    pub fn comment_exceptions(self) -> &'static [&'static str] {
+    pub fn code_tokens(self) -> &'static [&'static str] {
         match self {
             {% for key, value in languages -%}
                 {{key}} => &[
-                    {%- for item in value.comment_exceptions | default(value=[]) -%}
+                    {%- for item in value.code_tokens | default(value=[]) -%}
                         "{{item}}",
                     {%- endfor -%}
                 ],
@@ -373,7 +374,7 @@ impl LanguageType {
                 {%- set starting_doc_quotes = value.doc_quotes | default(value=[]) | map(attribute="0") -%}
                 {#- A line that only opens a verbatim quote, such as a Go backtick, must not skip analysis. -#}
                 {%- set starting_verbatim_quotes = value.verbatim_quotes | default(value=[]) | map(attribute="0") -%}
-                {%- set comment_exceptions = value.comment_exceptions | default(value=[]) -%}
+                {%- set code_tokens = value.code_tokens | default(value=[]) -%}
                 {%- set starting_multi_line_comments = value.multi_line_comments | default(value=[]) | map(attribute="0") -%}
                 {%- set starting_nested_comments = value.nested_comments | default(value=[]) | map(attribute="0") -%}
                 {%- set important_syntax = value.important_syntax | default(value=[]) -%}
@@ -382,7 +383,7 @@ impl LanguageType {
                     {%- for item in starting_quotes |
                                    concat(with=starting_doc_quotes) |
                                    concat(with=starting_verbatim_quotes) |
-                                   concat(with=comment_exceptions) |
+                                   concat(with=code_tokens) |
                                    concat(with=starting_multi_line_comments) |
                                    concat(with=starting_nested_comments) |
                                    concat(with=important_syntax) -%}

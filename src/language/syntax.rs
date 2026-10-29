@@ -12,7 +12,7 @@ use super::embedding::{
 };
 use super::interpolation::{Interpolation, OpenHole};
 use super::raw_delimiter::RawDelimiter;
-use super::regex_literal::regex_literal_len;
+use super::regex_literal::{regex_literal_len, RegexContext};
 use crate::LanguageType::LinguaFranca;
 use crate::{stats::CodeStats, utils::ext::SliceExt, Config, LanguageType};
 
@@ -90,7 +90,7 @@ pub(crate) struct SharedMatchers {
     pub nested_comments: &'static [(&'static str, &'static str)],
     pub string_literals: &'static [(&'static str, &'static str)],
     pub character_literals: &'static [(&'static str, &'static str)],
-    pub comment_exceptions: &'static [&'static str],
+    pub code_tokens: &'static [&'static str],
     pub doubled_quote_escapes: &'static [&'static str],
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
     pub raw_strings: &'static [RawDelimiter],
@@ -138,7 +138,7 @@ impl SharedMatchers {
             .chain(starts(language.doc_quotes()))
             .chain(starts(language.verbatim_quotes()))
             .chain(starts(language.character_literals()))
-            .chain(language.comment_exceptions().iter().copied())
+            .chain(language.code_tokens().iter().copied())
         {
             match opener.as_bytes().first() {
                 Some(&b) => opener_bytes[usize::from(b)] = true,
@@ -173,7 +173,7 @@ impl SharedMatchers {
             nested_comments: language.nested_comments(),
             string_literals: language.quotes(),
             character_literals: language.character_literals(),
-            comment_exceptions: language.comment_exceptions(),
+            code_tokens: language.code_tokens(),
             doubled_quote_escapes: language.doubled_quote_escapes(),
             verbatim_string_literals: language.verbatim_quotes(),
             raw_strings: language.raw_strings(),
@@ -253,13 +253,13 @@ impl SyntaxCounter {
         line: &[u8],
         stats: &mut crate::stats::CodeStats,
     ) -> bool {
-        if !self.is_plain_mode() || !self.holes.is_empty() {
+        if !self.is_plain_mode() {
             false
         } else if line.trim().is_empty() {
             stats.blanks += 1;
             trace!("Blank No.{}", stats.blanks);
             true
-        } else if self.shared.important_syntax.is_match(line) {
+        } else if !self.holes.is_empty() || self.shared.important_syntax.is_match(line) {
             false
         } else {
             trace!("^ Skippable");
@@ -331,8 +331,8 @@ impl SyntaxCounter {
 
             let may_open = self.shared.opener_bytes[usize::from(window[0])];
             if may_open {
-                if let Some(exception) = self.comment_exception(window) {
-                    skip!(exception.len());
+                if let Some(token) = self.code_token(window) {
+                    skip!(token.len());
                     continue;
                 }
 
@@ -405,7 +405,7 @@ impl SyntaxCounter {
             // comment, whatever comment marker that token starts with.
             let opens_with_code = self
                 .shared
-                .comment_exceptions
+                .code_tokens
                 .iter()
                 .any(|e| trimmed.starts_with(e.as_bytes()));
             !opens_with_code
@@ -728,13 +728,14 @@ impl SyntaxCounter {
         None
     }
 
-    /// The code token starting `window` that only looks like a comment opener.
-    pub(crate) fn comment_exception(&self, window: &[u8]) -> Option<&'static str> {
+    /// The code token starting `window` that only looks like a comment or
+    /// string opener.
+    pub(crate) fn code_token(&self, window: &[u8]) -> Option<&'static str> {
         if !self.is_plain_mode() {
             return None;
         }
         self.shared
-            .comment_exceptions
+            .code_tokens
             .iter()
             .copied()
             .find(|e| window.starts_with(e.as_bytes()))
@@ -900,7 +901,12 @@ impl SyntaxCounter {
         if !self.is_plain_mode() {
             return None;
         }
-        regex_literal_len(lines, i, keywords)
+        let context = RegexContext {
+            keywords,
+            line_comments: self.shared.line_comments,
+            multi_line_comments: self.shared.any_multi_line_comments,
+        };
+        regex_literal_len(lines, i, &context)
     }
 
     #[inline]

@@ -1,13 +1,15 @@
-// 13 lines 8 code 5 comments 0 blanks
+// 15 lines 8 code 5 comments 2 blanks
 const a = `x ${f("`")} /*`;
 // comment
 const b = `${`${"}"}`}`;
 // comment
 const c = `a ${
+
   "/*"
 }`;
 // comment
 const d = `${
   // comment in a hole
+
   "/*"
 }`;

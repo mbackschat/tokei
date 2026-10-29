@@ -20,7 +20,7 @@ Engine changes, each with a regression file in `tests/data`:
 | --- | --- | --- |
 | `character_literals`: an escape running to the closing delimiter on the same line, or exactly one character, so a quote inside a character literal cannot open a string while Rust lifetimes and Haskell primes stay code. | `9e65ec4` | Not offered yet; compare [#1389](https://github.com/XAMPPRocky/tokei/pull/1389) |
 | Verbatim-quote openers join the per-line fast path, so a line that only opens a Go backtick string is analysed. | `2c95b8f` | Not offered yet; compare [#1351](https://github.com/XAMPPRocky/tokei/pull/1351) |
-| `comment_exceptions`: code tokens that start like a comment, also exempt from the line-start comment rule. | `a23b225` | Not offered yet |
+| `code_tokens` (named `comment_exceptions` before 15.0.0+locmetry.3): code tokens that start like a comment or string, also exempt from the line-start comment rule. | `a23b225` | Not offered yet |
 | A line that starts inside a literal is code, even when its text starts with a comment marker. | `801aae6` | Not offered yet |
 | `doubled_quote_escapes`: closing delimiters of verbatim quotes that stand for themselves when written twice. | `b773e13` | Not offered yet |
 | Opener matching runs only at bytes that can start a token, keeping the analysis at upstream speed. | `f8a9a6d` | Not offered yet |

@@ -648,7 +648,7 @@
       "doubled_quote_escapes": ["\\\""],
       "nested": true,
       "character_literals": [["'", "'"]],
-      "comment_exceptions": ["(*)"],
+      "code_tokens": ["(*)"],
       "name": "F#",
       "line_comment": ["//"],
       "multi_line_comments": [["(*", "*)"]],
@@ -1389,7 +1389,7 @@
       "extensions": ["e","exw"]
     },
     "Php": {
-      "comment_exceptions": ["#["],
+      "code_tokens": ["#["],
       "name": "PHP",
       "line_comment": ["#", "//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -1647,6 +1647,7 @@
       "extensions": ["spec"]
     },
     "Ruby": {
+      "code_tokens": ["$'", "$\\\"", "$`"],
       "regex_literals": {"after_keywords": ["and", "begin", "case", "do", "else", "elsif", "ensure", "if", "in", "not", "or", "rescue", "return", "then", "unless", "until", "when", "while", "yield"]},
       "interpolations": [{"quote": "\\\"", "open": "#{", "close": "}", "nest": "{"}],
       "line_comment": ["#"],

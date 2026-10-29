@@ -1,4 +1,4 @@
-// 13 lines 7 code 6 comments 0 blanks
+// 21 lines 13 code 8 comments 0 blanks
 const r = /"/;
 // comment
 const s = x.replace(/\/*$/, "");
@@ -10,4 +10,12 @@ function f(x) {
 }
 // comment
 const u = /[/"]/;
+// comment
+const v = x.replace(
+  // comment between the call and the regex
+  /[/*]/g,
+  "",
+);
+const w = f(/* comment */ /[/*]/);
+const z = 1;
 // comment
