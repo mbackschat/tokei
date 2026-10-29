@@ -158,6 +158,7 @@ impl LanguageType {
                 continue;
             }
 
+            let started_in_literal = syntax.quote.is_some();
             let started_in_comments = !syntax.stack.is_empty()
                 || (config.treat_doc_strings_as_comments == Some(true)
                     && syntax.quote.is_some()
@@ -200,7 +201,13 @@ impl LanguageType {
             trace!("{}", String::from_utf8_lossy(line));
 
             if syntax.shared.is_literate
-                || syntax.line_is_comment(line, config, ended_with_comments, started_in_comments)
+                || syntax.line_is_comment(
+                    line,
+                    config,
+                    ended_with_comments,
+                    started_in_comments,
+                    started_in_literal,
+                )
             {
                 stats.comments += 1;
                 trace!("Comment No.{}", stats.comments);

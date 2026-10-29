@@ -318,6 +318,7 @@ impl SyntaxCounter {
         config: &crate::Config,
         _ended_with_comments: bool,
         started_in_comments: bool,
+        started_in_literal: bool,
     ) -> bool {
         let trimmed = line.trim();
         let whole_line_is_comment = || {
@@ -372,6 +373,10 @@ impl SyntaxCounter {
             && started_in_comments
         {
             true
+        } else if started_in_literal && !started_in_comments {
+            // The line's first characters belong to a literal, so a comment
+            // marker they spell, as in a raw string's `// …` line, is text.
+            false
         } else if (whole_line_is_comment)() {
             true
         } else if started_in_comments {
