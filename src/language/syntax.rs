@@ -1010,7 +1010,7 @@ impl SyntaxCounter {
 
 /// Whether a word can start after `before`: at the start of the text, after
 /// whitespace or after a shell operator character (POSIX.1-2024, Shell Command
-/// Language §2.3, rules 6 and 9).
+/// Language §2.3, rules 6, 8 and 9).
 fn starts_word(before: &[u8]) -> bool {
     match before.last() {
         None => true,
