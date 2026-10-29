@@ -158,7 +158,10 @@ fn literal_end(node: Node, bytes: &[u8]) -> usize {
     let text = &bytes[node.start_byte()..end];
     let header_end = text.iter().position(|b| *b == b'\n').unwrap_or(text.len());
     if text[..header_end].split(|b| *b == b'#').next().is_some_and(|h| h.contains(&b'+')) {
-        return end;
+        // Keep chomping makes the empty lines after the content part of it,
+        // which tree-sitter-yaml leaves outside the node.
+        let next_text = bytes[end..].iter().position(|b| !b.is_ascii_whitespace()).map_or(bytes.len(), |n| end + n);
+        return bytes[..next_text].iter().rposition(|b| *b == b'\n').map_or(end, |n| n.max(end));
     }
     node.start_byte() + text.iter().rposition(|b| !b.is_ascii_whitespace()).map_or(0, |n| n + 1)
 }
