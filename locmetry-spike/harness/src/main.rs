@@ -107,6 +107,13 @@ impl Lang {
         }
     }
 
+    fn regions(self, text: &str) -> (Vec<Region>, bool) {
+        match self {
+            Lang::Html => ts::html_regions(text),
+            _ => ts::regions(text, &self.grammar()),
+        }
+    }
+
     /// The spike's hand-written lexers, which exist only for its first eight languages.
     fn lexer(self, text: &str) -> Option<Vec<Region>> {
         Some(match self {
@@ -125,15 +132,39 @@ impl Lang {
 fn fork_lines(path: &Path, text: &str) -> Counts {
     let config = tokei_fork::Config::default();
     let kind = tokei_fork::LanguageType::from_path(path, &config).expect("fork language");
-    let stats = kind.parse_from_str(text, &config).summarise();
-    Counts { code: stats.code as u64, comments: stats.comments as u64, blanks: stats.blanks as u64 }
+    let stats = kind.parse_from_str(text, &config);
+    let mut counts = Counts { code: stats.code as u64, comments: stats.comments as u64, blanks: stats.blanks as u64 };
+    for (child, blob) in &stats.blobs {
+        let blob = blob.summarise();
+        // Locmetry folds Markdown blobs, which Tokei makes of Rust doc
+        // comments, into the host's comments (src/backend/records.rs).
+        if *child == tokei_fork::LanguageType::Markdown {
+            counts.comments += (blob.code + blob.comments) as u64;
+        } else {
+            counts.code += blob.code as u64;
+            counts.comments += blob.comments as u64;
+        }
+        counts.blanks += blob.blanks as u64;
+    }
+    counts
 }
 
 fn tokei_lines(path: &Path, text: &str) -> Counts {
     let config = tokei::Config::default();
     let kind = LanguageType::from_path(path, &config).expect("Tokei language");
-    let stats = kind.parse_from_str(text, &config).summarise();
-    Counts { code: stats.code as u64, comments: stats.comments as u64, blanks: stats.blanks as u64 }
+    let stats = kind.parse_from_str(text, &config);
+    let mut counts = Counts { code: stats.code as u64, comments: stats.comments as u64, blanks: stats.blanks as u64 };
+    for (child, blob) in &stats.blobs {
+        let blob = blob.summarise();
+        if *child == LanguageType::Markdown {
+            counts.comments += (blob.code + blob.comments) as u64;
+        } else {
+            counts.code += blob.code as u64;
+            counts.comments += blob.comments as u64;
+        }
+        counts.blanks += blob.blanks as u64;
+    }
+    counts
 }
 
 /// Tokei's class of each line, read from the counts of growing prefixes.
@@ -179,11 +210,11 @@ fn count(root: &Path) {
     let rows: Vec<String> = files
         .par_iter()
         .filter_map(|(path, lang)| {
-            let text = std::fs::read_to_string(path).ok()?;
+            let text = read(path)?;
             let t0 = Instant::now();
             let tokei = tokei_lines(path, &text);
             let t1 = Instant::now();
-            let (ts_regions, ts_error) = ts::regions(&text, &lang.grammar());
+            let (ts_regions, ts_error) = lang.regions(&text);
             let ts = lines::count(&lines::lines(&text, &ts_regions));
             let t2 = Instant::now();
             let lex = lang.lexer(&text).map(|r| json(lines::count(&lines::lines(&text, &r))));
@@ -208,10 +239,17 @@ fn count(root: &Path) {
     }
 }
 
+/// The file's text without a leading byte order mark, which Tokei's file
+/// reader strips (encoding_rs_io BOM sniffing) before counting.
+fn read(path: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(path).ok()?;
+    Some(text.strip_prefix('\u{feff}').map(str::to_owned).unwrap_or(text))
+}
+
 fn show_lines(path: &Path) {
     let lang = Lang::from_path(path).expect("spike language");
-    let text = std::fs::read_to_string(path).unwrap();
-    let ts = lines::lines(&text, &ts::regions(&text, &lang.grammar()).0);
+    let text = read(path).unwrap();
+    let ts = lines::lines(&text, &lang.regions(&text).0);
     let lex = lang.lexer(&text).map(|r| lines::lines(&text, &r));
     let tok = tokei_per_line(path, &text);
     let fork = fork_per_line(path, &text);
@@ -232,11 +270,37 @@ fn show_lines(path: &Path) {
     }
 }
 
+/// Prints the tree-sitter nodes that intersect lines FROM to TO, one-based,
+/// with their depth, kind, rows and error flags.
+fn show_tree(path: &Path, from: usize, to: usize) {
+    let lang = Lang::from_path(path).expect("spike language");
+    let text = read(path).unwrap();
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&lang.grammar()).unwrap();
+    let tree = parser.parse(&text, None).unwrap();
+    let mut stack = vec![(tree.root_node(), 0)];
+    while let Some((node, depth)) = stack.pop() {
+        let (start, end) = (node.start_position().row + 1, node.end_position().row + 1);
+        if end < from || start > to {
+            continue;
+        }
+        let snippet: String = node.utf8_text(text.as_bytes()).unwrap_or("").chars().take(40).collect();
+        println!("{}{} {}-{}{}{} {:?}", "  ".repeat(depth), node.kind(), start, end,
+            if node.is_error() { " ERROR" } else { "" }, if node.is_missing() { " MISSING" } else { "" }, snippet);
+        let mut cursor = node.walk();
+        let children: Vec<_> = node.children(&mut cursor).collect();
+        for child in children.into_iter().rev() {
+            stack.push((child, depth + 1));
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
         Some("count") => count(Path::new(&args[2])),
         Some("lines") => show_lines(Path::new(&args[2])),
+        Some("tree") => show_tree(Path::new(&args[2]), args[3].parse().unwrap(), args[4].parse().unwrap()),
         _ => eprintln!("usage: spike count ROOT | spike lines FILE"),
     }
 }
