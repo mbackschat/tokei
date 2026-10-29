@@ -322,6 +322,27 @@ impl LanguageType {
         }
     }
 
+    /// Returns whose rules decide whether a file opens with a shebang, a
+    /// comment line: any `#!` line, or Rust's, which excludes `#![`.
+    pub(crate) fn shebang(self) -> Option<crate::language::shebang::ShebangSyntax> {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.shebang is defined and value.shebang == "plain" %}Some(crate::language::shebang::ShebangSyntax::Plain){% elif value.shebang is defined and value.shebang == "rust" %}Some(crate::language::shebang::ShebangSyntax::Rust){% else %}None{% endif %},
+            {% endfor %}
+        }
+    }
+
+    /// Returns the verbatim closers that, followed by more of their last
+    /// character, close only at the end of the run, the characters before
+    /// them being text, as Kotlin's `"""` does.
+    pub(crate) fn run_closers(self) -> &'static [&'static str] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[{% for item in value.run_closers | default(value=[]) %}"{{ item }}",{% endfor %}],
+            {% endfor %}
+        }
+    }
+
     /// Returns the lines, such as Perl's `__END__`, after which the text is
     /// data rather than code.
     pub(crate) fn end_markers(self) -> &'static [&'static str] {

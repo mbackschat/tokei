@@ -11,6 +11,7 @@ mod pod;
 mod quote_like;
 mod raw_delimiter;
 mod regex_literal;
+mod shebang;
 mod syntax;
 
 use std::{collections::BTreeMap, mem, ops::AddAssign};

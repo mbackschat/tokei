@@ -3,6 +3,8 @@
 //! (rust-lang/rust `compiler/rustc_lexer/src/lib.rs`, published as
 //! `ra-ap-rustc_lexer` 0.179.0; RFC 3503).
 
+use super::shebang::{shebang_len, ShebangSyntax};
+
 /// The end of the frontmatter whose opening fence starts at `lines[start]`,
 /// at the end of the line of its closing fence, or `None` when none opens
 /// there. The closing fence is the next line that starts with as many dashes
@@ -30,18 +32,9 @@ pub(crate) fn frontmatter_end(lines: &[u8], start: usize) -> Option<usize> {
     )
 }
 
-/// Whether only whitespace comes before `start`, after a shebang line: a
-/// first line starting with `#!` not followed by `[`, which would open an
-/// inner attribute (rustc_lexer `strip_shebang`, which also skips comments
-/// before the `[`).
+/// Whether only whitespace comes before `start`, after a shebang line.
 fn only_whitespace_before(lines: &[u8], start: usize) -> bool {
-    let from = match lines.strip_prefix(b"#!") {
-        Some(tail) if tail.iter().find(|b| !b.is_ascii_whitespace()) != Some(&b'[') => lines
-            .iter()
-            .position(|b| *b == b'\n')
-            .map_or(lines.len(), |n| n + 1),
-        _ => 0,
-    };
+    let from = shebang_len(lines, ShebangSyntax::Rust).map_or(0, |len| len + 1);
     from <= start
         && std::str::from_utf8(&lines[from..start])
             .is_ok_and(|prefix| prefix.chars().all(is_whitespace))

@@ -1024,13 +1024,15 @@
       "extensions": ["kk"]
     },
     "Kotlin": {
-      "interpolations": [{"quote": "\\\"", "open": "${", "close": "}", "nest": "{"}, {"quote": "\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{"}],
-      "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
+      "interpolations": [{"quote": "\\\"", "open": "${", "close": "}", "nest": "{"}, {"quote": "\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{"}, {"quote": "$$\\\"", "open": "$${", "close": "}", "nest": "{"}, {"quote": "$$\\\"\\\"\\\"", "open": "$${", "close": "}", "nest": "{"}, {"quote": "$$$\\\"", "open": "$$${", "close": "}", "nest": "{"}, {"quote": "$$$\\\"\\\"\\\"", "open": "$$${", "close": "}", "nest": "{"}],
+      "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["$$\\\"\\\"\\\"", "\\\"\\\"\\\""], ["$$$\\\"\\\"\\\"", "\\\"\\\"\\\""], ["`", "`"]],
+      "run_closers": ["\\\"\\\"\\\""],
+      "shebang": "plain",
       "character_literals": [["'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "nested": true,
-      "quotes": [["\\\"", "\\\""]],
+      "quotes": [["\\\"", "\\\""], ["$$\\\"", "\\\""], ["$$$\\\"", "\\\""]],
       "extensions": ["kt", "kts"]
     },
     "Ksh": {
@@ -1698,6 +1700,7 @@
       "multi_line_comments": [["/*", "*/"]],
       "nested": true,
       "frontmatter": true,
+      "shebang": "rust",
       "blank_symbols": ["\u0085", "\u200e", "\u200f", "\u2028", "\u2029"],
       "extensions": ["rs"],
       "quotes": [["\\\"", "\\\""]]

@@ -19,6 +19,7 @@ use super::pod::{pod_block_end, PodSyntax};
 use super::quote_like::{quote_like_len, QuoteLikeSyntax};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{regex_literal_len, RegexContext};
+use super::shebang::{shebang_len, ShebangSyntax};
 use crate::LanguageType::LinguaFranca;
 use crate::{stats::CodeStats, utils::ext::SliceExt, Config, LanguageType};
 
@@ -109,6 +110,8 @@ pub(crate) struct SharedMatchers {
     pub line_start_comments: &'static [&'static str],
     pub pod: Option<PodSyntax>,
     pub frontmatter: bool,
+    pub shebang: Option<ShebangSyntax>,
+    pub run_closers: &'static [&'static str],
     pub backslash_operator: bool,
     pub quote_like: Option<QuoteLikeSyntax>,
     pub end_markers: &'static [&'static str],
@@ -246,6 +249,7 @@ impl SharedMatchers {
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
             .chain(language.pod().is_some().then(|| "=".to_owned()))
             .chain(language.frontmatter().then(|| "---".to_owned()))
+            .chain(language.shebang().is_some().then(|| "#!".to_owned()))
             .chain(
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
@@ -270,6 +274,8 @@ impl SharedMatchers {
             line_start_comments: language.line_start_comments(),
             pod: language.pod(),
             frontmatter: language.frontmatter(),
+            shebang: language.shebang(),
+            run_closers: language.run_closers(),
             backslash_operator: language.backslash_operator(),
             quote_like: language.quote_like(),
             end_markers: language.end_markers(),
@@ -364,6 +370,14 @@ impl SyntaxCounter {
         }
         if !self.is_plain_mode() {
             return None;
+        }
+        if start == 0
+            && self
+                .shared
+                .shebang
+                .is_some_and(|syntax| shebang_len(lines, syntax).is_some())
+        {
+            return Some(LineClass::Comment);
         }
         if self.shared.frontmatter {
             if let Some(frontmatter_end) = frontmatter_end(lines, start) {
@@ -1104,6 +1118,13 @@ impl SyntaxCounter {
             .filter(|quote| window.starts_with(quote.as_bytes()))
         {
             let len = quote.len();
+            // A run of more quotes closes at its end, the ones before the
+            // closer being text (Kotlin grammar, TRIPLE_QUOTE_CLOSE).
+            if self.shared.run_closers.contains(&quote)
+                && window.get(len) == quote.as_bytes().last()
+            {
+                return Some(1);
+            }
             if self.quote_is_verbatim
                 && self.shared.doubled_quote_escapes.contains(&quote)
                 && window[len..].starts_with(quote.as_bytes())
@@ -1585,7 +1606,7 @@ pub(crate) fn trim_blank_start<'a>(mut text: &'a [u8], blank_symbols: &[&str]) -
 
 /// The length of the block comment that opens at the start of `text`, up to
 /// and including its closer, or `None` when it does not close in `text`.
-fn block_comment_len(text: &[u8], start: &str, end: &str, nests: bool) -> Option<usize> {
+pub(crate) fn block_comment_len(text: &[u8], start: &str, end: &str, nests: bool) -> Option<usize> {
     let mut depth = 0usize;
     let mut i = 0;
     while i < text.len() {
