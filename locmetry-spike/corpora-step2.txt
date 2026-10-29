@@ -1,0 +1,5 @@
+swiftlang/swift-syntax 237beba662b7116dcc155618f923b6f54b5a68fe
+Kong/kong 21032122ab80c973f368f6bc539f53985e7164e8
+nlohmann/json 46bead6e134f2fe883086ba315dc687ef06210f8
+dotnet/aspire 818da5aea6497268a94a664ef7c4d28df23d4f5c
+folke/lazy.nvim 306a05526ada86a7b30af95c5cc81ffba93fef97
