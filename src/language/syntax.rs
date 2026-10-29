@@ -1336,6 +1336,15 @@ impl SyntaxCounter {
             // cannot open a hole.
             return (!self.quote_is_verbatim && window.starts_with(b"\\")).then_some(2);
         };
+        if kind.run_opens {
+            let run = window
+                .iter()
+                .take_while(|&&b| b == kind.open.as_bytes()[0])
+                .count();
+            if run > kind.open.len() {
+                return Some(run - kind.open.len());
+            }
+        }
         trace!("Start hole {:?}", kind.open);
         self.holes.push(OpenHole {
             quote: self.quote.take(),

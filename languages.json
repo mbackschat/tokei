@@ -392,7 +392,7 @@
       "extensions": ["cr"]
     },
     "CSharp": {
-      "interpolations": [{"quote": "$\\\"", "open": "{", "close": "}", "nest": "{", "literal": ["{{", "}}"]}, {"quote": "$@\\\"", "open": "{", "close": "}", "nest": "{", "literal": ["{{", "}}"]}, {"quote": "@$\\\"", "open": "{", "close": "}", "nest": "{", "literal": ["{{", "}}"]}, {"quote": "$\\\"\\\"\\\"", "open": "{", "close": "}", "nest": "{"}, {"quote": "$$\\\"\\\"\\\"", "open": "{{", "close": "}}", "nest": "{"}, {"quote": "$$$\\\"\\\"\\\"", "open": "{{{", "close": "}}}", "nest": "{"}],
+      "interpolations": [{"quote": "$\\\"", "open": "{", "close": "}", "nest": "{", "literal": ["{{", "}}"]}, {"quote": "$@\\\"", "open": "{", "close": "}", "nest": "{", "literal": ["{{", "}}"]}, {"quote": "@$\\\"", "open": "{", "close": "}", "nest": "{", "literal": ["{{", "}}"]}, {"quote": "$\\\"\\\"\\\"", "open": "{", "close": "}", "nest": "{", "run_opens": true}, {"quote": "$$\\\"\\\"\\\"", "open": "{{", "close": "}}", "nest": "{", "run_opens": true}, {"quote": "$$$\\\"\\\"\\\"", "open": "{{{", "close": "}}}", "nest": "{", "run_opens": true}],
       "raw_strings": [{"start": "$$$\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\""}, {"start": "$$\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\""}, {"start": "$\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\""}, {"start": "\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\""}],
       "doubled_quote_escapes": ["\\\""],
       "character_literals": [["'", "'"]],

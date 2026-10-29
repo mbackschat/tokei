@@ -245,6 +245,7 @@ impl LanguageType {
                             close: "{{ hole.close }}",
                             nest: b'{{ hole.nest }}',
                             literal: &[{% for text in hole.literal | default(value=[]) %}"{{ text }}",{% endfor %}],
+                            run_opens: {{ hole.run_opens | default(value=false) }},
                         },
                     {%- endfor -%}
                 ],

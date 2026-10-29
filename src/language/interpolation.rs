@@ -18,6 +18,11 @@ pub(crate) struct Interpolation {
     /// Texts of the string that would otherwise open a hole, such as C#'s
     /// `{{`, which stands for a brace.
     pub(crate) literal: &'static [&'static str],
+    /// Whether an `open` of one repeated byte opens at the end of a longer
+    /// run, the bytes before it being text, as C#'s `{{` does in `{{{x}}`
+    /// inside `$$"""…"""`, whose innermost braces form the interpolation
+    /// (csharplang proposal `raw-string-literal.md`).
+    pub(crate) run_opens: bool,
 }
 
 /// A string suspended while the code of one of its holes is read.
