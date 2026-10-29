@@ -15,6 +15,20 @@
         },
     {%- endfor -%}
 {%- endmacro raw_delimiters %}
+{% macro heredocs(items) -%}
+    {%- for heredoc in items -%}
+        crate::language::heredoc::Heredoc {
+            start: "{{ heredoc.start }}",
+            indent_flags: "{{ heredoc.indent_flags | default(value="") }}",
+            spacing: crate::language::heredoc::HeredocSpacing::
+                {%- if heredoc.spacing == "adjacent" %}Adjacent{% elif heredoc.spacing == "quoted_only" %}QuotedOnly{% else %}Any{% endif %},
+            word: crate::language::heredoc::HeredocWord::
+                {%- if heredoc.word == "shell" %}Shell{% else %}Identifier{% endif %},
+            closer: crate::language::heredoc::HeredocCloser::
+                {%- if heredoc.closer == "flexible" %}Flexible{% else %}Line{% endif %},
+        },
+    {%- endfor -%}
+{%- endmacro heredocs %}
 use arbitrary::Arbitrary;
 
 /// Represents a individual programming language. Can be used to provide
@@ -198,6 +212,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns the here-documents of a language, such as shell's `<<EOF`; the
+    /// first matching one wins.
+    pub(crate) fn heredocs(self) -> &'static [crate::language::heredoc::Heredoc] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[{{ self::heredocs(items=value.heredocs | default(value=[])) }}],
+            {% endfor %}
+        }
+    }
+
     /// Returns the comments of a language whose closer repeats a variable part
     /// of the opener, such as Lua's `--[==[…]==]`; the first matching one wins.
     pub(crate) fn raw_comments(self) -> &'static [crate::language::raw_delimiter::RawDelimiter] {
@@ -248,6 +272,16 @@ impl LanguageType {
         match self {
             {% for key, value in languages -%}
                 {{key}} => {{ value.line_comment_starts_word | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
+    /// Returns whether a `/` that starts a line opens a regular expression,
+    /// as in Ruby, where a line break ends the statement before it.
+    pub(crate) fn regex_after_line_break(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.regex_literals is defined %}{{ value.regex_literals.after_line_break | default(value=false) }}{% else %}false{% endif %},
             {% endfor %}
         }
     }

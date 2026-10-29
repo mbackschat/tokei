@@ -37,6 +37,7 @@ enum Lang {
     Tsx,
     Python,
     Shell,
+    Perl,
 }
 
 impl Lang {
@@ -65,6 +66,7 @@ impl Lang {
             "tsx" => Lang::Tsx,
             "py" => Lang::Python,
             "sh" | "bash" => Lang::Shell,
+            "pl" | "pm" => Lang::Perl,
             _ => return None,
         })
     }
@@ -92,6 +94,7 @@ impl Lang {
             Lang::Tsx => tree_sitter_typescript::LANGUAGE_TSX.into(),
             Lang::Python => tree_sitter_python::LANGUAGE.into(),
             Lang::Shell => tree_sitter_bash::LANGUAGE.into(),
+            Lang::Perl => ts_parser_perl::LANGUAGE.into(),
         }
     }
 

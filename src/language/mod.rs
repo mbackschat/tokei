@@ -1,4 +1,5 @@
 mod embedding;
+mod heredoc;
 mod interpolation;
 pub mod language_type;
 pub mod languages;

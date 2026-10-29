@@ -157,6 +157,7 @@
       "extensions": ["bal"]
     },
     "Bash": {
+      "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
       "verbatim_quotes": [["'", "'"]],
@@ -1024,6 +1025,7 @@
       "extensions": ["kt", "kts"]
     },
     "Ksh": {
+      "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
       "verbatim_quotes": [["'", "'"]],
@@ -1375,6 +1377,7 @@
       "extensions": ["pas"]
     },
     "Perl": {
+      "heredocs": [{"start": "<<", "indent_flags": "~", "spacing": "quoted_only", "word": "identifier", "closer": "line"}],
       "shebangs": ["#!/usr/bin/perl"],
       "line_comment": ["#"],
       "multi_line_comments": [["=pod", "=cut"]],
@@ -1395,6 +1398,7 @@
       "extensions": ["e","exw"]
     },
     "Php": {
+      "heredocs": [{"start": "<<<", "spacing": "any", "word": "identifier", "closer": "flexible"}],
       "code_tokens": ["#["],
       "name": "PHP",
       "line_comment": ["#", "//"],
@@ -1653,8 +1657,9 @@
       "extensions": ["spec"]
     },
     "Ruby": {
+      "heredocs": [{"start": "<<", "indent_flags": "-~", "spacing": "adjacent", "word": "identifier", "closer": "line"}],
       "code_tokens": ["$'", "$\\\"", "$`"],
-      "regex_literals": {"after_keywords": ["and", "begin", "case", "do", "else", "elsif", "ensure", "if", "in", "not", "or", "rescue", "return", "then", "unless", "until", "when", "while", "yield"]},
+      "regex_literals": {"after_line_break": true, "after_keywords": ["and", "begin", "case", "do", "else", "elsif", "ensure", "if", "in", "not", "or", "rescue", "return", "then", "unless", "until", "when", "while", "yield"]},
       "interpolations": [{"quote": "\\\"", "open": "#{", "close": "}", "nest": "{"}],
       "line_comment": ["#"],
       "multi_line_comments": [["=begin", "=end"]],
@@ -1713,6 +1718,7 @@
       "filenames": ["sconstruct", "sconscript"]
     },
     "Sh": {
+      "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
       "verbatim_quotes": [["'", "'"]],
@@ -2171,6 +2177,7 @@
       "extensions": ["zok"]
     },
     "Zsh": {
+      "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
       "verbatim_quotes": [["'", "'"]],

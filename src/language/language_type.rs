@@ -143,6 +143,10 @@ impl LanguageType {
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
 
         while let Some((start, end)) = stepper.next(lines) {
+            if start < syntax.heredoc_end {
+                stats.code += 1;
+                continue;
+            }
             let line = &lines[start..end];
             // FORTRAN has a rule where it only counts as a comment if it's the
             // first character in the column, so removing starting whitespace

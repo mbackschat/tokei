@@ -962,7 +962,7 @@ dependencies = [
  "rayon",
  "serde_json",
  "tokei 15.0.0",
- "tokei 15.0.0+locmetry.2",
+ "tokei 15.0.0+locmetry.3",
  "tree-sitter",
  "tree-sitter-bash",
  "tree-sitter-c",
@@ -984,6 +984,7 @@ dependencies = [
  "tree-sitter-scala",
  "tree-sitter-swift",
  "tree-sitter-typescript",
+ "ts-parser-perl",
  "walkdir",
 ]
 
@@ -1122,7 +1123,7 @@ dependencies = [
 
 [[package]]
 name = "tokei"
-version = "15.0.0+locmetry.2"
+version = "15.0.0+locmetry.3"
 dependencies = [
  "aho-corasick",
  "arbitrary",
@@ -1400,6 +1401,16 @@ name = "tree-sitter-typescript"
 version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c5f76ed8d947a75cc446d5fccd8b602ebf0cde64ccf2ffa434d873d7a575eff"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "ts-parser-perl"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "668b3649f53eeb75113d9a758eaf7c0b92c949a3753ca16a68033933bd228792"
 dependencies = [
  "cc",
  "tree-sitter-language",

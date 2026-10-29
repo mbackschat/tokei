@@ -75,5 +75,5 @@ fn is_literal(kind: &str) -> bool {
         && !kind.contains("get_expression"))
         || kind.contains("char_literal")
         || kind.contains("character_literal")
-        || matches!(kind, "char" | "character" | "rune_literal" | "heredoc" | "heredoc_body" | "nowdoc" | "regex")
+        || matches!(kind, "char" | "character" | "rune_literal" | "heredoc" | "heredoc_body" | "heredoc_content" | "nowdoc" | "regex")
 }

@@ -10,6 +10,7 @@ use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
     END_TEMPLATE,
 };
+use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, OpenHole};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{regex_literal_len, RegexContext};
@@ -38,6 +39,8 @@ pub(crate) struct SyntaxCounter {
     pub(crate) quote_opener: &'static str,
     /// Strings suspended while the code of their holes is read, innermost last.
     pub(crate) holes: Vec<OpenHole>,
+    /// The end of the last here-document body; lines before it are literal.
+    pub(crate) heredoc_end: usize,
     pub(crate) quote_is_doc_quote: bool,
     pub(crate) stack: Vec<Cow<'static, str>>,
     pub(crate) quote_is_verbatim: bool,
@@ -96,10 +99,12 @@ pub(crate) struct SharedMatchers {
     pub raw_strings: &'static [RawDelimiter],
     pub raw_comments: &'static [RawDelimiter],
     pub interpolations: &'static [Interpolation],
+    pub heredocs: &'static [Heredoc],
     /// Keywords after which `/` starts a regular expression, for languages
     /// that have regular expression literals.
     pub regex_keywords: Option<&'static [&'static str]>,
     pub line_comments_start_words: bool,
+    pub regex_after_line_break: bool,
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
@@ -156,6 +161,9 @@ impl SharedMatchers {
         if language.regex_keywords().is_some() {
             opener_bytes[usize::from(b'/')] = true;
         }
+        for heredoc in language.heredocs() {
+            opener_bytes[usize::from(heredoc.start.as_bytes()[0])] = true;
+        }
         let mut hole_bytes = [false; 256];
         for kind in language.interpolations() {
             for text in kind.literal.iter().chain([&kind.open]) {
@@ -170,6 +178,7 @@ impl SharedMatchers {
             .iter()
             .map(|text| (*text).to_owned())
             .chain(raw().flat_map(RawDelimiter::important_syntax))
+            .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .collect();
 
         Self {
@@ -192,8 +201,10 @@ impl SharedMatchers {
             raw_strings: language.raw_strings(),
             raw_comments: language.raw_comments(),
             interpolations: language.interpolations(),
+            heredocs: language.heredocs(),
             regex_keywords: language.regex_keywords(),
             line_comments_start_words: language.line_comments_start_words(),
+            regex_after_line_break: language.regex_after_line_break(),
             opener_bytes,
             hole_bytes,
         }
@@ -220,6 +231,7 @@ impl SyntaxCounter {
             quote_escape: None,
             quote_opener: "",
             holes: Vec::new(),
+            heredoc_end: 0,
         }
     }
 
@@ -361,6 +373,11 @@ impl SyntaxCounter {
                 }
 
                 if let Some(skip_amount) = self.parse_regex_literal(lines, i) {
+                    skip!(skip_amount);
+                    continue;
+                }
+
+                if let Some(skip_amount) = self.parse_heredoc(lines, i) {
                     skip!(skip_amount);
                     continue;
                 }
@@ -925,6 +942,23 @@ impl SyntaxCounter {
 
     /// Length of the regular expression literal at `lines[i]`, in plain mode
     /// for languages that have them.
+    /// Opens the here-document starting at `lines[i]`, whose body begins on
+    /// the next line or after the bodies of here-documents opened before it
+    /// on this line.
+    fn parse_heredoc(&mut self, lines: &[u8], i: usize) -> Option<usize> {
+        if self.shared.heredocs.is_empty() || !self.is_plain_mode() {
+            return None;
+        }
+        self.shared.heredocs.iter().find_map(|heredoc| {
+            let opening = heredoc.parse_opener(&lines[i..])?;
+            let next_line = i + lines[i..].iter().position(|b| *b == b'\n')? + 1;
+            let from = next_line.max(self.heredoc_end);
+            self.heredoc_end = heredoc.closing_line_end(&opening, lines, from)?;
+            trace!("Start heredoc, body ends at {}", self.heredoc_end);
+            Some(opening.len)
+        })
+    }
+
     fn parse_regex_literal(&self, lines: &[u8], i: usize) -> Option<usize> {
         let keywords = self.shared.regex_keywords?;
         if !self.is_plain_mode() {
@@ -932,6 +966,7 @@ impl SyntaxCounter {
         }
         let context = RegexContext {
             keywords,
+            after_line_break: self.shared.regex_after_line_break,
             line_comments: self.shared.line_comments,
             multi_line_comments: self.shared.any_multi_line_comments,
         };

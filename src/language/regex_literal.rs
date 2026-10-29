@@ -10,6 +10,9 @@ use crate::utils::ext::SliceExt;
 pub(crate) struct RegexContext<'a> {
     /// Keywords after which an expression, and so a regex, may follow.
     pub(crate) keywords: &'a [&'a str],
+    /// Whether a line break before the `/` ends the statement, so that the
+    /// `/` starts an expression.
+    pub(crate) after_line_break: bool,
     pub(crate) line_comments: &'a [&'a str],
     pub(crate) multi_line_comments: &'a [(&'a str, &'a str)],
 }
@@ -22,7 +25,9 @@ pub(crate) fn regex_literal_len(lines: &[u8], i: usize, context: &RegexContext) 
     if !window.starts_with(b"/") || matches!(window.get(1), Some(b'/' | b'*') | None) {
         return None;
     }
-    if !regex_allowed_after(&lines[..context.code_end(lines, i)], context.keywords) {
+    let code_end = context.code_end(lines, i);
+    let starts_line = context.after_line_break && lines[code_end..i].contains(&b'\n');
+    if !starts_line && !regex_allowed_after(&lines[..code_end], context.keywords) {
         return None;
     }
     let mut in_class = false;
