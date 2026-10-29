@@ -962,7 +962,7 @@ dependencies = [
  "rayon",
  "serde_json",
  "tokei 15.0.0",
- "tokei 15.0.0+locmetry.14",
+ "tokei 15.0.0+locmetry.15",
  "tree-sitter",
  "tree-sitter-bash",
  "tree-sitter-c",
@@ -1127,7 +1127,7 @@ dependencies = [
 
 [[package]]
 name = "tokei"
-version = "15.0.0+locmetry.14"
+version = "15.0.0+locmetry.15"
 dependencies = [
  "aho-corasick",
  "arbitrary",
