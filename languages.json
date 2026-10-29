@@ -157,10 +157,13 @@
       "extensions": ["bal"]
     },
     "Bash": {
+      "line_comment_starts_word": true,
+      "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
+      "verbatim_quotes": [["'", "'"]],
       "name": "BASH",
       "shebangs": ["#!/bin/bash"],
       "line_comment": ["#"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes": [["$'", "'"], ["\\\"", "\\\""]],
       "env": ["bash"],
       "extensions": ["bash"]
     },
@@ -1021,10 +1024,13 @@
       "extensions": ["kt", "kts"]
     },
     "Ksh": {
+      "line_comment_starts_word": true,
+      "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
+      "verbatim_quotes": [["'", "'"]],
       "name": "Korn shell",
       "shebangs": ["#!/bin/ksh"],
       "line_comment": ["#"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes": [["$'", "'"], ["\\\"", "\\\""]],
       "env": ["ksh"],
       "extensions": ["ksh"]
     },
@@ -1707,10 +1713,13 @@
       "filenames": ["sconstruct", "sconscript"]
     },
     "Sh": {
+      "line_comment_starts_word": true,
+      "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
+      "verbatim_quotes": [["'", "'"]],
       "name": "Shell",
       "shebangs": ["#!/bin/sh"],
       "line_comment": ["#"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes": [["$'", "'"], ["\\\"", "\\\""]],
       "env": ["sh"],
       "extensions": ["sh"]
     },
@@ -2162,9 +2171,12 @@
       "extensions": ["zok"]
     },
     "Zsh": {
+      "line_comment_starts_word": true,
+      "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
+      "verbatim_quotes": [["'", "'"]],
       "shebangs": ["#!/bin/zsh"],
       "line_comment": ["#"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes": [["$'", "'"], ["\\\"", "\\\""]],
       "extensions": ["zsh"]
     },
     "GdShader": {

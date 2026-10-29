@@ -65,7 +65,7 @@ fn holes(literal: Node, bytes: &[u8], out: &mut Vec<Region>) {
 }
 
 fn is_hole(kind: &str) -> bool {
-    kind.contains("interpolation") && !kind.contains("string") || matches!(kind, "template_substitution" | "interpolated_expression")
+    kind.contains("interpolation") && !kind.contains("string") || matches!(kind, "template_substitution" | "interpolated_expression" | "command_substitution")
 }
 
 fn is_literal(kind: &str) -> bool {

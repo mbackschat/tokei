@@ -99,6 +99,7 @@ pub(crate) struct SharedMatchers {
     /// Keywords after which `/` starts a regular expression, for languages
     /// that have regular expression literals.
     pub regex_keywords: Option<&'static [&'static str]>,
+    pub line_comments_start_words: bool,
     /// Bytes that can begin a comment, literal or comment exception, so the
     /// analysis loop can skip every other position without prefix matching.
     pub opener_bytes: [bool; 256],
@@ -180,6 +181,7 @@ impl SharedMatchers {
             raw_comments: language.raw_comments(),
             interpolations: language.interpolations(),
             regex_keywords: language.regex_keywords(),
+            line_comments_start_words: language.line_comments_start_words(),
             opener_bytes,
         }
     }
@@ -230,8 +232,12 @@ impl SyntaxCounter {
     }
 
     #[inline]
-    pub(crate) fn parse_line_comment(&self, window: &[u8]) -> bool {
-        if self.quote.is_some() || !self.stack.is_empty() {
+    pub(crate) fn parse_line_comment(&self, lines: &[u8], i: usize) -> bool {
+        let window = &lines[i..];
+        if self.quote.is_some()
+            || !self.stack.is_empty()
+            || (self.shared.line_comments_start_words && !starts_word(&lines[..i]))
+        {
             false
         } else if let Some(comment) = self
             .shared
@@ -364,7 +370,7 @@ impl SyntaxCounter {
                 continue;
             }
 
-            if self.parse_line_comment(window) {
+            if self.parse_line_comment(lines, i) {
                 ended_with_comments = true;
                 break;
             }
@@ -800,6 +806,7 @@ impl SyntaxCounter {
             self.quote = None;
             self.quote_escape = None;
             self.quote_opener = "";
+            self.quote_is_verbatim = false;
             Some(len)
         } else if let Some(escape) = self
             .quote_escape
@@ -813,14 +820,20 @@ impl SyntaxCounter {
             Some(2)
         } else if !self.quote_is_verbatim
             && window.starts_with(br"\")
-            && self
+            && (self
                 .shared
                 .string_literals
                 .iter()
+                .chain(self.shared.verbatim_string_literals)
                 .any(|(start, _)| window[1..].starts_with(start.as_bytes()))
+                || self
+                    .quote
+                    .as_deref()
+                    .is_some_and(|quote| window[1..].starts_with(quote.as_bytes())))
         {
             // Tell the state machine to skip the next character because it
-            // has been escaped if the string isn't a verbatim string.
+            // has been escaped if the string isn't a verbatim string. The
+            // closer need not open a string itself, as with shell's `$'…'`.
             Some(2)
         } else {
             None
@@ -976,5 +989,15 @@ impl SyntaxCounter {
         } else {
             None
         }
+    }
+}
+
+/// Whether a word can start after `before`: at the start of the text, after
+/// whitespace or after a shell operator character (POSIX.1-2024, Shell Command
+/// Language §2.3, rules 6 and 9).
+fn starts_word(before: &[u8]) -> bool {
+    match before.last() {
+        None => true,
+        Some(b) => b.is_ascii_whitespace() || b";&|()<>".contains(b),
     }
 }

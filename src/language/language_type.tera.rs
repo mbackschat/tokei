@@ -242,6 +242,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether a line comment marker opens a comment only where a word
+    /// could start, as `#` does in POSIX shells, so that `$#` is code.
+    pub(crate) fn line_comments_start_words(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.line_comment_starts_word | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns the tokens of a language that start like a comment or a string
     /// but are code, such as PHP's `#[` attributes, F#'s `(*)` operator or
     /// Ruby's `$'` global.
