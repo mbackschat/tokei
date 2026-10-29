@@ -10,6 +10,44 @@
 [![Packaging status](https://repology.org/badge/tiny-repos/tokei.svg)](https://repology.org/project/tokei/versions)
 
 
+> **This is the [Locmetry](https://github.com/mbackschat/locmetry) fork of Tokei 15.0.0**, on branch `locmetry`. It corrects comments and blank lines that Tokei miscounts when a literal holds a comment marker or a quote, as recorded in Locmetry's [Tokei counting defects](https://github.com/mbackschat/locmetry/blob/main/docs/tokei-defects.md) and [fork plan](https://github.com/mbackschat/locmetry/blob/main/docs/plans/tokei-fork.md). Its version carries the build metadata `+locmetry.N`, raised with every change to counting. The rest of this README describes upstream Tokei.
+
+## Changes From Upstream
+
+Engine changes, each with a regression file in `tests/data`:
+
+| Change | Commit | Upstream |
+| --- | --- | --- |
+| `character_literals`: an escape running to the closing delimiter on the same line, or exactly one character, so a quote inside a character literal cannot open a string while Rust lifetimes and Haskell primes stay code. | `9e65ec4` | Not offered yet; compare [#1389](https://github.com/XAMPPRocky/tokei/pull/1389) |
+| Verbatim-quote openers join the per-line fast path, so a line that only opens a Go backtick string is analysed. | `2c95b8f` | Not offered yet; compare [#1351](https://github.com/XAMPPRocky/tokei/pull/1351) |
+| `comment_exceptions`: code tokens that start like a comment, also exempt from the line-start comment rule. | `a23b225` | Not offered yet |
+| A line that starts inside a literal is code, even when its text starts with a comment marker. | `801aae6` | Not offered yet |
+| `doubled_quote_escapes`: closing delimiters of verbatim quotes that stand for themselves when written twice. | `b773e13` | Not offered yet |
+| Opener matching runs only at bytes that can start a token, keeping the analysis at upstream speed. | `f8a9a6d` | Not offered yet |
+
+Declarations in `languages.json`, each grounded in the cited specification or reference lexer:
+
+| Languages | Declared | Commit | Sources |
+| --- | --- | --- | --- |
+| C, C header | Character literals | `9e65ec4`, `6798eb4` | [N3220](https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3220.pdf) §6.4.4.5, §6.4.5, §6.4.9 |
+| C++, C++ header, C++ module | Character literals | `6798eb4` | [lex.ccon](https://eel.is/c++draft/lex.ccon), [lex.string](https://eel.is/c++draft/lex.string), [lex.comment](https://eel.is/c++draft/lex.comment) |
+| Rust | Character literals; `r`, `br` and `cr` raw strings with up to three `#` | `9e65ec4`, `2c95b8f` | [Tokens](https://doc.rust-lang.org/reference/tokens.html#character-literals), [raw strings](https://doc.rust-lang.org/reference/tokens.html#raw-string-literals) |
+| Go | Character (rune) literals; backtick raw strings as verbatim quotes | `2c95b8f` | [Go spec](https://go.dev/ref/spec#Rune_literals), [string literals](https://go.dev/ref/spec#String_literals) |
+| Java | Character literals; `"""` text blocks | `2c95b8f` | [JLS SE 21 §3.10.4–3.10.7](https://docs.oracle.com/javase/specs/jls/se21/html/jls-3.html) |
+| Kotlin | Character literals; `"""` raw strings as verbatim quotes instead of escaping quotes | `6798eb4` | [Kotlin spec, tokens](https://kotlinlang.org/spec/syntax-and-grammar.html#tokens) |
+| C# | Character literals; `""` in `@"…"` strings | `6798eb4`, `b773e13` | [C# standard §6.4.5.5–6.4.5.6](https://github.com/dotnet/csharpstandard/blob/draft-v8/standard/lexical-structure.md) |
+| Scala | Character literals; `"""` strings as verbatim quotes | `6798eb4` | [Scala 2.13 lexical syntax](https://scala-lang.org/files/archive/spec/2.13/01-lexical-syntax.html), [Scala 3 syntax](https://docs.scala-lang.org/scala3/reference/syntax.html) |
+| OCaml | Character literals; nested comments | `6798eb4` | [OCaml 5.2 lexical conventions](https://ocaml.org/manual/5.2/lex.html), [lexer.mll](https://github.com/ocaml/ocaml/blob/5.2/parsing/lexer.mll) |
+| F# | Character literals; nested comments; `"""` and `@"…"` verbatim strings with `""` escapes; `(*)` is code | `a23b225`, `6798eb4`, `b773e13` | [F# spec, lexical analysis](https://github.com/fsharp/fslang-spec/blob/main/spec/lexical-analysis.md), [lex.fsl](https://github.com/dotnet/fsharp/blob/main/src/Compiler/lex.fsl) |
+| PHP | `#[` attributes are code | `a23b225` | [Attributes](https://www.php.net/manual/en/language.attributes.syntax.php), [zend_language_scanner.l](https://github.com/php/php-src/blob/php-8.5.12/Zend/zend_language_scanner.l) |
+| Haskell | Strings and character literals | `6798eb4` | [Haskell 2010 §2.6](https://www.haskell.org/onlinereport/haskell2010/haskellch2.html#x7-200002.6) |
+| Elm | `"""` and `"` strings; character literals | `6798eb4` | [elm/compiler 0.19.1 Parse/String.hs](https://github.com/elm/compiler/blob/0.19.1/compiler/src/Parse/String.hs) |
+| PureScript | Strings, `"""` raw strings and character literals; non-nesting comments | `6798eb4` | [Syntax](https://github.com/purescript/documentation/blob/master/language/Syntax.md), [Lexer.hs v0.15.16](https://github.com/purescript/purescript/blob/v0.15.16/src/Language/PureScript/CST/Lexer.hs) |
+| Agda | Strings and character literals | `6798eb4` | [Lexical structure](https://agda.readthedocs.io/en/latest/language/lexical-structure.html), [Lexer.x v2.8.0.2](https://github.com/agda/agda/blob/v2.8.0.2/src/full/Agda/Syntax/Parser/Lexer.x) |
+| Racket, Scheme, Lisp | Strings; `#\` character literals | `6798eb4` | [Racket reader](https://docs.racket-lang.org/reference/reader.html), [R7RS small](https://small.r7rs.org/attachment/r7rs.pdf) §2.1–2.3, [CLHS 2.4.8.1](https://www.lispworks.com/documentation/HyperSpec/Body/02_dha.htm) |
+
+`locmetry-spike/` holds the development harness that compares these counts with tree-sitter on public repositories; it is not part of the crate.
+
 Tokei is a program that displays statistics about your code. Tokei will show the number of files, total lines within those files and code, comments, and blanks grouped by language.
 
 ## Example

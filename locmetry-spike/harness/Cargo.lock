@@ -962,7 +962,7 @@ dependencies = [
  "rayon",
  "serde_json",
  "tokei 15.0.0",
- "tokei 15.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokei 15.0.0+locmetry.1",
  "tree-sitter",
  "tree-sitter-bash",
  "tree-sitter-c",
@@ -1090,6 +1090,8 @@ dependencies = [
 [[package]]
 name = "tokei"
 version = "15.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cee2d8d958bbbe166867f95c85eb95ce0c67cdf6377ef8cd3186ce843c3f752c"
 dependencies = [
  "aho-corasick",
  "arbitrary",
@@ -1116,9 +1118,7 @@ dependencies = [
 
 [[package]]
 name = "tokei"
-version = "15.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cee2d8d958bbbe166867f95c85eb95ce0c67cdf6377ef8cd3186ce843c3f752c"
+version = "15.0.0+locmetry.1"
 dependencies = [
  "aho-corasick",
  "arbitrary",
