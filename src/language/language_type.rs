@@ -182,10 +182,6 @@ impl LanguageType {
                                 // Add the code inside the fence to the stats.
                                 *stats.blobs.entry(language).or_default() += blob;
                             }
-                            LanguageContext::Rust => {
-                                // Add all the markdown blobs.
-                                *stats.blobs.entry(LanguageType::Markdown).or_default() += blob;
-                            }
                             LanguageContext::LinguaFranca => {
                                 let child_lang = syntax.get_lf_target_language();
                                 *stats.blobs.entry(child_lang).or_default() += blob;

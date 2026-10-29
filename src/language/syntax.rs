@@ -2,7 +2,6 @@ use std::{borrow::Cow, sync::Arc};
 
 use aho_corasick::AhoCorasick;
 use dashmap::DashMap;
-use grep_searcher::LineStep;
 use log::Level::Trace;
 use once_cell::sync::Lazy;
 
@@ -81,7 +80,6 @@ pub(crate) enum LanguageContext {
         balanced: bool,
         language: LanguageType,
     },
-    Rust,
 }
 
 #[derive(Clone, Debug)]
@@ -616,42 +614,6 @@ impl SyntaxCounter {
                     LanguageContext::Markdown { balanced, language },
                     end_of_code_block,
                     stats,
-                ))
-            }
-            RegexFamily::Rust => {
-                let rest = &lines[start..];
-                let comment_syntax = if rest.trim_start().starts_with(b"///") {
-                    b"///"
-                } else if rest.trim_start().starts_with(b"//!") {
-                    b"//!"
-                } else {
-                    return None;
-                };
-
-                let mut stepper = LineStep::new(b'\n', start, lines.len());
-                let mut markdown = Vec::new();
-                let mut end_of_block = lines.len();
-
-                while let Some((start, end)) = stepper.next(lines) {
-                    if lines[start..].trim().starts_with(comment_syntax) {
-                        trace!("{}", String::from_utf8_lossy(&lines[start..end]));
-                        let line = lines[start..end].trim_start();
-                        let stripped_line = &line[3.min(line.len())..];
-                        markdown.extend_from_slice(stripped_line);
-                        end_of_block = end;
-                    } else {
-                        end_of_block = start;
-                        break;
-                    }
-                }
-
-                trace!("Markdown found: {:?}", String::from_utf8_lossy(&markdown));
-                let doc_block = LanguageType::Markdown.parse_from_slice(markdown.trim(), config);
-
-                Some(FileContext::new(
-                    LanguageContext::Rust,
-                    end_of_block,
-                    doc_block,
                 ))
             }
             RegexFamily::LinguaFranca(lf) => {
