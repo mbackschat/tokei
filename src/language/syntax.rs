@@ -83,6 +83,9 @@ pub(crate) struct SharedMatchers {
     pub comment_exceptions: &'static [&'static str],
     pub doubled_quote_escapes: &'static [&'static str],
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
+    /// Bytes that can begin a comment, literal or comment exception, so the
+    /// analysis loop can skip every other position without prefix matching.
+    pub opener_bytes: [bool; 256],
 }
 
 impl SharedMatchers {
@@ -107,6 +110,26 @@ impl SharedMatchers {
                 .unwrap()
         }
 
+        let starts = |pairs: &'static [(&'static str, &'static str)]| pairs.iter().map(|(s, _)| *s);
+        let mut opener_bytes = [false; 256];
+        for opener in language
+            .line_comments()
+            .iter()
+            .copied()
+            .chain(starts(language.multi_line_comments()))
+            .chain(starts(language.nested_comments()))
+            .chain(starts(language.quotes()))
+            .chain(starts(language.doc_quotes()))
+            .chain(starts(language.verbatim_quotes()))
+            .chain(starts(language.character_literals()))
+            .chain(language.comment_exceptions().iter().copied())
+        {
+            match opener.as_bytes().first() {
+                Some(&b) => opener_bytes[usize::from(b)] = true,
+                None => opener_bytes = [true; 256],
+            }
+        }
+
         Self {
             language,
             allows_nested: language.allows_nested(),
@@ -124,6 +147,7 @@ impl SharedMatchers {
             comment_exceptions: language.comment_exceptions(),
             doubled_quote_escapes: language.doubled_quote_escapes(),
             verbatim_string_literals: language.verbatim_quotes(),
+            opener_bytes,
         }
     }
 }
@@ -264,18 +288,25 @@ impl SyntaxCounter {
                 continue;
             }
 
-            if let Some(exception) = self.comment_exception(window) {
-                skip!(exception.len());
-                continue;
-            }
+            let may_open = self.shared.opener_bytes[usize::from(window[0])];
+            if may_open {
+                if let Some(exception) = self.comment_exception(window) {
+                    skip!(exception.len());
+                    continue;
+                }
 
-            if let Some(skip_amount) = self.parse_character_literal(window) {
-                skip!(skip_amount);
-                continue;
+                if let Some(skip_amount) = self.parse_character_literal(window) {
+                    skip!(skip_amount);
+                    continue;
+                }
             }
 
             if let Some(child) = self.parse_context(lines, i, end, config, &regex_cache) {
                 return AnalysisReport::ChildLanguage(child);
+            }
+
+            if !may_open {
+                continue;
             }
 
             let is_quote_or_multi_line = self
