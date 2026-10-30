@@ -759,9 +759,13 @@
       "extensions": ["gql", "graphql"]
     },
     "Groovy": {
+      "shebang": "plain",
+      "interpolations": [{"quote": "\\\"", "open": "${", "close": "}", "nest": "{"}, {"quote": "\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{"}],
+      "regex_literals": {"spans_lines": true, "after_keywords": ["assert", "case", "else", "in", "instanceof", "return", "throw", "yield"]},
+      "verbatim_quotes": [["$/", "/$"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
-      "quotes": [["\\\"", "\\\""]],
+      "quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["'''", "'''"], ["\\\"", "\\\""], ["'", "'"]],
       "env": ["groovy"],
       "extensions": ["groovy", "grt", "gtpl", "gvy"]
     },
