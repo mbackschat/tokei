@@ -7,6 +7,7 @@ use once_cell::sync::Lazy;
 
 use super::blank_symbols::BlankSymbols;
 use super::block_scalar::{block_scalar_end, may_start_block_scalar};
+use super::code_tags::CodeTags;
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
     END_TEMPLATE,
@@ -53,6 +54,9 @@ pub(crate) struct SyntaxCounter {
     comment_end: usize,
     /// Whether an end marker such as `__END__` has made the rest data.
     in_data_section: bool,
+    /// Whether the text read is outside the code tags, as before PHP's
+    /// `<?php`.
+    outside_code: bool,
     /// The YAML flow collections, `[…]` and `{…}`, open at this point.
     flow_depth: usize,
     /// Whether a markup tag is open, in which quotes open strings.
@@ -110,6 +114,7 @@ pub(crate) struct SharedMatchers {
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
     pub pod: Option<PodSyntax>,
+    pub code_tags: Option<CodeTags>,
     pub frontmatter: bool,
     pub line_comment_splices: bool,
     pub shebang: Option<ShebangSyntax>,
@@ -315,6 +320,12 @@ impl SharedMatchers {
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
             .chain(language.pod().is_some().then(|| "=".to_owned()))
+            .chain(
+                language
+                    .code_tags()
+                    .into_iter()
+                    .flat_map(|tags| ["<?".to_owned(), tags.close().to_owned()]),
+            )
             // A regular expression that spans lines decides the next line.
             .chain(language.regex_spans_lines().then(|| "/".to_owned()))
             // A line comment that a splice continues decides the next line.
@@ -343,6 +354,7 @@ impl SharedMatchers {
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
             pod: language.pod(),
+            code_tags: language.code_tags(),
             frontmatter: language.frontmatter(),
             line_comment_splices: language.line_comment_splices(),
             shebang: language.shebang(),
@@ -452,6 +464,7 @@ impl SyntaxCounter {
             literal_end: 0,
             comment_end: 0,
             in_data_section: false,
+            outside_code: language.code_tags().is_some(),
             flow_depth: 0,
             in_tag: false,
             jsx: Vec::new(),
@@ -545,7 +558,7 @@ impl SyntaxCounter {
     /// Returns whether the syntax is currently in plain mode, outside every
     /// literal and comment.
     pub(crate) fn is_plain_mode(&self) -> bool {
-        self.quote.is_none() && self.stack.is_empty()
+        self.quote.is_none() && self.stack.is_empty() && !self.outside_code
     }
 
     /// Whether `byte` leaves the analysis as it is, so the per-byte checks
@@ -636,7 +649,15 @@ impl SyntaxCounter {
         line: &[u8],
         stats: &mut crate::stats::CodeStats,
     ) -> bool {
-        if !self.is_plain_mode() {
+        if self.outside_code && !line.windows(2).any(|w| w == b"<?") {
+            // Output text holds no comments or literals.
+            if line.trim().is_empty() {
+                stats.blanks += 1;
+            } else {
+                stats.code += 1;
+            }
+            true
+        } else if !self.is_plain_mode() {
             false
         } else if self.shared.blank_symbols.trim_start(line).is_empty() {
             stats.blanks += 1;
@@ -724,6 +745,25 @@ impl SyntaxCounter {
             {
                 skip!(symbol.len());
                 continue;
+            }
+            if let Some(tags) = self.shared.code_tags {
+                if self.outside_code {
+                    // Text outside the tags is output, whose bytes are code.
+                    pending = Some((window[0], false));
+                    if let Some(len) = tags.open_len(window) {
+                        trace!("Open code tag");
+                        self.outside_code = false;
+                        skip!(len);
+                    }
+                    continue;
+                }
+                if self.is_plain_mode() && window.starts_with(tags.close().as_bytes()) {
+                    trace!("Close code tag");
+                    pending = Some((window[0], false));
+                    self.outside_code = true;
+                    skip!(tags.close().len());
+                    continue;
+                }
             }
             pending = Some((window[0], !self.stack.is_empty()));
 
@@ -855,6 +895,19 @@ impl SyntaxCounter {
             }
 
             if self.parse_line_comment(lines, i) {
+                if let Some(close) = self.shared.code_tags.map(CodeTags::close) {
+                    let line_end = memchr::memchr(b'\n', window).unwrap_or(window.len());
+                    if let Some(at) = window[..line_end]
+                        .windows(close.len())
+                        .position(|w| w == close.as_bytes())
+                    {
+                        trace!("Close code tag in a line comment");
+                        pending = Some((close.as_bytes()[0], false));
+                        self.outside_code = true;
+                        skip!(at + close.len());
+                        continue;
+                    }
+                }
                 if self.shared.line_comment_splices {
                     self.comment_end = self.comment_end.max(spliced_lines_end(lines, i));
                 }

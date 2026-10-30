@@ -1431,6 +1431,7 @@
       "extensions": ["e","exw"]
     },
     "Php": {
+      "code_tags": "php",
       "heredocs": [{"start": "<<<", "spacing": "any", "word": "identifier", "closer": "flexible"}],
       "code_tokens": ["#["],
       "name": "PHP",

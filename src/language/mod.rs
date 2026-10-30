@@ -1,5 +1,6 @@
 mod blank_symbols;
 mod block_scalar;
+mod code_tags;
 mod embedding;
 mod frontmatter;
 mod heredoc;

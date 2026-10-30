@@ -313,6 +313,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns whose tags delimit the code inside the file's text, as PHP's
+    /// `<?php … ?>` do.
+    pub(crate) fn code_tags(self) -> Option<crate::language::code_tags::CodeTags> {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.code_tags is defined and value.code_tags == "php" %}Some(crate::language::code_tags::CodeTags::Php){% else %}None{% endif %},
+            {% endfor %}
+        }
+    }
+
     /// Returns whose rules decide where a POD block of whole lines starts and
     /// ends: Perl's (perlpod) or NQP's (its grammar's `pod_comment`).
     pub(crate) fn pod(self) -> Option<crate::language::pod::PodSyntax> {

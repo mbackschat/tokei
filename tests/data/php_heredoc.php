@@ -1,4 +1,4 @@
-// 13 lines 9 code 4 comments 0 blanks
+// 13 lines 10 code 3 comments 0 blanks
 <?php
 $a = <<<EOT
 Don't panic

@@ -1,4 +1,4 @@
-// 9 lines 6 code 2 comments 1 blanks
+// 9 lines 7 code 1 comments 1 blanks
 <?php
 #[Attribute]
 final class Marker
