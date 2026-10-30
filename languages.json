@@ -858,7 +858,7 @@
     "Html": {
       "quotes_in_tags": true,
       "name": "HTML",
-      "multi_line_comments": [["<!--", "-->"]],
+      "multi_line_comments": [["<!--", "-->"], ["<?", ">"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "kind": "html",
       "important_syntax": ["<script", "<style"],
