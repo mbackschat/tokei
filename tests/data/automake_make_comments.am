@@ -1,0 +1,5 @@
+# 5 lines 1 code 4 comments 0 blanks
+# a comment continued \
+  on the next line
+all:
+	@# a recipe comment

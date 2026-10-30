@@ -134,7 +134,7 @@
       "extensions": ["ahk"]
     },
     "Automake": {
-      "line_comment": ["#"],
+      "syntax_of": "Makefile",
       "extensions": ["am"]
     },
     "AvaloniaXaml": {
