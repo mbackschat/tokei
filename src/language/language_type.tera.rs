@@ -353,7 +353,7 @@ impl LanguageType {
     pub(crate) fn quote_like(self) -> Option<crate::language::quote_like::QuoteLikeSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% elif value.quote_like is defined and value.quote_like == "elixir_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ElixirSigil){% elif value.quote_like is defined and value.quote_like == "haskell_quasi_quote" %}Some(crate::language::quote_like::QuoteLikeSyntax::HaskellQuasiQuote){% else %}None{% endif %},
+                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% elif value.quote_like is defined and value.quote_like == "elixir_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ElixirSigil){% elif value.quote_like is defined and value.quote_like == "haskell_quasi_quote" %}Some(crate::language::quote_like::QuoteLikeSyntax::HaskellQuasiQuote){% elif value.quote_like is defined and value.quote_like == "make_reference" %}Some(crate::language::quote_like::QuoteLikeSyntax::MakeReference){% else %}None{% endif %},
             {% endfor %}
         }
     }
@@ -605,13 +605,13 @@ impl LanguageType {
         }
     }
 
-    /// Returns whether a backslash before a newline splices the lines, so a
-    /// line comment ending in one continues on the next line, as in C
-    /// (C23 §5.1.1.2, translation phase 2).
-    pub(crate) fn line_splices(self) -> bool {
+    /// Returns how a backslash before a newline splices the lines, so a line
+    /// comment ending in one continues on the next line, as in C (C23
+    /// §5.1.1.2, translation phase 2) or GNU make.
+    pub(crate) fn line_splices(self) -> Option<crate::language::line_splices::LineSplices> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {{ value.line_splices | default(value=false) }},
+                {{key}} => {% if value.line_splices is defined and value.line_splices == "c" %}Some(crate::language::line_splices::LineSplices::C){% elif value.line_splices is defined and value.line_splices == "make" %}Some(crate::language::line_splices::LineSplices::Make){% else %}None{% endif %},
             {% endfor %}
         }
     }
@@ -658,13 +658,13 @@ impl LanguageType {
     /// Returns the texts beyond ASCII whitespace that read as blank, as `。`
     /// and `、` do in the WenYan tokenizer's `IGNORE_SYMBOLS` (src/parser.ts
     /// at wenyan-lang/wenyan `97f0a4b`), and as the rest of Unicode
-    /// Pattern_White_Space does in Rust, and as the backslash of a line splice
-    /// does.
+    /// Pattern_White_Space does in Rust, and as the backslash of a C line
+    /// splice does.
     pub(crate) fn blank_symbols(self) -> &'static [&'static str] {
         match self {
             {% for key, value in languages -%}
                 {{key}} => &[
-                    {%- if value.line_splices | default(value=false) -%}
+                    {%- if value.line_splices is defined and value.line_splices == "c" -%}
                         "\\",
                     {%- endif -%}
                     {%- for item in value.blank_symbols | default(value=[]) -%}

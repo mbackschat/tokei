@@ -5,6 +5,7 @@ mod heredoc;
 mod interpolation;
 pub mod language_type;
 pub mod languages;
+mod line_splices;
 mod quote_like;
 mod raw_delimiter;
 mod regex_literal;

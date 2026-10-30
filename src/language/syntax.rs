@@ -15,12 +15,13 @@ use super::dialects::rust::frontmatter_end;
 use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
-use super::dialects::{elixir, haskell, perl, ruby};
+use super::dialects::{elixir, haskell, make, perl, ruby};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
 use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, MarkupExpressions, OpenHole};
+use super::line_splices::LineSplices;
 use super::quote_like::{delimited_len, QuestionMarkSyntax, QuoteLikeSyntax};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{is_word_byte, regex_literal_len, RegexContext};
@@ -133,7 +134,7 @@ pub(crate) struct SharedMatchers {
     pub pod: Option<PodSyntax>,
     pub code_tags: Option<CodeTags>,
     pub frontmatter: bool,
-    pub line_splices: bool,
+    pub line_splices: Option<LineSplices>,
     pub shebang: Option<ShebangSyntax>,
     pub run_closers: &'static [&'static str],
     pub identifier_quote_prefix: Option<&'static str>,
@@ -317,6 +318,9 @@ impl SharedMatchers {
             Some(QuoteLikeSyntax::ElixirSigil) => {
                 opener_pairs.allow_any(b'~');
             }
+            Some(QuoteLikeSyntax::MakeReference) => {
+                opener_pairs.allow_any(b'$');
+            }
             Some(QuoteLikeSyntax::HaskellQuasiQuote) => {
                 for b in (b'a'..=b'z').chain(b'A'..=b'Z').chain(*b"_") {
                     opener_pairs.allow(b'[', b);
@@ -392,7 +396,7 @@ impl SharedMatchers {
             // A regular expression that spans lines decides the next line.
             .chain(language.regex_spans_lines().then(|| "/".to_owned()))
             // A line comment that a splice continues decides the next line.
-            .chain(language.line_splices().then(|| "\\".to_owned()))
+            .chain(language.line_splices().map(|_| "\\".to_owned()))
             .chain(
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
@@ -401,6 +405,10 @@ impl SharedMatchers {
                     // Only files that turn quasi-quotes on search for their
                     // `|`, which `may_open_quasi_quote` does.
                     Some(QuoteLikeSyntax::HaskellQuasiQuote) | None => vec![],
+                    // A make reference changes the class of no line but one
+                    // that a splice continues, which the splice's backslash
+                    // already sends to the full parse.
+                    Some(QuoteLikeSyntax::MakeReference) => vec![],
                 }
                 .into_iter()
                 .map(str::to_owned),
@@ -1067,8 +1075,8 @@ impl SyntaxCounter {
                         continue;
                     }
                 }
-                if self.shared.line_splices {
-                    self.comment_end = self.comment_end.max(spliced_lines_end(lines, i));
+                if let Some(splices) = self.shared.line_splices {
+                    self.comment_end = self.comment_end.max(splices.comment_end(lines, i));
                 }
                 pending = None;
                 ended_with_comments = true;
@@ -1549,11 +1557,19 @@ impl SyntaxCounter {
                 || self
                     .quote
                     .as_deref()
-                    .is_some_and(|quote| window[1..].starts_with(quote.as_bytes())))
+                    .is_some_and(|quote| window[1..].starts_with(quote.as_bytes()))
+                || (self.quote.is_none()
+                    && self
+                        .shared
+                        .line_comments
+                        .iter()
+                        .any(|comment| window[1..].starts_with(comment.as_bytes()))))
         {
             // Tell the state machine to skip the next character because it
             // has been escaped if the string isn't a verbatim string. The
             // closer need not open a string itself, as with shell's `$'…'`.
+            // Outside a literal, an escaped line comment marker is text, as
+            // make's `\#` is (GNU make manual, 3.1 What Makefiles Contain).
             Some(2)
         } else {
             None
@@ -1746,6 +1762,8 @@ impl SyntaxCounter {
             QuoteLikeSyntax::HaskellQuasiQuote => {
                 haskell::quasi_quote_len(lines, i, || self.quasi_quoting(lines))
             }
+            QuoteLikeSyntax::MakeReference if lines[i] == b'$' => make::reference_len(lines, i),
+            QuoteLikeSyntax::MakeReference => None,
         }
     }
 
@@ -1865,21 +1883,6 @@ fn lang_language(lang: &[u8]) -> Option<LanguageType> {
     LanguageType::from_str(&lang)
         .ok()
         .or_else(|| LanguageType::from_file_extension(&lang))
-}
-
-/// The end of the line holding `from` and of each following line that a
-/// backslash before the newline splices to it (C23 §5.1.1.2, translation
-/// phase 2); like GCC and Clang, whitespace may follow the backslash.
-fn spliced_lines_end(text: &[u8], mut from: usize) -> usize {
-    loop {
-        let Some(newline) = memchr::memchr(b'\n', &text[from..]).map(|n| from + n) else {
-            return text.len();
-        };
-        if !text[from..newline].trim_end().ends_with(b"\\") {
-            return newline;
-        }
-        from = newline + 1;
-    }
 }
 
 /// Whether nothing but spaces and tabs precede `lines[i]` on its line.

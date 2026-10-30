@@ -1,6 +1,7 @@
 //! Literals whose delimiters the program chooses, which may span lines:
 //! Perl's quote-like operators, Ruby's percent literals, Elixir's sigils and
-//! Haskell's quasi-quotes, each read by its dialect's rules. For Perl's and
+//! Haskell's quasi-quotes, each read by its dialect's rules, and GNU make's
+//! references, whose text is code that starts no comment. For Perl's and
 //! Ruby's, a bracket delimiter closes at its partner and nests; any other
 //! delimiter closes at its next occurrence; a backslash escapes either.
 
@@ -13,6 +14,7 @@ pub(crate) enum QuoteLikeSyntax {
     RubyPercent,
     ElixirSigil,
     HaskellQuasiQuote,
+    MakeReference,
 }
 
 /// Whose character literals a `?` starts.

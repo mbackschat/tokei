@@ -5,6 +5,7 @@ pub(crate) mod commonmark;
 pub(crate) mod elixir;
 pub(crate) mod haskell;
 pub(crate) mod jsx;
+pub(crate) mod make;
 pub(crate) mod markdown;
 pub(crate) mod perl;
 pub(crate) mod php;
