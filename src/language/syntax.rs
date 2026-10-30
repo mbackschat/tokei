@@ -1256,12 +1256,7 @@ impl SyntaxCounter {
                     let end_of_code = start_of_code + closing_tag.start();
                     let language = captures
                         .next()
-                        .and_then(|m| {
-                            LanguageType::from_str(
-                                &String::from_utf8_lossy(m.as_bytes().trim()).to_lowercase(),
-                            )
-                            .ok()
-                        })
+                        .and_then(|m| lang_language(m.as_bytes()))
                         .unwrap_or(LanguageType::Css);
                     let style_contents = &lines[start_of_code..end_of_code];
                     if style_contents.trim().is_empty() {
@@ -1283,12 +1278,7 @@ impl SyntaxCounter {
                     let end_of_code = start_of_code + closing_tag.start();
                     let language = captures
                         .next()
-                        .and_then(|m| {
-                            LanguageType::from_str(
-                                &String::from_utf8_lossy(m.as_bytes().trim()).to_lowercase(),
-                            )
-                            .ok()
-                        })
+                        .and_then(|m| lang_language(m.as_bytes()))
                         .unwrap_or(LanguageType::Html);
 
                     let template_contents = &lines[start_of_code..end_of_code];
@@ -2034,6 +2024,17 @@ impl SyntaxCounter {
 /// The end of the line holding `from` and of each following line that a
 /// backslash before the newline splices to it (C23 §5.1.1.2, translation
 /// phase 2); like GCC and Clang, whitespace may follow the backslash.
+/// The language a `lang` attribute names, by name or, as Vue's
+/// `<style lang="scss">` does, by file extension (Vue SFC specification,
+/// "Pre-Processors").
+fn lang_language(lang: &[u8]) -> Option<LanguageType> {
+    use std::str::FromStr;
+    let lang = String::from_utf8_lossy(lang.trim()).to_lowercase();
+    LanguageType::from_str(&lang)
+        .ok()
+        .or_else(|| LanguageType::from_file_extension(&lang))
+}
+
 fn spliced_lines_end(text: &[u8], mut from: usize) -> usize {
     loop {
         let Some(newline) = memchr::memchr(b'\n', &text[from..]).map(|n| from + n) else {
