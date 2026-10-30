@@ -23,3 +23,7 @@ Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbacksch
 Judges read paths on stdin and print one JSON object per file: `path`, `comments` and `literals` as `[start, end]` offsets after a byte order mark, `units` (`bytes` or `utf16`) and `errors`. `judgecmp stream LANGUAGE` reads them, `auto` takes each file's language from its path, and `JUDGE_LIST_INVALID=1` also lists the invalid files. Build `judgecmp` with `cargo build --release` in `judgecmp/`; it builds this repository as its `tokei`.
 
 The Lean judge checks Locmetry's own Lean counter, which counts Lean in place of the fork. `python3 lean/leanlines/gen.py LOCMETRY/src/backend/lean.rs lean/leanlines/src/main.rs` generates a per-line copy of that counter; build it with `cargo build --release` in `lean/leanlines/` and the judge with `lake build` in `lean/`, then run `python3 lean/leancmp.py OUT.json ROOT...` over Git checkouts.
+
+## Speed
+
+Every release must parse within 10% of upstream Tokei's time on each measured repository, as Locmetry's owner decided on 2026-10-30. `python3 speed/check.py ROOT...` builds the same in-memory benchmark against this working tree and against upstream's `v15.0.0` tag, runs both 15 times interleaved on each root, compares their minimum user CPU time, and exits with an error when any root exceeds the threshold. `--threshold`, `--runs` and `--base` change those defaults; builds are cached in `speed/target`.

@@ -1,0 +1,15 @@
+[package]
+name = "speed-base"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "speed-base"
+path = "../src/main.rs"
+
+[dependencies]
+walkdir = "2"
+tokei = { path = "../upstream", default-features = false }
+
+[workspace]

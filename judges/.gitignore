@@ -11,3 +11,5 @@ swift/judge
 dart/.dart_tool/
 scala/lib/
 scala/out/
+speed/target/
+speed/upstream/
