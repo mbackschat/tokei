@@ -10,7 +10,7 @@ use std::{
 use crate::{
     config::Config,
     language::{
-        dialects::markdown,
+        dialects::{markdown, rpm},
         syntax::{line_end, FileContext, LanguageContext, LineClass, SyntaxCounter},
     },
     stats::{CodeStats, Report},
@@ -310,6 +310,9 @@ impl LanguageType {
     ) -> CodeStats {
         if matches!(self, Markdown | UnrealDeveloperMarkdown) {
             return markdown::parse(config, lines, stats, counted, on_line);
+        }
+        if self == RPMSpecfile {
+            return rpm::parse(config, lines, stats, counted, on_line);
         }
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
 

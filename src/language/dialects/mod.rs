@@ -10,6 +10,7 @@ pub(crate) mod make;
 pub(crate) mod markdown;
 pub(crate) mod perl;
 pub(crate) mod php;
+pub(crate) mod rpm;
 pub(crate) mod ruby;
 pub(crate) mod rust;
 pub(crate) mod sql;
