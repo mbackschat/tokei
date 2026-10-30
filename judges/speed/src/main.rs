@@ -7,7 +7,8 @@ fn main() {
     let config = Config::default();
     let mut files = Vec::new();
     for root in std::env::args().skip(1) {
-        for entry in walkdir::WalkDir::new(root).into_iter().filter_map(Result::ok) {
+        let before = files.len();
+        for entry in walkdir::WalkDir::new(&root).into_iter().filter_map(Result::ok) {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -16,6 +17,11 @@ fn main() {
                     files.push((language, bytes));
                 }
             }
+        }
+        // A missing or emptied root would time nothing and pass any gate.
+        if files.len() == before {
+            eprintln!("{root} holds no file Tokei recognizes");
+            std::process::exit(1);
         }
     }
     let mut code = 0;

@@ -51,7 +51,8 @@ def add_quotes(path, quotes):
 
 def user_time(binary, root):
     before = resource.getrusage(resource.RUSAGE_CHILDREN).ru_utime
-    subprocess.run([str(binary), root], check=True, stdout=subprocess.DEVNULL)
+    if subprocess.run([str(binary), root], stdout=subprocess.DEVNULL).returncode != 0:
+        sys.exit(f"the benchmark could not time {root}")
     return resource.getrusage(resource.RUSAGE_CHILDREN).ru_utime - before
 
 
