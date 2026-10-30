@@ -973,6 +973,9 @@
     "Json": {
       "name": "JSON",
       "blank": true,
+      "line_comment": ["//"],
+      "multi_line_comments": [["/*", "*/"]],
+      "quotes": [["\\\"", "\\\""]],
       "mime": ["application/json", "application/manifest+json"],
       "extensions": ["json"]
     },

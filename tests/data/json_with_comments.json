@@ -1,0 +1,10 @@
+{
+  // 10 lines 5 code 4 comments 1 blanks
+  "url": "http://example.org/*not a comment*/",
+  /* a block comment
+     on two lines */
+
+  "path": "C:\\dir\\", // a trailing comment
+  "n": 1
+  // the end
+}
