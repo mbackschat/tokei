@@ -136,6 +136,18 @@ and measure them on files of the formats that share the extension:
 },
 ```
 
+A language whose files another language's lexer reads, as Groovy's reads
+Nextflow scripts, names it in `syntax_of` and declares only the fields
+that say which files it claims; it takes every other field from that
+language, so the two cannot drift apart:
+
+```json
+"Nextflow": {
+    "syntax_of": "Groovy",
+    "extensions": ["nextflow", "nf"]
+},
+```
+
 Note that filenames will **override** extensions. With the
 following definition, a file named `CMakeLists.txt` will be
 detected as a `CMake` file, not a `Text` file.

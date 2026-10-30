@@ -1303,9 +1303,7 @@
       "extensions": ["mustache"]
     },
     "Nextflow": {
-      "line_comment": ["//"],
-      "multi_line_comments": [["/*", "*/"]],
-      "quotes": [["\\\"", "\\\""]],
+      "syntax_of": "Groovy",
       "extensions": ["nextflow", "nf"]
     },
     "Nim": {
@@ -1859,9 +1857,7 @@
       "extensions": ["cs.st", "pck.st"]
     },
     "Snakemake": {
-      "line_comment": ["#"],
-      "doc_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["'''", "'''"]],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "syntax_of": "Python",
       "extensions": ["smk"],
       "content_checked_extensions": {"rules": ["^(?:(?:rule|checkpoint|module)[ \\t]+\\w+[ \\t]*:|use[ \\t]+rule[ \\t]|(?:include|configfile|workdir|localrules|ruleorder|wildcard_constraints|onstart|onsuccess|onerror|container|envvars|pepfile)[ \\t]*:)"]},
       "filenames": ["snakefile"]

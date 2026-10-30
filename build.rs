@@ -23,6 +23,7 @@ fn generate_languages(out_dir: &OsStr) -> Result<(), Box<dyn error::Error>> {
 
     let json_string: String = fs::read_to_string("languages.json")?.parse()?;
     let mut json: Value = json5::from_str(&json_string)?;
+    inherit_syntax(json.get_mut("languages").unwrap().as_object_mut().unwrap());
 
     for (_key, ref mut item) in json
         .get_mut("languages")
@@ -54,6 +55,52 @@ fn generate_languages(out_dir: &OsStr) -> Result<(), Box<dyn error::Error>> {
     std::fs::write(output_path, rust_code)?;
 
     Ok(())
+}
+
+/// Fields that say which files a language claims and how it is named, as
+/// opposed to how its text is lexed.
+const IDENTITY_FIELDS: &[&str] = &[
+    "name",
+    "extensions",
+    "filenames",
+    "exact_filenames",
+    "content_checked_extensions",
+    "path_suffixes",
+    "env",
+    "mime",
+    "shebangs",
+    "syntax_of",
+];
+
+/// Gives each language declaring `"syntax_of": "Other"` every lexical field
+/// of `Other`, for languages read by another's lexer, as Nextflow scripts are
+/// Groovy and Snakefiles are tokenized as Python.
+fn inherit_syntax(languages: &mut serde_json::Map<String, Value>) {
+    let inheriting: Vec<(String, String)> = languages
+        .iter()
+        .filter_map(|(key, value)| {
+            let source = value.get("syntax_of")?.as_str()?;
+            Some((key.clone(), source.to_owned()))
+        })
+        .collect();
+    for (key, source) in inheriting {
+        let lexical: Vec<(String, Value)> = languages
+            .get(&source)
+            .and_then(Value::as_object)
+            .unwrap_or_else(|| panic!("{key} takes the syntax of unknown {source}"))
+            .iter()
+            .filter(|(field, _)| !IDENTITY_FIELDS.contains(&field.as_str()))
+            .map(|(field, value)| (field.clone(), value.clone()))
+            .collect();
+        let target = languages.get_mut(&key).unwrap().as_object_mut().unwrap();
+        for (field, value) in lexical {
+            assert!(
+                !target.contains_key(&field),
+                "{key} declares {field} although it takes the syntax of {source}"
+            );
+            target.insert(field, value);
+        }
+    }
 }
 
 fn compare_json_str_len(a: &Value, b: &Value) -> cmp::Ordering {
