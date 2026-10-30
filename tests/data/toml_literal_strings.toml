@@ -1,0 +1,9 @@
+# 9 lines 4 code 4 comments 1 blanks
+path = 'C:\dir\'
+# a comment after a literal string
+
+lines = '''ends here\'''
+# another comment
+quoted = """a "" b """
+four = """x""""
+# the end
