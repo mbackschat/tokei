@@ -60,6 +60,9 @@ Engine changes, each with a regression file in `tests/data`:
 | `quote_like`: Perl quote-like operators and Ruby percent literals, whose delimiters the program chooses, nest brackets and may span lines; Elixir sigils close at their first unescaped delimiter, a heredoc sigil at its quotes starting a line; Haskell quasi-quotes close at their first `\|]` and open only where the file's LANGUAGE pragmas turn on `QuasiQuotes`. | `56379a6`, `9c6d1c7`, `df73c4e` | Not offered yet |
 | `template_expressions`: a template expression inside a markup tag, such as `{{ $a->b }}`, is skipped whole, so its `>` does not end the tag. | `598ce84` | Not offered yet |
 | `backslash_operator`: a backslash outside a literal is an operator, so the quote after it opens a literal instead of being escaped. | `daf1c1d` | Not offered yet |
+| `text_sections`: a section of character data whose text holds no markup up to its closer, such as XML's `<![CDATA[`…`]]>`; its lines are code, or blank when only whitespace. | `cfdcdc5` | Not offered yet |
+| Inside a comment that does not nest, an opener no longer hides a closer it overlaps, so `<!-->` ends an HTML comment and `/*/` a C one. | `a0c8f52` | Not offered yet |
+| `line_classes` classes the lines of an embedded script or style element as its own language counts them. | `3eda0aa` | Not offered yet |
 
 Declarations in `languages.json`, each grounded in the cited specification or reference lexer:
 
@@ -112,6 +115,10 @@ Declarations in `languages.json`, each grounded in the cited specification or re
 | HTML and other markup with embedded scripts | Script and style elements end where the HTML tokenizer ends them | `44f2a48` | [HTML Living Standard, script data end tag name state](https://html.spec.whatwg.org/multipage/parsing.html#script-data-end-tag-name-state), [RAWTEXT end tag name state](https://html.spec.whatwg.org/multipage/parsing.html#rawtext-end-tag-name-state) |
 | Not Quite Perl | POD blocks as NQP's grammar reads them, instead of `=begin`/`=end` comments | `c19e61e` | [src/NQP/Grammar.nqp `pod_comment`](https://github.com/Raku/nqp/blob/e5e5a90/src/NQP/Grammar.nqp) |
 | WenYan | Comments as `注曰`, `疏曰` or `批曰` followed by a `「「…」」` or `『…』` string; `。` and `、` as whitespace | `273e1d0` | [wenyan `97f0a4b` parser and `IGNORE_SYMBOLS`](https://github.com/wenyan-lang/wenyan/tree/97f0a4b/src) |
+| XML, SVG, XAML | CDATA sections as text | `cfdcdc5` | [XML 1.0 §2.7](https://www.w3.org/TR/xml/#sec-cdata-sect) |
+| CSS | No `//` line comments | `76b5c44` | [CSS Syntax Level 3 §4.3.2](https://www.w3.org/TR/css-syntax-3/#consume-comment) |
+| HTML | `<?…>` as a bogus comment; a script of a type neither JavaScript's nor a language's is a data block, counted as the page's text; `text/babel` and `text/jsx` scripts as JavaScript | `ecf6858`, `f5768c9` | [HTML Living Standard, tag open state](https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state), [the script element](https://html.spec.whatwg.org/multipage/scripting.html#the-script-element), [Babel standalone](https://babeljs.io/docs/babel-standalone) |
+| Vue, Svelte, HTML | A `lang` attribute names a language by name or file extension, as `<style lang="scss">` does | `0772c2f` | [Vue SFC specification, pre-processors](https://vuejs.org/api/sfc-spec.html#pre-processors) |
 
 `locmetry-spike/` holds the development harness that compares these counts with tree-sitter on public repositories; it is not part of the crate.
 
