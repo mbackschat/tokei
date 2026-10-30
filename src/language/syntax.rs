@@ -1979,18 +1979,20 @@ impl SyntaxCounter {
             .iter()
             .chain(self.shared.nested_comments);
         for &(start, end) in iter {
-            if window.starts_with(start.as_bytes()) {
-                if self.stack.is_empty()
+            // Inside a comment that does not nest, an opener means nothing,
+            // so it must not hide a closer it overlaps, as `<!-->` closes an
+            // HTML comment and `/*/` a C one.
+            if window.starts_with(start.as_bytes())
+                && (self.stack.is_empty()
                     || self.shared.allows_nested
-                    || self.shared.nested_comments.contains(&(start, end))
-                {
-                    self.stack.push(Cow::Borrowed(end));
+                    || self.shared.nested_comments.contains(&(start, end)))
+            {
+                self.stack.push(Cow::Borrowed(end));
 
-                    if log_enabled!(Trace) && self.shared.allows_nested {
-                        trace!("Start nested {:?}", start);
-                    } else {
-                        trace!("Start {:?}", start);
-                    }
+                if log_enabled!(Trace) && self.shared.allows_nested {
+                    trace!("Start nested {:?}", start);
+                } else {
+                    trace!("Start {:?}", start);
                 }
 
                 return Some(start.len());
