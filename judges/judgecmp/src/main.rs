@@ -5,6 +5,8 @@
 //! stdin, one JSON object per file: `path`, `comments` and `literals` as
 //! `[start, end]` offsets into the text after a byte order mark, `units`
 //! (`"bytes"` or `"utf16"`), and `errors`, the lexical errors the judge found.
+//! `judgecmp markdown` compares Markdown counts with a judge's fenced code
+//! blocks instead; see `markdown.rs`.
 //!
 //! Lines follow the owner's rule of 2026-10-29: a line is a comment when it
 //! holds nothing but comments; a line of whitespace takes the class of the
@@ -34,8 +36,14 @@ struct Outcome {
     differences: Vec<(usize, char, char, String)>,
 }
 
+mod markdown;
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("markdown") {
+        markdown::run();
+        return;
+    }
     let (language, judgements): (Option<LanguageType>, Vec<Judgement>) = match args.get(1).map(String::as_str) {
         Some("rust") => (Some(LanguageType::Rust), judge_rust(&args[2..])),
         Some("stream") => {
