@@ -617,6 +617,19 @@ mod tests {
     }
 
     #[test]
+    fn meson_reads_options_from_meson_options_since_1_1() {
+        // https://mesonbuild.com/Build-options.html
+        assert_eq!(
+            detect("meson.options", "option('x', type: 'string')\n"),
+            Some(Meson)
+        );
+        assert_eq!(
+            detect("meson_options.txt", "option('x', type: 'string')\n"),
+            Some(Meson)
+        );
+    }
+
+    #[test]
     fn a_spec_file_is_rpm_only_with_an_rpm_preamble_and_section() {
         let rpm = "Name: x\nVersion: 1\nSummary: s\n\n%description\nText.\n";
         assert_eq!(detect("x.spec", rpm), Some(RPMSpecfile));

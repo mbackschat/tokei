@@ -1235,8 +1235,9 @@
     },
     "Meson": {
       "line_comment": ["#"],
-      "quotes": [["'", "'"], ["'''", "'''"]],
-      "filenames": ["meson.build", "meson_options.txt"]
+      "quotes": [["'", "'"]],
+      "verbatim_quotes": [["'''", "'''"]],
+      "filenames": ["meson.build", "meson.options", "meson_options.txt"]
     },
     "Metal": {
       "name": "Metal Shading Language",
