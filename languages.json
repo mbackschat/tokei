@@ -942,7 +942,9 @@
           "text/jscript",
           "text/livescript",
           "text/x-ecmascript",
-          "text/x-javascript"
+          "text/x-javascript",
+          "text/babel",
+          "text/jsx"
       ],
       "extensions": ["cjs", "js", "mjs"]
     },

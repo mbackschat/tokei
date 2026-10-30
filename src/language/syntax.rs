@@ -105,7 +105,9 @@ impl FileContext {
 #[derive(Clone, Debug)]
 pub(crate) enum LanguageContext {
     Html {
-        language: LanguageType,
+        /// `None` for a script that is a data block, whose text is the
+        /// host's.
+        language: Option<LanguageType>,
         /// Where the element's text starts, after its opening tag.
         start: usize,
     },
@@ -1225,18 +1227,21 @@ impl SyntaxCounter {
                     let start_of_code = captures.next().unwrap().end();
                     let closing_tag = END_SCRIPT.find(&lines[start_of_code..])?;
                     let end_of_code = start_of_code + closing_tag.start();
-                    let language = captures
-                        .next()
-                        .and_then(|m| {
-                            LanguageType::from_mime(&String::from_utf8_lossy(m.as_bytes().trim()))
-                        })
-                        .unwrap_or(LanguageType::JavaScript);
+                    // A script of a type that is not JavaScript's and that no
+                    // language claims is a data block, which the browser does
+                    // not run (HTML Standard, "The script element").
+                    let language = match captures.next().map(|m| m.as_bytes().trim()) {
+                        None | Some(b"" | b"module") => Some(LanguageType::JavaScript),
+                        Some(mime) => LanguageType::from_mime(&String::from_utf8_lossy(mime)),
+                    };
                     let script_contents = &lines[start_of_code..end_of_code];
                     if script_contents.trim().is_empty() {
                         return None;
                     }
 
-                    let stats = language.parse_embedded(script_contents, config);
+                    let stats = language
+                        .map(|language| language.parse_embedded(script_contents, config))
+                        .unwrap_or_default();
                     Some(FileContext::new(
                         LanguageContext::Html {
                             language,
@@ -1266,7 +1271,7 @@ impl SyntaxCounter {
                     let stats = language.parse_embedded(style_contents, config);
                     Some(FileContext::new(
                         LanguageContext::Html {
-                            language,
+                            language: Some(language),
                             start: start_of_code,
                         },
                         end_of_code,
@@ -1293,7 +1298,7 @@ impl SyntaxCounter {
                     let stats = language.parse_embedded(template_contents, config);
                     Some(FileContext::new(
                         LanguageContext::Html {
-                            language,
+                            language: Some(language),
                             start: start_of_code,
                         },
                         end_of_code,

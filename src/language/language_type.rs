@@ -40,11 +40,25 @@ pub(crate) enum LineReport<'a> {
     Class(Option<LineClass>),
     /// The text of an element embedded in markup, from the end of its
     /// opening tag to the start of its closing tag, whose lines its language
-    /// counts.
+    /// counts, or, for a data block, the host.
     Embedded {
-        language: LanguageType,
+        language: Option<LanguageType>,
         text: &'a [u8],
     },
+}
+
+/// The classes of the lines of a data block's `text` that the host counts:
+/// its text is code, or blank where only whitespace.
+fn data_line_classes(text: &[u8]) -> impl Iterator<Item = LineClass> + '_ {
+    text[embedded_lines(text)]
+        .split_inclusive(|b| *b == b'\n')
+        .map(|line| {
+            if line.trim().is_empty() {
+                LineClass::Blank
+            } else {
+                LineClass::Code
+            }
+        })
 }
 
 /// The lines of an element's `text` that the element's language counts:
@@ -227,12 +241,19 @@ impl LanguageType {
             &mut |report| {
                 let lines = match report {
                     LineReport::Class(class) => class.map(|class| vec![class]),
-                    LineReport::Embedded { language, text } => language.collect_line_classes(
+                    LineReport::Embedded {
+                        language: Some(language),
+                        text,
+                    } => language.collect_line_classes(
                         config,
                         text,
                         SyntaxCounter::new(language),
                         embedded_lines(text),
                     ),
+                    LineReport::Embedded {
+                        language: None,
+                        text,
+                    } => Some(data_line_classes(text).collect()),
                 };
                 match (classes.as_mut(), lines) {
                     (Some(list), Some(lines)) => list.extend(lines),
@@ -346,8 +367,21 @@ impl LanguageType {
                                     start: text_start,
                                 } => {
                                     stats.code += 1;
-                                    element = Some((language, &lines[text_start..end]));
-                                    *stats.blobs.entry(language).or_default() += blob;
+                                    let text = &lines[text_start..end];
+                                    element = Some((language, text));
+                                    match language {
+                                        Some(language) => {
+                                            *stats.blobs.entry(language).or_default() += blob;
+                                        }
+                                        None => {
+                                            for class in data_line_classes(text) {
+                                                match class {
+                                                    LineClass::Blank => stats.blanks += 1,
+                                                    _ => stats.code += 1,
+                                                }
+                                            }
+                                        }
+                                    }
                                     // A closing tag on this line leaves the rest
                                     // of it, already counted, to be read.
                                     let opening_line_end = line_end(lines, start);
