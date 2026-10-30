@@ -17,6 +17,7 @@ Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbacksch
 | Dart | the scanner of the Dart SDK's front end, `_fe_analyzer_shared` 111.0.0 (measured with Dart 3.13.7) | `dart pub get` and `dart compile exe -o judge bin/judge.dart` in `dart/`, as in the `dart:stable` image, then `… \| dart/judge \| judgecmp stream Dart` |
 | Scala | the Scala 3.10.0 compiler's parser and scanner, run on the JDK; Scala 2 code reads as Scala 3, with the scanner continuing where the parser gives up | `… \| scala/run.sh \| judgecmp stream Scala`, which downloads the compiler from Maven Central on first use |
 | R | R's own parser, through the parse data of `parse(keep.source = TRUE)` (measured with R 4.6.1) | `… \| Rscript r/judge.R \| judgecmp stream R`, as in the `r-base` image with `jsonlite` installed |
+| Elixir | Elixir's own tokenizer, `:elixir_tokenizer`, the one `Code.string_to_quoted_with_comments/2` runs (measured with Elixir 1.20.4 on OTP 29); a literal ends where the next token or comment starts, less the whitespace before it | `… \| elixir elixir/judge.exs \| judgecmp stream Elixir`, as in the `elixir` image |
 | Python | CPython's `tokenize` (measured with 3.14) | `… \| python3 python/judge.py \| judgecmp stream Python` |
 | Lean | Lean 4.31.0's own lexer functions | see below |
 
