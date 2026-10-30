@@ -1195,7 +1195,7 @@
     },
     "Makefile": {
       "line_comment": ["#"],
-      "line_start_comments": ["@#", "-#", "+#"],
+      "line_comment_flags": "@-+",
       "line_splices": "make",
       "quote_like": "make_reference",
       "extensions": ["makefile", "mak", "mk"],

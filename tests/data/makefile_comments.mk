@@ -1,4 +1,4 @@
-# 28 lines 18 code 8 comments 2 blanks
+# 30 lines 18 code 10 comments 2 blanks
 # a comment \
   continued by a backslash
 X := a # trailing \
@@ -11,6 +11,8 @@ all:
 	echo the shell runs this
 	@# a silent comment
 	-# an ignored comment
+	@-# a comment after two flags
+	+ # a comment after a flag and a blank
 W := d # a backslash and a space \ 
 V := e
 U := a\#b \

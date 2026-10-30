@@ -493,6 +493,19 @@ impl LanguageType {
         }
     }
 
+    /// Returns the bytes that, with blanks among them, may come before a line
+    /// comment at the start of a line and belong to it, as make's recipe
+    /// flags `@`, `-` and `+` do (`start_job_command` in GNU make 4.4.1's
+    /// `src/job.c`): a recipe line holding only them and a comment runs
+    /// nothing.
+    pub(crate) fn line_comment_flags(self) -> &'static [u8] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => b"{{ value.line_comment_flags | default(value="") }}",
+            {% endfor %}
+        }
+    }
+
     /// Returns the line comment markers that open a comment only at the start
     /// of a line, as JavaScript's `-->` does (ECMA-262 Annex B.1.1).
     pub(crate) fn line_start_comments(self) -> &'static [&'static str] {

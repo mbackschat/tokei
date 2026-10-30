@@ -135,6 +135,7 @@ pub(crate) struct SharedMatchers {
     pub is_literate: bool,
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
+    pub line_comment_flags: &'static [u8],
     pub line_start_closers: &'static [&'static str],
     pub pod: Option<PodSyntax>,
     pub code_tags: Option<CodeTags>,
@@ -224,13 +225,34 @@ impl SharedMatchers {
             || self
                 .line_comments
                 .iter()
-                .chain(self.line_start_comments)
                 .any(|c| line.starts_with(c.as_bytes()))
+            || self.starts_with_line_start_comment(line)
         {
             LineClass::Comment
         } else {
             LineClass::Code
         }
+    }
+
+    /// Whether `text`, with nothing but comments before it on its line, opens
+    /// a comment that opens one only there: a line-start comment, or a line
+    /// comment after line comment flags.
+    pub(crate) fn starts_with_line_start_comment(&self, text: &[u8]) -> bool {
+        let flags = match self.line_comment_flags {
+            [] => 0,
+            flags => text
+                .iter()
+                .take_while(|b| flags.contains(b) || matches!(b, b' ' | b'\t'))
+                .count(),
+        };
+        self.line_start_comments
+            .iter()
+            .any(|c| text.starts_with(c.as_bytes()))
+            || (flags > 0
+                && self
+                    .line_comments
+                    .iter()
+                    .any(|c| text[flags..].starts_with(c.as_bytes())))
     }
 
     pub fn new(language: LanguageType) -> Arc<Self> {
@@ -441,6 +463,7 @@ impl SharedMatchers {
             any_comments: language.any_comments(),
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
+            line_comment_flags: language.line_comment_flags(),
             line_start_closers: language.line_start_closers(),
             pod: language.pod(),
             code_tags: language.code_tags(),
@@ -777,16 +800,10 @@ impl SyntaxCounter {
         {
             trace!("Start {:?}", comment);
             true
-        } else if let Some(comment) = self
-            .shared
-            .line_start_comments
-            .iter()
-            .find(|c| window.starts_with(c.as_bytes()))
-            // Only comments may come before it on the line, as before an
-            // HTML-like `-->` (ECMA-262 Annex B.1.1, HTMLCloseComment).
-            .filter(|_| !self.line_has_code)
-        {
-            trace!("Start {:?} at the start of a line", comment);
+        // Only comments may come before it on the line, as before an HTML-like
+        // `-->` (ECMA-262 Annex B.1.1, HTMLCloseComment).
+        } else if !self.line_has_code && self.shared.starts_with_line_start_comment(window) {
+            trace!("Start a comment at the start of a line");
             true
         } else if self.in_tag
             && self
@@ -1118,8 +1135,8 @@ impl SyntaxCounter {
                     .shared
                     .line_comments
                     .iter()
-                    .chain(self.shared.line_start_comments)
                     .any(|c| text.starts_with(c.as_bytes()))
+                || self.shared.starts_with_line_start_comment(text)
             {
                 return true;
             }
