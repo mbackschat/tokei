@@ -1,1 +1,2 @@
 tests/data/* linguist-documentation
+tests/data/batch.bat -text
