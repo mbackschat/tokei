@@ -129,6 +129,7 @@ pub(crate) struct SharedMatchers {
     pub identifier_quote_prefix: Option<&'static str>,
     pub line_directives: &'static [&'static str],
     pub backslash_operator: bool,
+    pub escape: u8,
     pub quote_like: Option<QuoteLikeSyntax>,
     pub end_markers: &'static [&'static str],
     pub any_multi_line_comments: &'static [(&'static str, &'static str)],
@@ -169,6 +170,10 @@ pub(crate) struct SharedMatchers {
     /// Bytes that can begin a hole, a text that only looks like one or an
     /// escape, so strings skip the hole check at every other position.
     pub hole_bytes: [bool; 256],
+    pub quote_aliases: &'static [(&'static str, &'static str)],
+    /// Bytes that begin a quote alias, so strings skip the alias check at
+    /// every other position.
+    pub alias_bytes: [bool; 256],
     /// Bytes that begin an interpolating quote, so a string opened by any
     /// other byte skips the search of the interpolations, which for Python's
     /// 80 f-string and t-string kinds ran at every escape in a plain string.
@@ -296,11 +301,13 @@ impl SharedMatchers {
                     hole_bytes[usize::from(b)] = true;
                 }
             }
-            hole_bytes[usize::from(b'\\')] = true;
+            hole_bytes[usize::from(language.escape_character())] = true;
         }
         let pair_inert_bytes: [bool; 256] = std::array::from_fn(|i| {
             let b = i as u8;
-            !hole_bytes[i] && b != b'\\' && !(language.jsx() && b == b'<')
+            !hole_bytes[i]
+                && b != language.escape_character()
+                && !(language.jsx() && b == b'<')
         });
         let inert_bytes = std::array::from_fn(|i| pair_inert_bytes[i] && !opener_bytes[i]);
         let important_syntax: Vec<String> = language
@@ -355,6 +362,7 @@ impl SharedMatchers {
             identifier_quote_prefix: language.identifier_quote_prefix(),
             line_directives: language.line_directives(),
             backslash_operator: language.backslash_operator(),
+            escape: language.escape_character(),
             quote_like: language.quote_like(),
             end_markers: language.end_markers(),
             multi_line_comments: language.multi_line_comments(),
@@ -386,6 +394,13 @@ impl SharedMatchers {
             opener_bytes,
             opener_pairs,
             hole_bytes,
+            quote_aliases: language.quote_aliases(),
+            alias_bytes: std::array::from_fn(|b| {
+                language
+                    .quote_aliases()
+                    .iter()
+                    .any(|(_, alias)| alias.as_bytes()[0] == b as u8)
+            }),
             interpolating_quote_bytes,
             inert_bytes,
             pair_inert_bytes,
@@ -578,7 +593,7 @@ impl SyntaxCounter {
     /// 18,019M to 14,893M (measured 2026-10-29).
     fn passes_over(&self, window: &[u8], embeds: bool) -> bool {
         let byte = window[0];
-        if byte == b'\\' || !self.stack.is_empty() {
+        if byte == self.shared.escape || !self.stack.is_empty() {
             return false;
         }
         let starts = |text: &str| text.as_bytes().first() == Some(&byte);
@@ -587,6 +602,7 @@ impl SyntaxCounter {
                 !starts(quote)
                     && !self.quote_escape.as_deref().is_some_and(starts)
                     && !self.shared.hole_bytes[usize::from(byte)]
+                    && !self.shared.alias_bytes[usize::from(byte)]
             }
             None => {
                 !embeds
@@ -1365,12 +1381,11 @@ impl SyntaxCounter {
     pub(crate) fn parse_end_of_quote(&mut self, lines: &[u8], i: usize) -> Option<usize> {
         let window = &lines[i..];
         #[allow(clippy::if_same_then_else)]
-        if let Some(quote) = self
+        if let Some((quote, len)) = self
             .quote
             .as_deref()
-            .filter(|quote| window.starts_with(quote.as_bytes()))
+            .and_then(|quote| Some((quote, self.closer_len(window, quote)?)))
         {
-            let len = quote.len();
             // Elsewhere on its line, a heredoc's closer is text.
             if self.shared.line_start_closers.contains(&quote) && !starts_line(lines, i) {
                 return Some(1);
@@ -1404,10 +1419,10 @@ impl SyntaxCounter {
             Some(skip_amount)
         } else if !self.escapes_here() {
             None
-        } else if !self.quote_is_verbatim && window.starts_with(br"\\") {
+        } else if !self.quote_is_verbatim && window.starts_with(&[self.shared.escape; 2]) {
             Some(2)
         } else if !self.quote_is_verbatim
-            && window.starts_with(br"\")
+            && window.first() == Some(&self.shared.escape)
             && (self
                 .shared
                 .string_literals
@@ -1432,6 +1447,20 @@ impl SyntaxCounter {
     /// inside a literal, and outside one unless the language makes it an
     /// operator. Outside a literal it is the shells' quoting of a single
     /// character (POSIX Shell Command Language, 2.2.1).
+    /// Length of the `closer` that `window` starts with, its leading quote
+    /// character perhaps written as one of the language's aliases.
+    fn closer_len(&self, window: &[u8], closer: &str) -> Option<usize> {
+        if window.starts_with(closer.as_bytes()) {
+            return Some(closer.len());
+        }
+        self.shared.quote_aliases.iter().find_map(|&(quote, alias)| {
+            let rest = closer.strip_prefix(quote)?;
+            (window.starts_with(alias.as_bytes())
+                && window[alias.len()..].starts_with(rest.as_bytes()))
+            .then_some(alias.len() + rest.len())
+        })
+    }
+
     fn escapes_here(&self) -> bool {
         self.quote.is_some() || !self.shared.backslash_operator
     }
@@ -1468,7 +1497,8 @@ impl SyntaxCounter {
         let Some(kind) = hole else {
             // An escaped character, such as the `$` of JavaScript's `\${`,
             // cannot open a hole.
-            return (!self.quote_is_verbatim && window.starts_with(b"\\")).then_some(2);
+            return (!self.quote_is_verbatim && window.first() == Some(&self.shared.escape))
+                .then_some(2);
         };
         if kind.run_opens {
             let run = window

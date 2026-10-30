@@ -313,6 +313,17 @@ impl LanguageType {
         }
     }
 
+    /// Returns the character that escapes the next one in a string that is
+    /// not verbatim: a backslash, or the backtick of PowerShell
+    /// (about_Special_Characters).
+    pub(crate) fn escape_character(self) -> u8 {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.escape_character is defined %}b'{{ value.escape_character }}'{% else %}b'\\'{% endif %},
+            {% endfor %}
+        }
+    }
+
     /// Returns whose tags delimit the code inside the file's text, as PHP's
     /// `<?php … ?>` do.
     pub(crate) fn code_tags(self) -> Option<crate::language::code_tags::CodeTags> {
@@ -436,6 +447,22 @@ impl LanguageType {
         match self {
             {% for key, value in languages -%}
                 {{key}} => &[{% for item in value.line_start_closers | default(value=[]) %}"{{ item }}",{% endfor %}],
+            {% endfor %}
+        }
+    }
+
+    /// Returns the texts that a closer's leading quote character may be
+    /// written as, each after the character it stands for, as PowerShell
+    /// writes `"` as `“`, `”` or `„` (PowerShell Language Specification 3.0,
+    /// §2.3.1).
+    pub(crate) fn quote_aliases(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[
+                    {%- for items in value.quote_aliases | default(value=[]) -%}
+                        ({% for item in items %}"{{item}}",{% endfor %}),
+                    {%- endfor -%}
+                ],
             {% endfor %}
         }
     }
