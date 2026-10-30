@@ -14,3 +14,4 @@ scala/out/
 speed/target/
 speed/upstream/
 lua/judge-linux
+shell/judge-linux
