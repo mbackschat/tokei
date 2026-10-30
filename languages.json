@@ -236,9 +236,7 @@
       "extensions": ["c3"]
     },
     "Cabal": {
-      "nested": true,
       "line_comment": ["--"],
-      "multi_line_comments": [["{-", "-}"]],
       "extensions": ["cabal"]
     },
     "Cairo": {

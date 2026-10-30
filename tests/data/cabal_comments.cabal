@@ -1,0 +1,11 @@
+-- 11 lines 7 code 3 comments 1 blanks
+cabal-version: 3.0
+name: example
+description:
+  A field mentioning {- which opens nothing,
+  -- a comment line inside the field
+  and more text.
+-- a comment line
+
+library
+  exposed-modules: Example -- not a comment
