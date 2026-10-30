@@ -7,3 +7,4 @@ csharp/out/
 csharp/obj/
 csharp/bin/
 go/judge-linux
+swift/judge

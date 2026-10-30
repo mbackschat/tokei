@@ -13,6 +13,7 @@ Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbacksch
 | C# | Roslyn's parser, `Microsoft.CodeAnalysis.CSharp` 5.9.0; text in inactive `#if` regions parsed on its own | `dotnet build -c Release -o out` in `csharp/`, then `… \| dotnet csharp/out/Judge.dll \| judgecmp stream auto` |
 | Ruby | Prism, `Prism.lex`, Ruby 3.4's default parser (measured with 3.4.12) | `… \| ruby ruby/judge.rb \| judgecmp stream Ruby`, as in the `ruby:3.4` image |
 | PHP | PHP's `token_get_all` (measured with 8.4.27, `short_open_tag` on by default); text outside the PHP tags is in no range | `… \| php php/judge.php \| judgecmp stream PHP`, as in the `php:8.4-cli` image; Blade templates (`.blade.php`) are not PHP |
+| Swift | swift-syntax, the compiler's parser, from the Xcode toolchain's `usr/lib/swift/host` (measured with Apple Swift 6.4) | `swift/build.sh`, then `… \| swift/judge \| judgecmp stream Swift` |
 | Python | CPython's `tokenize` (measured with 3.14) | `… \| python3 python/judge.py \| judgecmp stream Python` |
 | Lean | Lean 4.31.0's own lexer functions | see below |
 
