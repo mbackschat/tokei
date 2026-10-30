@@ -284,7 +284,7 @@ impl SharedMatchers {
                 opener_pairs.allow_any(b'~');
             }
             Some(QuoteLikeSyntax::HaskellQuasiQuote) => {
-                for b in (b'a'..=b'z').chain(b'A'..=b'Z').chain([b'_']) {
+                for b in (b'a'..=b'z').chain(b'A'..=b'Z').chain(*b"_") {
                     opener_pairs.allow(b'[', b);
                 }
             }
