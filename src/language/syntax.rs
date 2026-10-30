@@ -20,7 +20,7 @@ use super::plain_scalar::plain_scalar_end;
 use super::pod::{pod_block_end, PodSyntax};
 use super::quote_like::{quote_like_len, ruby_character_len, QuoteLikeSyntax};
 use super::raw_delimiter::RawDelimiter;
-use super::regex_literal::{regex_literal_len, RegexContext};
+use super::regex_literal::{is_word_byte, regex_literal_len, RegexContext};
 use super::shebang::{shebang_len, ShebangSyntax};
 use crate::LanguageType::LinguaFranca;
 use crate::{stats::CodeStats, utils::ext::SliceExt, Config, LanguageType};
@@ -119,6 +119,7 @@ pub(crate) struct SharedMatchers {
     pub line_comment_splices: bool,
     pub shebang: Option<ShebangSyntax>,
     pub run_closers: &'static [&'static str],
+    pub identifier_quote_prefix: Option<&'static str>,
     pub backslash_operator: bool,
     pub quote_like: Option<QuoteLikeSyntax>,
     pub end_markers: &'static [&'static str],
@@ -359,6 +360,7 @@ impl SharedMatchers {
             line_comment_splices: language.line_comment_splices(),
             shebang: language.shebang(),
             run_closers: language.run_closers(),
+            identifier_quote_prefix: language.identifier_quote_prefix(),
             backslash_operator: language.backslash_operator(),
             quote_like: language.quote_like(),
             end_markers: language.end_markers(),
@@ -885,7 +887,7 @@ impl SyntaxCounter {
             self.track_flow_collection(lines, i);
             let may_quote = self.may_open_quote(lines, i);
             let is_quote_or_multi_line = may_quote
-                .then(|| self.parse_quote(window))
+                .then(|| self.parse_quote(window, i > 0 && is_word_byte(lines[i - 1])))
                 .flatten()
                 .or_else(|| self.parse_multi_line_comment(window));
 
@@ -1197,7 +1199,7 @@ impl SyntaxCounter {
     }
 
     #[inline]
-    pub(crate) fn parse_quote(&mut self, window: &[u8]) -> Option<usize> {
+    pub(crate) fn parse_quote(&mut self, window: &[u8], after_identifier: bool) -> Option<usize> {
         if !self.stack.is_empty() {
             return None;
         }
@@ -1215,6 +1217,18 @@ impl SyntaxCounter {
             self.quote_is_verbatim = true;
             self.quote_is_doc_quote = false;
             return Some(opening.len);
+        }
+
+        if let Some((start, end, verbatim, len)) = after_identifier
+            .then(|| self.identifier_prefixed_opener(window))
+            .flatten()
+        {
+            trace!("Start {:?} after an identifier", start);
+            self.quote = Some(Cow::Borrowed(end));
+            self.quote_opener = start;
+            self.quote_is_verbatim = verbatim;
+            self.quote_is_doc_quote = false;
+            return Some(len);
         }
 
         if let Some((start, end)) = self
@@ -1260,6 +1274,36 @@ impl SyntaxCounter {
         }
 
         None
+    }
+
+    /// The declared opener `prefix` + quote, with its closer, whether it is
+    /// verbatim, and the length of the quote, for a quote at the start of
+    /// `window` that directly follows an identifier, in a language whose
+    /// quotes take the identifier as a prefix.
+    fn identifier_prefixed_opener(
+        &self,
+        window: &[u8],
+    ) -> Option<(&'static str, &'static str, bool, usize)> {
+        let prefix = self.shared.identifier_quote_prefix?;
+        let quote_len = |opener: &str| {
+            opener
+                .strip_prefix(prefix)
+                .filter(|quote| window.starts_with(quote.as_bytes()))
+                .map(str::len)
+        };
+        let verbatim = self
+            .shared
+            .verbatim_string_literals
+            .iter()
+            .map(|&(s, e)| (s, e, true));
+        let plain = self
+            .shared
+            .string_literals
+            .iter()
+            .map(|&(s, e)| (s, e, false));
+        verbatim
+            .chain(plain)
+            .find_map(|(start, end, verbatim)| Some((start, end, verbatim, quote_len(start)?)))
     }
 
     /// The code token starting `window` that only looks like a comment or

@@ -343,6 +343,18 @@ impl LanguageType {
         }
     }
 
+    /// Returns the declared opener prefix, such as Scala's `s`, that a quote
+    /// written directly after any identifier opens as: Scala reads `id"…"`
+    /// as an interpolated string for every identifier `id` (Scala 3
+    /// reference, Lexical Syntax, `interpolatedString`).
+    pub(crate) fn identifier_quote_prefix(self) -> Option<&'static str> {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.identifier_quote_prefix is defined %}Some("{{ value.identifier_quote_prefix }}"){% else %}None{% endif %},
+            {% endfor %}
+        }
+    }
+
     /// Returns the verbatim closers that, followed by more of their last
     /// character, close only at the end of the run, the characters before
     /// them being text, as Kotlin's `"""` does.

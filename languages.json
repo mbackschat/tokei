@@ -1738,6 +1738,9 @@
       "character_literals": [["'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
+      "nested": true,
+      "run_closers": ["\\\"\\\"\\\""],
+      "identifier_quote_prefix": "s",
       "quotes": [["s\\\"", "\\\""], ["f\\\"", "\\\""], ["raw\\\"", "\\\""], ["\\\"", "\\\""]],
       "extensions": ["sc", "scala"]
     },

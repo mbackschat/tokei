@@ -195,6 +195,6 @@ const NOT_COMMANDS: &[&[u8]] = &[
     b"__ENCODING__",
 ];
 
-fn is_word_byte(byte: u8) -> bool {
+pub(crate) fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'$') || byte >= 0x80
 }
