@@ -1,7 +1,7 @@
 use crate::consts::{
     BLANKS_COLUMN_WIDTH, CODE_COLUMN_WIDTH, COMMENTS_COLUMN_WIDTH, LINES_COLUMN_WIDTH,
 };
-use crate::LanguageType;
+use crate::{LanguageType, LineClass};
 use std::{collections::BTreeMap, fmt, ops, path::PathBuf};
 
 /// A struct representing stats about a single blob of code.
@@ -19,6 +19,15 @@ pub struct CodeStats {
 }
 
 impl CodeStats {
+    /// Counts one line of `class`.
+    pub(crate) fn add_line(&mut self, class: LineClass) {
+        match class {
+            LineClass::Code => self.code += 1,
+            LineClass::Comment => self.comments += 1,
+            LineClass::Blank => self.blanks += 1,
+        }
+    }
+
     /// Creates a new blank `CodeStats`.
     #[must_use]
     pub fn new() -> Self {

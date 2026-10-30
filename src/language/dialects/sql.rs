@@ -5,6 +5,8 @@
 //! `core_yylex`), so a body that lexes as SQL is read as code, and any other
 //! body, such as a Perl function's or a fragment of a query, is a literal.
 
+use crate::language::heredoc::is_identifier_byte as is_tag_byte;
+use crate::language::regex_literal::is_word_byte as is_ident_byte;
 use crate::language::syntax::SyntaxCounter;
 
 /// What a `$` read as code starts.
@@ -130,14 +132,6 @@ fn nested_comment_len(text: &[u8]) -> Option<usize> {
         }
     }
     None
-}
-
-fn is_tag_byte(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_' || b >= 0x80
-}
-
-fn is_ident_byte(b: u8) -> bool {
-    is_tag_byte(b) || b == b'$'
 }
 
 impl SyntaxCounter {

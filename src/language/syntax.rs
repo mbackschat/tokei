@@ -15,14 +15,13 @@ use super::dialects::rust::frontmatter_end;
 use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
+use super::dialects::{elixir, haskell, perl, ruby};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
 use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, MarkupExpressions, OpenHole};
-use super::quote_like::{
-    question_mark_character_len, quote_like_len, QuestionMarkSyntax, QuoteLikeSyntax,
-};
+use super::quote_like::{delimited_len, QuestionMarkSyntax, QuoteLikeSyntax};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{is_word_byte, regex_literal_len, RegexContext};
 use super::shebang::{shebang_len, ShebangSyntax};
@@ -208,6 +207,26 @@ pub(crate) struct SharedMatchers {
 }
 
 impl SharedMatchers {
+    /// The class of a line that opens no comment or literal other than a
+    /// line comment at its start: blank, a comment, or code. The full parse
+    /// and the fast path over the lines before a file's first important
+    /// syntax both classify such lines with it, so the two cannot disagree.
+    pub(crate) fn plain_line_class(&self, line: &[u8]) -> LineClass {
+        if self.blank_symbols.trim_start(line).is_empty() {
+            LineClass::Blank
+        } else if self.is_literate
+            || self
+                .line_comments
+                .iter()
+                .chain(self.line_start_comments)
+                .any(|c| line.starts_with(c.as_bytes()))
+        {
+            LineClass::Comment
+        } else {
+            LineClass::Code
+        }
+    }
+
     pub fn new(language: LanguageType) -> Arc<Self> {
         static MATCHERS: Lazy<DashMap<LanguageType, Arc<SharedMatchers>>> = Lazy::new(DashMap::new);
 
@@ -803,22 +822,7 @@ impl SyntaxCounter {
             false
         } else {
             trace!("^ Skippable");
-
-            if self.shared.is_literate
-                || self
-                    .shared
-                    .line_comments
-                    .iter()
-                    .chain(self.shared.line_start_comments)
-                    .any(|c| line.starts_with(c.as_bytes()))
-            {
-                stats.comments += 1;
-                trace!("Comment No.{}", stats.comments);
-            } else {
-                stats.code += 1;
-                trace!("Code No.{}", stats.code);
-            }
-
+            stats.add_line(self.shared.plain_line_class(line));
             true
         }
     }
@@ -853,6 +857,27 @@ impl SyntaxCounter {
             macro_rules! skip {
                 ($len:expr) => {{
                     positions.start = i + $len;
+                }};
+            }
+            // Skips the literal of `len` bytes from `i` on, or, when it goes
+            // on past this line, leaves the rest of the line to it; a text
+            // literal's lines of whitespace are text rather than code.
+            macro_rules! literal {
+                ($len:expr, $what:literal) => {
+                    literal!($len, $what, false)
+                };
+                ($len:expr, $what:literal, $text:expr) => {{
+                    let len = $len;
+                    if lines[i..i + len].contains(&b'\n') {
+                        trace!(concat!("Start ", $what, ", ends at {}"), i + len);
+                        self.literal_end = i + len;
+                        if $text {
+                            self.text_end = i + len;
+                        }
+                        break;
+                    }
+                    skip!(len);
+                    continue;
                 }};
             }
             settle!();
@@ -951,30 +976,18 @@ impl SyntaxCounter {
                     .shared
                     .question_mark_characters
                     .filter(|_| self.is_plain_mode())
-                    .and_then(|syntax| question_mark_character_len(lines, i, syntax))
+                    .and_then(|syntax| syntax.character_len(lines, i))
                 {
                     skip!(len);
                     continue;
                 }
 
                 if let Some(len) = self.parse_regex_literal(lines, i) {
-                    if lines[i..i + len].contains(&b'\n') {
-                        trace!("Start regular expression, ends at {}", i + len);
-                        self.literal_end = i + len;
-                        break;
-                    }
-                    skip!(len);
-                    continue;
+                    literal!(len, "regular expression");
                 }
 
                 if let Some(len) = self.parse_quote_like(lines, i) {
-                    if lines[i..i + len].contains(&b'\n') {
-                        trace!("Start quote-like literal, ends at {}", i + len);
-                        self.literal_end = i + len;
-                        break;
-                    }
-                    skip!(len);
-                    continue;
+                    literal!(len, "quote-like literal");
                 }
 
                 if let Some(skip_amount) = self.parse_heredoc(lines, i) {
@@ -996,14 +1009,7 @@ impl SyntaxCounter {
             }
 
             if let Some(len) = self.text_section_len(lines, i) {
-                if lines[i..i + len].contains(&b'\n') {
-                    trace!("Start text section, ends at {}", i + len);
-                    self.literal_end = i + len;
-                    self.text_end = i + len;
-                    break;
-                }
-                skip!(len);
-                continue;
+                literal!(len, "text section", true);
             }
 
             match self.dollar_quote(lines, i) {
@@ -1011,15 +1017,7 @@ impl SyntaxCounter {
                     skip!(len);
                     continue;
                 }
-                Some(DollarQuote::Literal(len)) => {
-                    if lines[i..i + len].contains(&b'\n') {
-                        trace!("Start dollar-quoted literal, ends at {}", i + len);
-                        self.literal_end = i + len;
-                        break;
-                    }
-                    skip!(len);
-                    continue;
-                }
+                Some(DollarQuote::Literal(len)) => literal!(len, "dollar-quoted literal"),
                 None => {}
             }
 
@@ -1034,13 +1032,7 @@ impl SyntaxCounter {
             if self.in_tag {
                 if let Some(len) = template_expression_len(window, self.shared.template_expressions)
                 {
-                    if window[..len].contains(&b'\n') {
-                        trace!("Start template expression, ends at {}", i + len);
-                        self.literal_end = i + len;
-                        break;
-                    }
-                    skip!(len);
-                    continue;
+                    literal!(len, "template expression");
                 }
                 if window[0] == b'>' {
                     self.in_tag = false;
@@ -1568,10 +1560,6 @@ impl SyntaxCounter {
         }
     }
 
-    /// Whether a backslash at the current position escapes the next byte:
-    /// inside a literal, and outside one unless the language makes it an
-    /// operator. Outside a literal it is the shells' quoting of a single
-    /// character (POSIX Shell Command Language, 2.2.1).
     /// Length of the `closer` that `window` starts with, its leading quote
     /// character perhaps written as one of the language's aliases.
     fn closer_len(&self, window: &[u8], closer: &str) -> Option<usize> {
@@ -1589,6 +1577,10 @@ impl SyntaxCounter {
             })
     }
 
+    /// Whether the language's escape character at the current position
+    /// escapes the next byte: inside a literal, and outside one unless the
+    /// language makes it an operator. Outside a literal it is the shells'
+    /// quoting of a single character (POSIX Shell Command Language, 2.2.1).
     fn escapes_here(&self) -> bool {
         self.quote.is_some() || !self.shared.backslash_operator
     }
@@ -1741,11 +1733,20 @@ impl SyntaxCounter {
         if !self.is_plain_mode() {
             return None;
         }
-        let syntax = self.shared.quote_like?;
-        let context = self.expression_context();
-        quote_like_len(lines, i, syntax, context.as_ref(), || {
-            self.quasi_quoting(lines)
-        })
+        match self.shared.quote_like? {
+            QuoteLikeSyntax::Perl => {
+                let (open, parts) = perl::quote_operator(lines, i)?;
+                delimited_len(lines, i, open, parts)
+            }
+            QuoteLikeSyntax::RubyPercent => {
+                let (open, parts) = ruby::percent_literal(lines, i, &self.expression_context()?)?;
+                delimited_len(lines, i, open, parts)
+            }
+            QuoteLikeSyntax::ElixirSigil => elixir::sigil_len(lines, i),
+            QuoteLikeSyntax::HaskellQuasiQuote => {
+                haskell::quasi_quote_len(lines, i, || self.quasi_quoting(lines))
+            }
+        }
     }
 
     /// Length of the text section at `lines[i]`, outside tags and literals,
@@ -1855,9 +1856,6 @@ impl SyntaxCounter {
     }
 }
 
-/// The end of the line holding `from` and of each following line that a
-/// backslash before the newline splices to it (C23 §5.1.1.2, translation
-/// phase 2); like GCC and Clang, whitespace may follow the backslash.
 /// The language a `lang` attribute names, by name or, as Vue's
 /// `<style lang="scss">` does, by file extension (Vue SFC specification,
 /// "Pre-Processors").
@@ -1869,6 +1867,9 @@ fn lang_language(lang: &[u8]) -> Option<LanguageType> {
         .or_else(|| LanguageType::from_file_extension(&lang))
 }
 
+/// The end of the line holding `from` and of each following line that a
+/// backslash before the newline splices to it (C23 §5.1.1.2, translation
+/// phase 2); like GCC and Clang, whitespace may follow the backslash.
 fn spliced_lines_end(text: &[u8], mut from: usize) -> usize {
     loop {
         let Some(newline) = memchr::memchr(b'\n', &text[from..]).map(|n| from + n) else {

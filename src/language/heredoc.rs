@@ -160,6 +160,6 @@ impl Heredoc {
     }
 }
 
-fn is_identifier_byte(byte: u8) -> bool {
+pub(crate) fn is_identifier_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_' || byte >= 0x80
 }

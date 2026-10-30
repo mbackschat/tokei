@@ -87,19 +87,23 @@ const RAW_TAGS: &[&str] = &["pre", "script", "style", "textarea"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ListData {
-    ordered: bool,
-    bullet: u8,
-    delimiter: u8,
+    marker: Marker,
     marker_offset: usize,
     padding: usize,
+}
+
+/// A list item's marker: an item continues a list only with the same bullet
+/// character or ordered delimiter (§5.3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Marker {
+    Bullet(u8),
+    Ordered(u8),
 }
 
 impl ListData {
     /// Whether an item with `other`'s marker continues this list.
     fn matches(&self, other: &ListData) -> bool {
-        self.ordered == other.ordered
-            && self.delimiter == other.delimiter
-            && self.bullet == other.bullet
+        self.marker == other.marker
     }
 }
 
@@ -466,8 +470,8 @@ impl BlockParser<'_> {
             return None;
         }
         let rest = self.rest().as_bytes();
-        let (ordered, bullet, delimiter, marker_len) = match *rest.first()? {
-            bullet @ (b'*' | b'+' | b'-') => (false, bullet, 0, 1),
+        let (marker, marker_len) = match *rest.first()? {
+            bullet @ (b'*' | b'+' | b'-') => (Marker::Bullet(bullet), 1),
             _ => {
                 let digits = rest.iter().take_while(|b| b.is_ascii_digit()).count();
                 let delimiter = *rest.get(digits)?;
@@ -482,7 +486,7 @@ impl BlockParser<'_> {
                 {
                     return None;
                 }
-                (true, 0, delimiter, digits + 1)
+                (Marker::Ordered(delimiter), digits + 1)
             }
         };
         if !rest.get(marker_len).map_or(true, |b| is_space_or_tab(*b)) {
@@ -516,9 +520,7 @@ impl BlockParser<'_> {
             marker_len + spaces
         };
         Some(ListData {
-            ordered,
-            bullet,
-            delimiter,
+            marker,
             marker_offset,
             padding,
         })
@@ -720,12 +722,11 @@ fn html_block_opens(html: u8, rest: &str) -> bool {
 fn html_block_closes(html: u8, text: &str) -> bool {
     let bytes = text.as_bytes();
     match html {
-        1 => {
-            let lower = text.to_ascii_lowercase();
-            RAW_TAGS
-                .iter()
-                .any(|tag| lower.contains(&format!("</{tag}>")))
-        }
+        1 => memchr::memmem::find_iter(bytes, b"</").any(|at| {
+            RAW_TAGS.iter().any(|tag| {
+                tag_name_at(text, at + 2, tag).is_some_and(|end| bytes.get(end) == Some(&b'>'))
+            })
+        }),
         2 => memchr::memmem::find(bytes, b"-->").is_some(),
         3 => memchr::memmem::find(bytes, b"?>").is_some(),
         4 => bytes.contains(&b'>'),

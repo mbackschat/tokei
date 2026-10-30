@@ -149,14 +149,7 @@ impl LanguageType {
             })
         {
             let (skippable_text, rest) = text.split_at(end + 1);
-            let is_fortran = syntax.shared.is_fortran;
-            let is_literate = syntax.shared.is_literate;
-            let comments = syntax.shared.line_comments;
-            // A marker that opens a comment only at the start of a line,
-            // such as Dockerfile's `#`, opens one here, where every line
-            // starts with nothing before it.
-            let line_start_comments = syntax.shared.line_start_comments;
-            let blank_symbols = syntax.shared.blank_symbols;
+            let shared = syntax.shared.clone();
             trace!(
                 "Using Simple Parse on {:?}",
                 String::from_utf8_lossy(skippable_text)
@@ -178,18 +171,11 @@ impl LanguageType {
                         // FORTRAN has a rule where it only counts as a comment if it's the
                         // first character in the column, so removing starting whitespace
                         // could cause a miscount.
-                        let line = if is_fortran { line } else { line.trim() };
-                        if blank_symbols.trim_start(line).is_empty() {
-                            (1, 0, 0)
-                        } else if is_literate
-                            || comments
-                                .iter()
-                                .chain(line_start_comments)
-                                .any(|c| line.starts_with(c.as_bytes()))
-                        {
-                            (0, 0, 1)
-                        } else {
-                            (0, 1, 0)
+                        let line = if shared.is_fortran { line } else { line.trim() };
+                        match shared.plain_line_class(line) {
+                            LineClass::Blank => (1, 0, 0),
+                            LineClass::Code => (0, 1, 0),
+                            LineClass::Comment => (0, 0, 1),
                         }
                     })
                     .reduce(|| (0, 0, 0), |a, b| (a.0 + b.0, a.1 + b.1, a.2 + b.2))
@@ -218,8 +204,9 @@ impl LanguageType {
     /// line.
     ///
     /// `None` when lines are counted elsewhere: for Jupyter notebooks, and for
-    /// a text that embeds another language, such as a Markdown code block or
-    /// an HTML script, whose lines that language counts.
+    /// a Markdown text with a code block in a named language, whose lines that
+    /// language counts. The lines of a script or style element embedded in
+    /// markup take the classes its own language gives them.
     pub fn line_classes(self, text: &[u8], config: &Config) -> Option<Vec<LineClass>> {
         if self == Jupyter {
             return None;
@@ -252,25 +239,37 @@ impl LanguageType {
             syntax,
             counted,
             &mut |report| {
-                let lines = match report {
-                    LineReport::Class(class) => class.map(|class| vec![class]),
+                let Some(list) = classes.as_mut() else {
+                    return;
+                };
+                let complete = match report {
+                    LineReport::Class(Some(class)) => {
+                        list.push(class);
+                        true
+                    }
+                    LineReport::Class(None) => false,
                     LineReport::Embedded {
                         language: Some(language),
                         text,
-                    } => language.collect_line_classes(
-                        config,
-                        text,
-                        SyntaxCounter::new(language),
-                        embedded_lines(text),
-                    ),
+                    } => language
+                        .collect_line_classes(
+                            config,
+                            text,
+                            SyntaxCounter::new(language),
+                            embedded_lines(text),
+                        )
+                        .map(|lines| list.extend(lines))
+                        .is_some(),
                     LineReport::Embedded {
                         language: None,
                         text,
-                    } => Some(data_line_classes(text).collect()),
+                    } => {
+                        list.extend(data_line_classes(text));
+                        true
+                    }
                 };
-                match (classes.as_mut(), lines) {
-                    (Some(list), Some(lines)) => list.extend(lines),
-                    _ => classes = None,
+                if !complete {
+                    classes = None;
                 }
             },
         );
@@ -323,11 +322,7 @@ impl LanguageType {
             let reads_line = whole_line.is_none() && syntax.quote.is_none();
             'line: {
                 if let Some(class) = whole_line {
-                    match class {
-                        LineClass::Code => stats.code += 1,
-                        LineClass::Comment => stats.comments += 1,
-                        LineClass::Blank => stats.blanks += 1,
-                    }
+                    stats.add_line(class);
                     trace!("{:?} No.{} as a whole line", class, stats.lines());
                     // A literal that closes inside this line leaves the rest
                     // of it to be read.

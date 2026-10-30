@@ -4,9 +4,7 @@
 //! Ruby's, a bracket delimiter closes at its partner and nests; any other
 //! delimiter closes at its next occurrence; a backslash escapes either.
 
-use super::dialects::haskell::{self, QuasiQuoting};
-use super::dialects::{elixir, perl, ruby};
-use super::regex_literal::RegexContext;
+use super::dialects::{elixir, ruby};
 
 /// Which family of chosen-delimiter literals a language has.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,21 +22,20 @@ pub(crate) enum QuestionMarkSyntax {
     Elixir,
 }
 
-/// The length of the literal that starts at `lines[i]`, up to its closing
-/// delimiter and modifiers, or `None` when none starts there.
-pub(crate) fn quote_like_len(
-    lines: &[u8],
-    i: usize,
-    syntax: QuoteLikeSyntax,
-    context: Option<&RegexContext>,
-    quoting: impl FnOnce() -> QuasiQuoting,
-) -> Option<usize> {
-    let (open, parts) = match syntax {
-        QuoteLikeSyntax::Perl => perl::quote_operator(lines, i)?,
-        QuoteLikeSyntax::RubyPercent => ruby::percent_literal(lines, i, context?)?,
-        QuoteLikeSyntax::ElixirSigil => return elixir::sigil_len(lines, i),
-        QuoteLikeSyntax::HaskellQuasiQuote => return haskell::quasi_quote_len(lines, i, quoting),
-    };
+impl QuestionMarkSyntax {
+    /// Length of the character literal that the `?` at `lines[i]` starts.
+    pub(crate) fn character_len(self, lines: &[u8], i: usize) -> Option<usize> {
+        match self {
+            QuestionMarkSyntax::Ruby => ruby::character_len(lines, i),
+            QuestionMarkSyntax::Elixir => elixir::character_len(lines, i),
+        }
+    }
+}
+
+/// The length of the Perl or Ruby literal that starts at `lines[i]` and
+/// whose first delimiter is at `lines[open]`, with `parts` delimited parts,
+/// up to its closing delimiter and modifiers.
+pub(crate) fn delimited_len(lines: &[u8], i: usize, open: usize, parts: usize) -> Option<usize> {
     let mut end = part_end(lines, open)?;
     if parts == 2 {
         end = if is_bracket(lines[open]) {
@@ -102,16 +99,4 @@ fn is_bracket(byte: u8) -> bool {
 
 pub(crate) fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
-}
-
-/// Length of the character literal that the `?` at `lines[i]` starts.
-pub(crate) fn question_mark_character_len(
-    lines: &[u8],
-    i: usize,
-    syntax: QuestionMarkSyntax,
-) -> Option<usize> {
-    match syntax {
-        QuestionMarkSyntax::Ruby => ruby::character_len(lines, i),
-        QuestionMarkSyntax::Elixir => elixir::character_len(lines, i),
-    }
 }

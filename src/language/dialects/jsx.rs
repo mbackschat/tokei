@@ -39,7 +39,8 @@ pub(crate) fn element_starts(lines: &[u8], i: usize) -> bool {
         return false;
     }
     if name.is_empty() {
-        return lines.get(name_start) == Some(&b'>') && contains(&lines[name_start..], b"</>");
+        return lines.get(name_start) == Some(&b'>')
+            && memchr::memmem::find(&lines[name_start..], b"</>").is_some();
     }
     let Some(tag_end) = opening_tag_end(lines, name_start + name_len) else {
         return false;
@@ -48,7 +49,7 @@ pub(crate) fn element_starts(lines: &[u8], i: usize) -> bool {
         return true;
     }
     let mut from = tag_end;
-    while let Some(at) = find(&lines[from..], b"</") {
+    while let Some(at) = memchr::memmem::find(&lines[from..], b"</") {
         let candidate = from + at + 2;
         let rest = &lines[candidate..];
         if rest.starts_with(name) && !rest.get(name.len()).is_some_and(|b| is_name_byte(*b)) {
@@ -87,14 +88,6 @@ fn opening_tag_end(lines: &[u8], start: usize) -> Option<usize> {
 /// `svg:rect`.
 pub(crate) fn is_name_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'$' | b'.' | b'-' | b':') || byte >= 0x80
-}
-
-fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack.windows(needle.len()).position(|w| w == needle)
-}
-
-fn contains(haystack: &[u8], needle: &[u8]) -> bool {
-    find(haystack, needle).is_some()
 }
 
 impl SyntaxCounter {
