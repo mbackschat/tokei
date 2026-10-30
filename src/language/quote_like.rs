@@ -6,7 +6,7 @@
 //! a backslash escapes either. The literal may span lines.
 
 use super::regex_literal::{starts_command_argument, RegexContext};
-use crate::utils::ext::SliceExt;
+use crate::utils::ext::{utf8_len, SliceExt};
 
 /// Which family of chosen-delimiter literals a language has.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -178,12 +178,5 @@ pub(crate) fn ruby_character_len(lines: &[u8], i: usize) -> Option<usize> {
         return None;
     }
     let escape = usize::from(first == b'\\');
-    let lead = *body.get(escape)?;
-    let width = match lead {
-        lead if lead < 0x80 => 1,
-        lead if lead >= 0xf0 => 4,
-        lead if lead >= 0xe0 => 3,
-        _ => 2,
-    };
-    Some(1 + escape + width)
+    Some(1 + escape + utf8_len(*body.get(escape)?))
 }

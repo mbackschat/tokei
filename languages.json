@@ -218,8 +218,7 @@
       "extensions": ["brs"]
     },
     "C": {
-      "blank_symbols": ["\\\\"],
-      "line_comment_splices": true,
+      "line_splices": true,
       "character_literals": [["'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -274,8 +273,7 @@
       "extensions": ["chpl"]
     },
     "CHeader": {
-      "blank_symbols": ["\\\\"],
-      "line_comment_splices": true,
+      "line_splices": true,
       "character_literals": [["'", "'"]],
       "name": "C Header",
       "line_comment": ["//"],
@@ -354,8 +352,7 @@
       "extensions": ["v"]
     },
     "Cpp": {
-      "blank_symbols": ["\\\\"],
-      "line_comment_splices": true,
+      "line_splices": true,
       "raw_strings": [{"start": "R\\\"", "label": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{}[]#<>%:;.?*+-/^&|~!=,'$@`\\\"", "max_label": 16, "open": "(", "close": ")", "end": "\\\""}],
       "character_literals": [["'", "'"]],
       "name": "C++",
@@ -365,8 +362,7 @@
       "extensions": ["cc", "cpp", "cxx", "c++", "pcc", "tpp"]
     },
     "CppHeader": {
-      "blank_symbols": ["\\\\"],
-      "line_comment_splices": true,
+      "line_splices": true,
       "raw_strings": [{"start": "R\\\"", "label": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{}[]#<>%:;.?*+-/^&|~!=,'$@`\\\"", "max_label": 16, "open": "(", "close": ")", "end": "\\\""}],
       "character_literals": [["'", "'"]],
       "name": "C++ Header",
@@ -1316,8 +1312,7 @@
     },
     "ObjectiveC": {
       "character_literals": [["'", "'"]],
-      "blank_symbols": ["\\\\"],
-      "line_comment_splices": true,
+      "line_splices": true,
       "name": "Objective-C",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -1327,8 +1322,7 @@
     "ObjectiveCpp": {
       "raw_strings": [{"start": "R\\\"", "label": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{}[]#<>%:;.?*+-/^&|~!=,'$@`\\\"", "max_label": 16, "open": "(", "close": ")", "end": "\\\""}],
       "character_literals": [["'", "'"]],
-      "blank_symbols": ["\\\\"],
-      "line_comment_splices": true,
+      "line_splices": true,
       "name": "Objective-C++",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -1736,15 +1730,15 @@
       "extensions": ["sass", "scss"]
     },
     "Scala": {
-      "interpolations": [{"quote": "s\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "f\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "raw\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "s\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "f\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "raw\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}],
-      "verbatim_quotes": [["s\\\"\\\"\\\"", "\\\"\\\"\\\""], ["f\\\"\\\"\\\"", "\\\"\\\"\\\""], ["raw\\\"\\\"\\\"", "\\\"\\\"\\\""], ["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
+      "interpolations": [{"quote": "s\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "s\\\"\\\"\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}],
+      "verbatim_quotes": [["s\\\"\\\"\\\"", "\\\"\\\"\\\""], ["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
       "character_literals": [["'", "'"]],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "nested": true,
       "run_closers": ["\\\"\\\"\\\""],
       "identifier_quote_prefix": "s",
-      "quotes": [["s\\\"", "\\\""], ["f\\\"", "\\\""], ["raw\\\"", "\\\""], ["\\\"", "\\\""]],
+      "quotes": [["s\\\"", "\\\""], ["\\\"", "\\\""]],
       "extensions": ["sc", "scala"]
     },
     "Scheme": {

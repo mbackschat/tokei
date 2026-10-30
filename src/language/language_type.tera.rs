@@ -473,10 +473,10 @@ impl LanguageType {
     /// Returns whether a backslash before a newline splices the lines, so a
     /// line comment ending in one continues on the next line, as in C
     /// (C23 §5.1.1.2, translation phase 2).
-    pub(crate) fn line_comment_splices(self) -> bool {
+    pub(crate) fn line_splices(self) -> bool {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {{ value.line_comment_splices | default(value=false) }},
+                {{key}} => {{ value.line_splices | default(value=false) }},
             {% endfor %}
         }
     }
@@ -523,11 +523,15 @@ impl LanguageType {
     /// Returns the texts beyond ASCII whitespace that read as blank, as `。`
     /// and `、` do in the WenYan tokenizer's `IGNORE_SYMBOLS` (src/parser.ts
     /// at wenyan-lang/wenyan `97f0a4b`), and as the rest of Unicode
-    /// Pattern_White_Space does in Rust.
+    /// Pattern_White_Space does in Rust, and as the backslash of a line splice
+    /// does.
     pub(crate) fn blank_symbols(self) -> &'static [&'static str] {
         match self {
             {% for key, value in languages -%}
                 {{key}} => &[
+                    {%- if value.line_splices | default(value=false) -%}
+                        "\\",
+                    {%- endif -%}
                     {%- for item in value.blank_symbols | default(value=[]) -%}
                         "{{item}}",
                     {%- endfor -%}

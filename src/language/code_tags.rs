@@ -15,7 +15,7 @@ impl CodeTags {
     pub(crate) fn open_len(self, window: &[u8]) -> Option<usize> {
         match self {
             CodeTags::Php => {
-                if !window.starts_with(b"<?") {
+                if !window.starts_with(self.open().as_bytes()) {
                     None
                 } else if window
                     .get(2..5)
@@ -29,6 +29,13 @@ impl CodeTags {
                     Some(2)
                 }
             }
+        }
+    }
+
+    /// The start that every opening tag shares.
+    pub(crate) fn open(self) -> &'static str {
+        match self {
+            CodeTags::Php => "<?",
         }
     }
 

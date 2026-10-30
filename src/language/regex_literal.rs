@@ -162,6 +162,13 @@ fn regex_allowed_after(before: &[u8], keywords: &[&str]) -> bool {
 /// such as `end` or `def`, takes no argument.
 pub(crate) fn starts_command_argument(lines: &[u8], i: usize) -> bool {
     let before = &lines[..i];
+    if !matches!(before.last(), Some(b' ' | b'\t'))
+        || !lines
+            .get(i + 1)
+            .is_some_and(|b| !b.is_ascii_whitespace() && *b != b'=')
+    {
+        return false;
+    }
     let code = &before[..before
         .iter()
         .rposition(|b| !matches!(b, b' ' | b'\t'))
@@ -171,12 +178,7 @@ pub(crate) fn starts_command_argument(lines: &[u8], i: usize) -> bool {
         .or_else(|| code.strip_suffix(b"!"))
         .unwrap_or(code);
     let word = &name[name.len() - name.iter().rev().take_while(|b| is_word_byte(**b)).count()..];
-    code.len() < before.len()
-        && !word.is_empty()
-        && !NOT_COMMANDS.contains(&word)
-        && lines
-            .get(i + 1)
-            .is_some_and(|b| !b.is_ascii_whitespace() && *b != b'=')
+    !word.is_empty() && !NOT_COMMANDS.contains(&word)
 }
 
 /// Ruby keywords after which the lexer expects an operator or a method name

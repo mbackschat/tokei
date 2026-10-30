@@ -23,7 +23,11 @@ use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{is_word_byte, regex_literal_len, RegexContext};
 use super::shebang::{shebang_len, ShebangSyntax};
 use crate::LanguageType::LinguaFranca;
-use crate::{stats::CodeStats, utils::ext::SliceExt, Config, LanguageType};
+use crate::{
+    stats::CodeStats,
+    utils::ext::{utf8_len, SliceExt},
+    Config, LanguageType,
+};
 
 /// Tracks the syntax of the language as well as the current state in the file.
 /// Current has what could be consider three types of mode.
@@ -116,7 +120,7 @@ pub(crate) struct SharedMatchers {
     pub pod: Option<PodSyntax>,
     pub code_tags: Option<CodeTags>,
     pub frontmatter: bool,
-    pub line_comment_splices: bool,
+    pub line_splices: bool,
     pub shebang: Option<ShebangSyntax>,
     pub run_closers: &'static [&'static str],
     pub identifier_quote_prefix: Option<&'static str>,
@@ -216,7 +220,6 @@ impl SharedMatchers {
         }
 
         let starts = |pairs: &'static [(&'static str, &'static str)]| pairs.iter().map(|(s, _)| *s);
-        let mut opener_bytes = [false; 256];
         let mut opener_pairs = OpenerPairs::default();
         for opener in language
             .line_comments()
@@ -232,72 +235,52 @@ impl SharedMatchers {
             .chain(language.code_tokens().iter().copied())
         {
             match *opener.as_bytes() {
-                [] => {
-                    opener_bytes = [true; 256];
-                    opener_pairs = OpenerPairs::any();
-                }
-                [first] => {
-                    opener_bytes[usize::from(first)] = true;
-                    opener_pairs.allow_any(first);
-                }
-                [first, second, ..] => {
-                    opener_bytes[usize::from(first)] = true;
-                    opener_pairs.allow(first, second);
-                }
+                [] => opener_pairs = OpenerPairs::any(),
+                [first] => opener_pairs.allow_any(first),
+                [first, second, ..] => opener_pairs.allow(first, second),
             }
         }
         let raw = || language.raw_strings().iter().chain(language.raw_comments());
         for b in raw().flat_map(RawDelimiter::first_bytes) {
-            opener_bytes[usize::from(b)] = true;
             opener_pairs.allow_any(b);
         }
         if language.question_mark_characters() {
-            opener_bytes[usize::from(b'?')] = true;
             opener_pairs.allow_any(b'?');
         }
         if language.regex_keywords().is_some() {
-            opener_bytes[usize::from(b'/')] = true;
             opener_pairs.allow_any(b'/');
         }
         for heredoc in language.heredocs() {
-            opener_bytes[usize::from(heredoc.start.as_bytes()[0])] = true;
             opener_pairs.allow_any(heredoc.start.as_bytes()[0]);
         }
         if language.block_scalars() {
-            opener_bytes[usize::from(b'|')] = true;
             opener_pairs.allow_any(b'|');
-            opener_bytes[usize::from(b'>')] = true;
             opener_pairs.allow_any(b'>');
         }
         match language.quote_like() {
             Some(QuoteLikeSyntax::Perl) => {
                 for b in *b"qmsty" {
-                    opener_bytes[usize::from(b)] = true;
                     opener_pairs.allow_any(b);
                 }
             }
             Some(QuoteLikeSyntax::RubyPercent) => {
-                opener_bytes[usize::from(b'%')] = true;
                 opener_pairs.allow_any(b'%');
             }
             None => {}
         }
         if language.quotes_after().is_some() {
             for b in *b"[]{}" {
-                opener_bytes[usize::from(b)] = true;
                 opener_pairs.allow_any(b);
             }
         }
         if language.quotes_in_tags() {
-            opener_bytes[usize::from(b'<')] = true;
             opener_pairs.allow_any(b'<');
-            opener_bytes[usize::from(b'>')] = true;
             opener_pairs.allow_any(b'>');
         }
         for (open, _) in language.template_expressions() {
-            opener_bytes[usize::from(open.as_bytes()[0])] = true;
             opener_pairs.allow_any(open.as_bytes()[0]);
         }
+        let opener_bytes = std::array::from_fn(|b| opener_pairs.may_start(b as u8));
         let mut hole_bytes = [false; 256];
         let mut interpolating_quote_bytes = [false; 256];
         for kind in language.interpolations() {
@@ -326,12 +309,12 @@ impl SharedMatchers {
                 language
                     .code_tags()
                     .into_iter()
-                    .flat_map(|tags| ["<?".to_owned(), tags.close().to_owned()]),
+                    .flat_map(|tags| [tags.open().to_owned(), tags.close().to_owned()]),
             )
             // A regular expression that spans lines decides the next line.
             .chain(language.regex_spans_lines().then(|| "/".to_owned()))
             // A line comment that a splice continues decides the next line.
-            .chain(language.line_comment_splices().then(|| "\\".to_owned()))
+            .chain(language.line_splices().then(|| "\\".to_owned()))
             .chain(
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
@@ -358,7 +341,7 @@ impl SharedMatchers {
             pod: language.pod(),
             code_tags: language.code_tags(),
             frontmatter: language.frontmatter(),
-            line_comment_splices: language.line_comment_splices(),
+            line_splices: language.line_splices(),
             shebang: language.shebang(),
             run_closers: language.run_closers(),
             identifier_quote_prefix: language.identifier_quote_prefix(),
@@ -426,6 +409,10 @@ impl OpenerPairs {
 
     fn allow_any(&mut self, first: u8) {
         self.0[usize::from(first)] = [u64::MAX; 4];
+    }
+
+    fn may_start(&self, first: u8) -> bool {
+        self.0[usize::from(first)] != [0; 4]
     }
 
     fn allows(&self, first: u8, second: u8) -> bool {
@@ -662,7 +649,12 @@ impl SyntaxCounter {
         line: &[u8],
         stats: &mut crate::stats::CodeStats,
     ) -> bool {
-        if self.outside_code && !line.windows(2).any(|w| w == b"<?") {
+        if self.outside_code
+            && self
+                .shared
+                .code_tags
+                .is_some_and(|tags| !line.contains_slice(tags.open().as_bytes()))
+        {
             // Output text holds no comments or literals.
             if line.trim().is_empty() {
                 stats.blanks += 1;
@@ -770,7 +762,7 @@ impl SyntaxCounter {
                     }
                     continue;
                 }
-                if self.is_plain_mode() && window.starts_with(tags.close().as_bytes()) {
+                if window.starts_with(tags.close().as_bytes()) && self.is_plain_mode() {
                     trace!("Close code tag");
                     pending = Some((window[0], false));
                     self.outside_code = true;
@@ -821,12 +813,9 @@ impl SyntaxCounter {
                     continue;
                 }
 
-                if let Some(len) = self
-                    .shared
-                    .question_mark_characters
+                if let Some(len) = (self.shared.question_mark_characters && self.is_plain_mode())
                     .then(|| ruby_character_len(lines, i))
                     .flatten()
-                    .filter(|_| self.is_plain_mode())
                 {
                     skip!(len);
                     continue;
@@ -910,10 +899,7 @@ impl SyntaxCounter {
             if self.parse_line_comment(lines, i) {
                 if let Some(close) = self.shared.code_tags.map(CodeTags::close) {
                     let line_end = memchr::memchr(b'\n', window).unwrap_or(window.len());
-                    if let Some(at) = window[..line_end]
-                        .windows(close.len())
-                        .position(|w| w == close.as_bytes())
-                    {
+                    if let Some(at) = memchr::memmem::find(&window[..line_end], close.as_bytes()) {
                         trace!("Close code tag in a line comment");
                         pending = Some((close.as_bytes()[0], false));
                         self.outside_code = true;
@@ -921,7 +907,7 @@ impl SyntaxCounter {
                         continue;
                     }
                 }
-                if self.shared.line_comment_splices {
+                if self.shared.line_splices {
                     self.comment_end = self.comment_end.max(spliced_lines_end(lines, i));
                 }
                 pending = None;
@@ -1344,12 +1330,7 @@ impl SyntaxCounter {
             .iter()
             .find(|(s, _)| opens_with(window, s))?;
         let body = &window[start.len()..];
-        let width = match *body.first()? {
-            lead if lead < 0x80 => 1,
-            lead if lead >= 0xf0 => 4,
-            lead if lead >= 0xe0 => 3,
-            _ => 2,
-        };
+        let width = utf8_len(*body.first()?);
         let close = end.as_bytes();
         let Some(&first_close) = close.first() else {
             // A literal without a closing delimiter, such as Lisp's `#\"`,
@@ -1850,7 +1831,7 @@ fn spliced_lines_end(text: &[u8], mut from: usize) -> usize {
         let Some(newline) = memchr::memchr(b'\n', &text[from..]).map(|n| from + n) else {
             return text.len();
         };
-        if !text[from..newline].trim().ends_with(b"\\") {
+        if !text[from..newline].trim_end().ends_with(b"\\") {
             return newline;
         }
         from = newline + 1;

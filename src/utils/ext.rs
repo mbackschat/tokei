@@ -15,6 +15,17 @@ impl AsciiExt for u8 {
     }
 }
 
+/// Length of the UTF-8 character that `lead` begins, judged by its lead byte
+/// alone, so a continuation byte counts as a two-byte character.
+pub(crate) fn utf8_len(lead: u8) -> usize {
+    match lead {
+        lead if lead < 0x80 => 1,
+        lead if lead >= 0xf0 => 4,
+        lead if lead >= 0xe0 => 3,
+        _ => 2,
+    }
+}
+
 pub(crate) trait SliceExt {
     fn trim_first_and_last_line_of_whitespace(&self) -> &Self;
     fn trim_start(&self) -> &Self;
