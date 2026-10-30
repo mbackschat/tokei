@@ -11,6 +11,9 @@ use crate::utils::ext::SliceExt;
 pub(crate) enum ShebangSyntax {
     /// Any first line starting with `#!`.
     Plain,
+    /// Any first line starting with `#`, which Lua's loader skips (Lua 5.5
+    /// `lauxlib.c`, `skipcomment`).
+    Hash,
     /// Rust's: `#!` not followed by `[`, which opens an inner attribute such
     /// as `#![allow(dead_code)]`, past whitespace and comments other than
     /// doc comments.
@@ -20,7 +23,10 @@ pub(crate) enum ShebangSyntax {
 /// The length of the shebang line that opens `lines`, without its line
 /// terminator, or `None` when the file opens with none.
 pub(crate) fn shebang_len(lines: &[u8], syntax: ShebangSyntax) -> Option<usize> {
-    let tail = lines.strip_prefix(b"#!")?;
+    let tail = match syntax {
+        ShebangSyntax::Hash => lines.strip_prefix(b"#")?,
+        ShebangSyntax::Plain | ShebangSyntax::Rust => lines.strip_prefix(b"#!")?,
+    };
     if syntax == ShebangSyntax::Rust && opens_inner_attribute(tail) {
         return None;
     }

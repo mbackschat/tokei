@@ -435,7 +435,7 @@ impl LanguageType {
     pub(crate) fn shebang(self) -> Option<crate::language::shebang::ShebangSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.shebang is defined and value.shebang == "plain" %}Some(crate::language::shebang::ShebangSyntax::Plain){% elif value.shebang is defined and value.shebang == "rust" %}Some(crate::language::shebang::ShebangSyntax::Rust){% else %}None{% endif %},
+                {{key}} => {% if value.shebang is defined and value.shebang == "plain" %}Some(crate::language::shebang::ShebangSyntax::Plain){% elif value.shebang is defined and value.shebang == "hash" %}Some(crate::language::shebang::ShebangSyntax::Hash){% elif value.shebang is defined and value.shebang == "rust" %}Some(crate::language::shebang::ShebangSyntax::Rust){% else %}None{% endif %},
             {% endfor %}
         }
     }
