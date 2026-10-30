@@ -141,6 +141,8 @@
       "name": "AXAML",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes_in_tags": true,
+      "text_sections": [["<![CDATA[", "]]>"]],
       "extensions": ["axaml"]
     },
     "AWK": {
@@ -501,7 +503,9 @@
     "DotNetResource": {
       "name": ".NET Resource",
       "multi_line_comments": [["<!--", "-->"]],
-      "quotes": [["\\\"", "\\\""]],
+      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes_in_tags": true,
+      "text_sections": [["<![CDATA[", "]]>"]],
       "extensions": ["resx"]
     },
     "DreamMaker": {
@@ -1287,6 +1291,8 @@
       "name": "MSBuild",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes_in_tags": true,
+      "text_sections": [["<![CDATA[", "]]>"]],
       "extensions": ["csproj", "vbproj", "fsproj", "props", "targets"]
     },
     "Mustache": {
@@ -1322,6 +1328,8 @@
       "name": "NuGet Config",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes_in_tags": true,
+      "text_sections": [["<![CDATA[", "]]>"]],
       "filenames": ["nuget.config", "packages.config", "nugetdefaults.config"]
     },
     "Nushell": {
@@ -2182,6 +2190,8 @@
       "name": "Visual Studio Project",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes_in_tags": true,
+      "text_sections": [["<![CDATA[", "]]>"]],
       "extensions": ["vcproj", "vcxproj"]
     },
     "VisualStudioSolution": {
@@ -2251,6 +2261,8 @@
       "name": "XSL",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes_in_tags": true,
+      "text_sections": [["<![CDATA[", "]]>"]],
       "extensions": ["xsl", "xslt"]
     },
     "Xtend": {
