@@ -64,6 +64,7 @@ Engine changes, each with a regression file in `tests/data`:
 | Inside a comment that does not nest, an opener no longer hides a closer it overlaps, so `<!-->` ends an HTML comment and `/*/` a C one. | `a0c8f52` | Not offered yet |
 | `line_classes` classes the lines of an embedded script or style element as its own language counts them. | `3eda0aa` | Not offered yet |
 | `markup_expressions`: an expression in markup text or a tag, such as Svelte's `{…}`, is read with another language's syntax up to its closer; an `interpolations` hole may name such a language too. `tag_line_comments` and `tag_multi_line_comments`: comments a tag holds where an attribute may start. | `3d035cd` | Not offered yet |
+| `code_line_markers`: outside literals and comments, the rest of the line after the marker is code, as after the backslash of a psql meta-command. `dollar_quotes`: PostgreSQL's `$tag$…$tag$` strings, whose body is code when it lexes as SQL and a literal otherwise. The `hash` shebang: any first line starting with `#`. | `25583bf`, `64d070b` | Not offered yet |
 
 Declarations in `languages.json`, each grounded in the cited specification or reference lexer:
 
@@ -121,6 +122,8 @@ Declarations in `languages.json`, each grounded in the cited specification or re
 | HTML | `<?…>` as a bogus comment; a script of a type neither JavaScript's nor a language's is a data block, counted as the page's text; `text/babel` and `text/jsx` scripts as JavaScript | `ecf6858`, `f5768c9` | [HTML Living Standard, tag open state](https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state), [the script element](https://html.spec.whatwg.org/multipage/scripting.html#the-script-element), [Babel standalone](https://babeljs.io/docs/babel-standalone) |
 | Vue, Svelte, HTML | A `lang` attribute names a language by name or file extension, as `<style lang="scss">` does | `0772c2f` | [Vue SFC specification, pre-processors](https://vuejs.org/api/sfc-spec.html#pre-processors) |
 | Svelte | `{…}` in text and attributes as TypeScript expressions, `{/…}` as a block's end tag; `//` and `/* */` comments between attributes | `3d035cd` | [Svelte, Basic markup](https://svelte.dev/docs/svelte/basic-markup), [Svelte 5.53.0 changelog, comments in tags](https://github.com/sveltejs/svelte/pull/17671) |
+| Lua | A first line starting with `#` is a comment, as `luaL_loadfile` skips it | `64d070b` | [Lua 5.4 `lauxlib.c`, `skipcomment`](https://www.lua.org/source/5.4/lauxlib.c.html#skipcomment), unchanged in 5.5 |
+| SQL | `'…'` strings without backslash escapes, `E'…'` strings with them, `"…"` identifiers, nested `/* */` comments and `$tag$…$tag$` dollar quotes, as PostgreSQL's scanner reads them; a dollar-quoted body that lexes as SQL, such as a PL/pgSQL function's, is code; a psql meta-command's line is code | `25583bf` | [PostgreSQL, lexical structure](https://www.postgresql.org/docs/current/sql-syntax-lexical.html), [psql meta-commands](https://www.postgresql.org/docs/current/app-psql.html#APP-PSQL-META-COMMANDS) |
 
 `locmetry-spike/` holds the development harness that compares these counts with tree-sitter on public repositories; it is not part of the crate.
 
