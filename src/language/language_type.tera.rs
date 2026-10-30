@@ -165,6 +165,22 @@ impl LanguageType {
         }
     }
 
+    /// Returns the sections of character data in a markup language, whose
+    /// text holds no markup up to the closer, such as XML's
+    /// `<![CDATA[`…`]]>`; their lines are code, or blank when only whitespace.
+    pub fn text_sections(self) -> &'static [(&'static str, &'static str)]
+    {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[
+                    {%- for items in value.text_sections | default(value=[]) -%}
+                        ({% for item in items %}"{{item}}",{% endfor %}),
+                    {%- endfor -%}
+                ],
+            {% endfor %}
+        }
+    }
+
     /// Returns the quotes of a language.
     /// ```
     /// use tokei::LanguageType;

@@ -1906,6 +1906,7 @@
       "extensions": ["svelte"]
     },
     "Svg": {
+      "text_sections": [["<![CDATA[", "]]>"]],
       "quotes_in_tags": true,
       "name": "SVG",
       "multi_line_comments": [["<!--", "-->"]],
@@ -2200,6 +2201,7 @@
       "extensions": ["nb", "wl"]
     },
     "Xaml": {
+      "text_sections": [["<![CDATA[", "]]>"]],
       "quotes_in_tags": true,
       "name": "XAML",
       "multi_line_comments": [["<!--", "-->"]],
@@ -2213,6 +2215,7 @@
       "extensions": ["xcconfig"]
     },
     "Xml": {
+      "text_sections": [["<![CDATA[", "]]>"]],
       "quotes_in_tags": true,
       "name": "XML",
       "multi_line_comments": [["<!--", "-->"]],

@@ -57,6 +57,9 @@ pub(crate) struct SyntaxCounter {
     /// The end of the last heredoc or block scalar body; lines before it are
     /// literal.
     pub(crate) literal_end: usize,
+    /// The end of the last text section that spans lines, which ends a
+    /// literal at `literal_end` whose lines of whitespace are blank.
+    pub(crate) text_end: usize,
     /// The bracket quotes that the file's pragmas turn on, read at the
     /// first quasi-quote opener of a language that has them.
     quasi_quoting: Option<QuasiQuoting>,
@@ -140,6 +143,7 @@ pub(crate) struct SharedMatchers {
     pub any_multi_line_comments: &'static [(&'static str, &'static str)],
     pub multi_line_comments: &'static [(&'static str, &'static str)],
     pub nested_comments: &'static [(&'static str, &'static str)],
+    pub text_sections: &'static [(&'static str, &'static str)],
     pub string_literals: &'static [(&'static str, &'static str)],
     pub character_literals: &'static [(&'static str, &'static str)],
     pub code_tokens: &'static [&'static str],
@@ -242,6 +246,7 @@ impl SharedMatchers {
             .copied()
             .chain(starts(language.multi_line_comments()))
             .chain(starts(language.nested_comments()))
+            .chain(starts(language.text_sections()))
             .chain(starts(language.quotes()))
             .chain(starts(language.doc_quotes()))
             .chain(starts(language.verbatim_quotes()))
@@ -358,6 +363,7 @@ impl SharedMatchers {
                 .map(str::to_owned),
             )
             .chain(language.end_markers().iter().map(|m| (*m).to_owned()))
+            .chain(starts(language.text_sections()).map(str::to_owned))
             .collect();
         let important_syntax = without_superstrings(important_syntax);
 
@@ -388,6 +394,7 @@ impl SharedMatchers {
             multi_line_comments: language.multi_line_comments(),
             any_multi_line_comments: language.any_multi_line_comments(),
             nested_comments: language.nested_comments(),
+            text_sections: language.text_sections(),
             string_literals: language.quotes(),
             character_literals: language.character_literals(),
             code_tokens: language.code_tokens(),
@@ -497,6 +504,7 @@ impl SyntaxCounter {
             quote_opener: "",
             holes: Vec::new(),
             literal_end: 0,
+            text_end: 0,
             quasi_quoting: None,
             comment_end: 0,
             in_data_section: false,
@@ -521,7 +529,13 @@ impl SyntaxCounter {
         end: usize,
     ) -> Option<LineClass> {
         if start < self.literal_end {
-            return Some(LineClass::Code);
+            return Some(
+                if start < self.text_end && lines[start..end].trim().is_empty() {
+                    LineClass::Blank
+                } else {
+                    LineClass::Code
+                },
+            );
         }
         if start < self.comment_end {
             return Some(LineClass::Comment);
@@ -931,6 +945,17 @@ impl SyntaxCounter {
             }
 
             if !may_open {
+                continue;
+            }
+
+            if let Some(len) = self.text_section_len(lines, i) {
+                if lines[i..i + len].contains(&b'\n') {
+                    trace!("Start text section, ends at {}", i + len);
+                    self.literal_end = i + len;
+                    self.text_end = i + len;
+                    break;
+                }
+                skip!(len);
                 continue;
             }
 
@@ -1748,6 +1773,27 @@ impl SyntaxCounter {
         quote_like_len(lines, i, syntax, context.as_ref(), || {
             self.quasi_quoting(lines)
         })
+    }
+
+    /// Length of the text section at `lines[i]`, outside tags and literals,
+    /// up to its closer or the end of the text: only the closer is markup
+    /// in it (XML 1.0, §2.7 "CDATA Sections").
+    fn text_section_len(&self, lines: &[u8], i: usize) -> Option<usize> {
+        if !self.is_plain_mode() || self.in_tag {
+            return None;
+        }
+        let window = &lines[i..];
+        let &(open, close) = self
+            .shared
+            .text_sections
+            .iter()
+            .find(|(open, _)| window.starts_with(open.as_bytes()))?;
+        let text = &window[open.len()..];
+        Some(
+            open.len()
+                + memchr::memmem::find(text, close.as_bytes())
+                    .map_or(text.len(), |at| at + close.len()),
+        )
     }
 
     /// The quasi-quotes that the file `lines` turns on, read once per file.
