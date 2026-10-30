@@ -112,18 +112,27 @@ fn is_word(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'\'')
 }
 
-/// The position of the opening delimiter and the number of delimited parts
-/// of the quote-like operator (perlop, "Quote and Quote-like Operators") at `lines[i]`: one for `q`, `qq`, `qw`, `qx`, `qr`
-/// and `m`, two for `s`, `tr` and `y`. A word that is a hash key or method
-/// name, as in `$h{s}`, `->q(` or `y => 1`, is not an operator.
+/// The position of the opening delimiter and the number of delimited parts of
+/// the quote-like operator at `lines[i]` (perlop, "Quote and Quote-like
+/// Operators"): one for `q`, `qq`, `qw`, `qx`, `qr` and `m`, two for `s`,
+/// `tr` and `y`. Its delimiter is the next character that is not whitespace,
+/// whichever it is, as in `m,/,` or `m;^;`. The word is a name instead where
+/// PPI 1.270's tokenizer forces one
+/// (`PPI::Tokenizer::__current_token_is_forced_word`): after a sigil, `$#` as
+/// in `$#y`, `->` or `sub`, `package`, `use` or `no`, before `=>` or `::`, or
+/// alone in braces, as in `$h{s}`. A `#` after whitespace starts a comment,
+/// and the delimiter on a later line is not looked for.
 pub(crate) fn quote_operator(lines: &[u8], i: usize) -> Option<(usize, usize)> {
     let before = &lines[..i];
+    let code_before = before.trim_end();
     if before
         .last()
         .is_some_and(|b| is_word_byte(*b) || matches!(b, b'$' | b'@' | b'%' | b'&' | b'*' | b'-'))
-        || before.ends_with(b"->")
+        || code_before.ends_with(b"->")
         || before.ends_with(b"::")
-        || before.trim_end().ends_with(b"sub")
+        || before.ends_with(b"$#")
+        || previous_word(code_before)
+            .is_some_and(|word| matches!(word, b"sub" | b"package" | b"use" | b"no"))
     {
         return None;
     }
@@ -133,17 +142,33 @@ pub(crate) fn quote_operator(lines: &[u8], i: usize) -> Option<(usize, usize)> {
         b"s" | b"tr" | b"y" => 2,
         _ => return None,
     };
-    let spaces = lines[i + word_len..]
+    let after = &lines[i + word_len..];
+    let code_after = after.trim_start();
+    if code_after.starts_with(b"=>")
+        || after.starts_with(b"::")
+        || (code_before.ends_with(b"{") && code_after.starts_with(b"}"))
+    {
+        return None;
+    }
+    let spaces = after
         .iter()
         .take_while(|b| matches!(b, b' ' | b'\t'))
         .count();
     let open = i + word_len + spaces;
     let delimiter = *lines.get(open)?;
-    let opens = delimiter.is_ascii_punctuation()
-        && !matches!(
-            delimiter,
-            b'=' | b',' | b';' | b')' | b']' | b'}' | b'>' | b'$' | b'@'
-        )
-        && !(delimiter == b'#' && spaces > 0);
+    let opens = delimiter.is_ascii_graphic() && !(delimiter == b'#' && spaces > 0);
     opens.then_some((open, parts))
+}
+
+/// The word that `code` ends in, if it ends in one that no sigil or `->`
+/// makes a variable or method name.
+fn previous_word(code: &[u8]) -> Option<&[u8]> {
+    let len = code.iter().rev().take_while(|b| is_word_byte(**b)).count();
+    let start = code.len() - len;
+    let word = &code[start..];
+    let named = code[..start]
+        .last()
+        .is_some_and(|b| matches!(b, b'$' | b'@' | b'%' | b'&' | b'*'))
+        || code[..start].ends_with(b"->");
+    (len > 0 && !named).then_some(word)
 }

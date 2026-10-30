@@ -1414,11 +1414,12 @@
       "heredocs": [{"start": "<<", "indent_flags": "~", "spacing": "quoted_only", "word": "identifier", "closer": "line"}],
       "pod": "perl",
       "quote_like": "perl",
-      "regex_literals": {"after_keywords": ["and", "grep", "if", "map", "not", "or", "return", "split", "unless", "until", "when", "while"]},
+      "regex_literals": {"spans_lines": true, "after_keywords": ["and", "grep", "if", "map", "not", "or", "return", "split", "unless", "until", "when", "while"]},
       "end_markers": ["__END__", "__DATA__"],
+      "code_tokens": ["$'", "$\\\"", "$`", "$#"],
       "shebangs": ["#!/usr/bin/perl"],
       "line_comment": ["#"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes": [["\\\"", "\\\""], ["'", "'"], ["`", "`"]],
       "extensions": ["pl", "pm"]
     },
     "Pest": {

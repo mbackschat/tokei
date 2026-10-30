@@ -131,8 +131,10 @@ impl RegexContext<'_> {
 /// in its last token: at the start of the
 /// text, after an operator or opening punctuation, or after a keyword such as
 /// `return`, but not after a value such as an identifier, a number, a closing
-/// bracket or a string. A regex after `}` or `<` is rare, while JSX writes
-/// `</div>` and `<Foo {...p} />`, so both count as division.
+/// bracket, a string or a regular expression, whose closing `/` makes a `/`
+/// after it division, as PPI 1.270 reads Perl's (`PPI::Token::Whitespace`,
+/// `__TOKENIZER__on_char`). A regex after `}` or `<` is rare, while JSX
+/// writes `</div>` and `<Foo {...p} />`, so both count as division.
 fn regex_allowed_after(before: &[u8], keywords: &[&str]) -> bool {
     let Some(&previous) = before.last() else {
         return true;
@@ -151,7 +153,7 @@ fn regex_allowed_after(before: &[u8], keywords: &[&str]) -> bool {
     if previous == b'<' {
         return before.ends_with(b"<<");
     }
-    !matches!(previous, b')' | b']' | b'}' | b'"' | b'\'' | b'`')
+    !matches!(previous, b')' | b']' | b'}' | b'"' | b'\'' | b'`' | b'/')
 }
 
 pub(crate) fn is_word_byte(byte: u8) -> bool {
