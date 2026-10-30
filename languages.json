@@ -312,6 +312,8 @@
       "extensions": ["cljs"]
     },
     "CMake": {
+      "raw_comments": [{ "start": "#[", "repeat": "=", "open": "[", "close": "]", "end": "]" }],
+      "raw_strings": [{ "start": "[", "repeat": "=", "open": "[", "close": "]", "end": "]" }],
       "line_comment": ["#"],
       "quotes": [["\\\"", "\\\""]],
       "extensions": ["cmake"],
