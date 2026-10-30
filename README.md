@@ -65,7 +65,7 @@ Engine changes, each with a regression file in `tests/data`:
 | `line_classes` classes the lines of an embedded script or style element as its own language counts them. | `3eda0aa` | Not offered yet |
 | `markup_expressions`: an expression in markup text or a tag, such as Svelte's `{…}`, is read with another language's syntax up to its closer; an `interpolations` hole may name such a language too. `tag_line_comments` and `tag_multi_line_comments`: comments a tag holds where an attribute may start. | `3d035cd` | Not offered yet |
 | `code_line_markers`: outside literals and comments, the rest of the line after the marker is code, as after the backslash of a psql meta-command. `dollar_quotes`: PostgreSQL's `$tag$…$tag$` strings, whose body is code when it lexes as SQL and a literal otherwise. The `hash` shebang: any first line starting with `#`. | `25583bf`, `64d070b` | Not offered yet |
-| Markdown's fenced code blocks are found by a CommonMark parser, pulldown-cmark, in the whole file: `~~~` fences too, none inside paragraphs or other blocks, and the content of a block in a list item or block quote without their prefixes; its blank lines count. | `bdc6aff` | Not offered yet |
+| Markdown's fenced code blocks are found by CommonMark's block structure, ported from commonmark.js's first pass, in the whole file: `~~~` fences too, none inside paragraphs or other blocks, and the content of a block in a list item or block quote without their prefixes; its blank lines count. | `bdc6aff`, `72d47d8` | Not offered yet |
 
 Declarations in `languages.json`, each grounded in the cited specification or reference lexer:
 
