@@ -8,3 +8,6 @@ csharp/obj/
 csharp/bin/
 go/judge-linux
 swift/judge
+dart/.dart_tool/
+scala/lib/
+scala/out/
