@@ -1,0 +1,1 @@
+{"name":"htmlref","private":true,"type":"module","dependencies":{"@babel/parser":"^7.29.11","parse5-sax-parser":"^7.0.0","postcss":"^8.5.32"}}
