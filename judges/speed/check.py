@@ -10,8 +10,8 @@ over the threshold fails the check.
 
 Upstream is given the string quotes of `baseline-quotes.json`, for languages
 whose upstream definition has none: without them it analyses none of the
-lines holding strings, a quarter of cabal's Haskell lines, a cost no correct
-count can avoid. With them, the check measures the fork's own overhead, as
+lines holding strings, a quarter of cabal's Haskell lines and nearly every
+JSON line, a cost no correct count can avoid. With them, the check measures the fork's own overhead, as
 the owner decided on 2026-10-30.
 
     python3 judges/speed/check.py ROOT...
