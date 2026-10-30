@@ -3,7 +3,7 @@
 //! (rust-lang/rust `compiler/rustc_lexer/src/lib.rs`, published as
 //! `ra-ap-rustc_lexer` 0.179.0; RFC 3503).
 
-use super::shebang::{shebang_len, ShebangSyntax};
+use crate::language::shebang::{shebang_len, ShebangSyntax};
 
 /// The end of the frontmatter whose opening fence starts at `lines[start]`,
 /// at the end of the line of its closing fence, or `None` when none opens

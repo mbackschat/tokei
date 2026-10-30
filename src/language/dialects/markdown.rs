@@ -4,6 +4,8 @@
 //! fences included, and the block's content is the text it holds, without
 //! the prefixes of the list items and block quotes around it.
 
+use crate::language::syntax::{FileContext, LanguageContext, SyntaxCounter};
+use crate::{Config, LanguageType};
 use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
 
 #[derive(Clone, Debug)]
@@ -56,4 +58,51 @@ pub(crate) fn fenced_blocks(text: &[u8]) -> Vec<FencedBlock> {
         }
     }
     blocks
+}
+
+impl SyntaxCounter {
+    /// The Markdown code block whose opening fence is on the line at `start`,
+    /// when the fork names its language: the first word of its info string,
+    /// or the first of that word's comma-separated parts, that names one.
+    /// Blocks in other languages are text.
+    pub(crate) fn parse_fenced_block(
+        &mut self,
+        lines: &[u8],
+        start: usize,
+        config: &Config,
+    ) -> Option<FileContext> {
+        if !matches!(
+            self.shared.language,
+            LanguageType::Markdown | LanguageType::UnrealDeveloperMarkdown
+        ) {
+            return None;
+        }
+        use std::str::FromStr;
+
+        let blocks = self
+            .fenced_blocks
+            .get_or_insert_with(|| fenced_blocks(lines));
+        // `start` follows the line's indentation, which the opening fence of
+        // a block in a list item has.
+        let at = blocks.partition_point(|block| block.line_start <= start);
+        let block = blocks[..at].last().filter(|block| {
+            memchr::memchr(b'\n', &lines[block.line_start..])
+                .map_or(true, |n| start < block.line_start + n)
+        })?;
+        let language = block
+            .info
+            .split_whitespace()
+            .next()?
+            .split(',')
+            .find_map(|part| LanguageType::from_str(part).ok())?;
+        trace!("{} block: {:?}", language, block.content);
+        Some(FileContext::new(
+            LanguageContext::Markdown {
+                balanced: block.fence_lines == 2,
+                language,
+            },
+            block.end,
+            language.parse_from_str(&block.content, config),
+        ))
+    }
 }

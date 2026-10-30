@@ -4,6 +4,7 @@
 //! Embedded Documentation"); NQP's are the `pod_comment` token of its grammar
 //! (src/NQP/Grammar.nqp at Raku/nqp `e5e5a90`).
 
+use crate::language::quote_like::is_word_byte;
 use crate::utils::ext::SliceExt;
 
 /// Which language's POD rules apply.
@@ -109,4 +110,40 @@ fn line_end(lines: &[u8], start: usize) -> usize {
 /// NQP's identifier characters, `\w` with the `-` and `'` that join words.
 fn is_word(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'\'')
+}
+
+/// The position of the opening delimiter and the number of delimited parts
+/// of the quote-like operator (perlop, "Quote and Quote-like Operators") at `lines[i]`: one for `q`, `qq`, `qw`, `qx`, `qr`
+/// and `m`, two for `s`, `tr` and `y`. A word that is a hash key or method
+/// name, as in `$h{s}`, `->q(` or `y => 1`, is not an operator.
+pub(crate) fn quote_operator(lines: &[u8], i: usize) -> Option<(usize, usize)> {
+    let before = &lines[..i];
+    if before
+        .last()
+        .is_some_and(|b| is_word_byte(*b) || matches!(b, b'$' | b'@' | b'%' | b'&' | b'*' | b'-'))
+        || before.ends_with(b"->")
+        || before.ends_with(b"::")
+        || before.trim_end().ends_with(b"sub")
+    {
+        return None;
+    }
+    let word_len = lines[i..].iter().take_while(|b| is_word_byte(**b)).count();
+    let parts = match &lines[i..i + word_len] {
+        b"q" | b"qq" | b"qw" | b"qx" | b"qr" | b"m" => 1,
+        b"s" | b"tr" | b"y" => 2,
+        _ => return None,
+    };
+    let spaces = lines[i + word_len..]
+        .iter()
+        .take_while(|b| matches!(b, b' ' | b'\t'))
+        .count();
+    let open = i + word_len + spaces;
+    let delimiter = *lines.get(open)?;
+    let opens = delimiter.is_ascii_punctuation()
+        && !matches!(
+            delimiter,
+            b'=' | b',' | b';' | b')' | b']' | b'}' | b'>' | b'$' | b'@'
+        )
+        && !(delimiter == b'#' && spaces > 0);
+    opens.then_some((open, parts))
 }

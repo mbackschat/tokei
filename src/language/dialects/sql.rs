@@ -5,6 +5,8 @@
 //! `core_yylex`), so a body that lexes as SQL is read as code, and any other
 //! body, such as a Perl function's or a fragment of a query, is a literal.
 
+use crate::language::syntax::SyntaxCounter;
+
 /// What a `$` read as code starts.
 #[derive(Debug, PartialEq)]
 pub(crate) enum DollarQuote {
@@ -136,4 +138,28 @@ fn is_tag_byte(b: u8) -> bool {
 
 fn is_ident_byte(b: u8) -> bool {
     is_tag_byte(b) || b == b'$'
+}
+
+impl SyntaxCounter {
+    /// Reads the dollar-quote delimiter at `lines[i..]`, outside literals and
+    /// comments: the closer of the innermost body read as SQL, or an opener.
+    pub(crate) fn dollar_quote(&mut self, lines: &[u8], i: usize) -> Option<DollarQuote> {
+        if !self.shared.dollar_quotes || lines[i] != b'$' || !self.is_plain_mode() {
+            return None;
+        }
+        if let Some(close) = self.dollar_bodies.last() {
+            if lines[i..].starts_with(close) {
+                let len = close.len();
+                self.dollar_bodies.pop();
+                return Some(DollarQuote::Code(len));
+            }
+        }
+        let delimiter = opener_at(lines, i)?;
+        let quote = classify(lines, i, delimiter)?;
+        if matches!(quote, DollarQuote::Code(_)) {
+            trace!("Start dollar-quoted body read as SQL");
+            self.dollar_bodies.push(delimiter.to_vec());
+        }
+        Some(quote)
+    }
 }

@@ -4,6 +4,7 @@
 //! lexer state. Like most tools without a parser, this module approximates the
 //! context by the previous significant byte or keyword.
 
+use super::dialects::ruby;
 use crate::utils::ext::SliceExt;
 
 /// The syntax that decides whether a `/` starts a regular expression.
@@ -40,7 +41,7 @@ pub(crate) fn regex_literal_len(lines: &[u8], i: usize, context: &RegexContext) 
     }
     if (context.operator_symbols && lines[..i].last() == Some(&b':'))
         || !(context.expression_may_start(lines, i)
-            || (context.command_arguments && starts_command_argument(lines, i)))
+            || (context.command_arguments && ruby::starts_command_argument(lines, i)))
     {
         return None;
     }
@@ -152,50 +153,6 @@ fn regex_allowed_after(before: &[u8], keywords: &[&str]) -> bool {
     }
     !matches!(previous, b')' | b']' | b'}' | b'"' | b'\'' | b'`')
 }
-
-/// Whether the operator-like byte at `lines[i]`, after a space but before no
-/// space or `=`, starts the argument of a method called without parentheses,
-/// as the `%` of `assert_equal %{a}` or the `/` of `match /re/` do in Ruby
-/// (parse.y, `IS_SPCARG`). Before it stands a name, which may end in `?` or
-/// `!`; were the name a local variable, the byte would be an operator, which
-/// only a parser can tell. A keyword that ends a value or names a method,
-/// such as `end` or `def`, takes no argument.
-pub(crate) fn starts_command_argument(lines: &[u8], i: usize) -> bool {
-    let before = &lines[..i];
-    if !matches!(before.last(), Some(b' ' | b'\t'))
-        || !lines
-            .get(i + 1)
-            .is_some_and(|b| !b.is_ascii_whitespace() && *b != b'=')
-    {
-        return false;
-    }
-    let code = &before[..before
-        .iter()
-        .rposition(|b| !matches!(b, b' ' | b'\t'))
-        .map_or(0, |n| n + 1)];
-    let name = code
-        .strip_suffix(b"?")
-        .or_else(|| code.strip_suffix(b"!"))
-        .unwrap_or(code);
-    let word = &name[name.len() - name.iter().rev().take_while(|b| is_word_byte(**b)).count()..];
-    !word.is_empty() && !NOT_COMMANDS.contains(&word)
-}
-
-/// Ruby keywords after which the lexer expects an operator or a method name
-/// (parse.y lex states `EXPR_END` and `EXPR_FNAME`).
-const NOT_COMMANDS: &[&[u8]] = &[
-    b"def",
-    b"end",
-    b"self",
-    b"nil",
-    b"true",
-    b"false",
-    b"alias",
-    b"undef",
-    b"__FILE__",
-    b"__LINE__",
-    b"__ENCODING__",
-];
 
 pub(crate) fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'$') || byte >= 0x80

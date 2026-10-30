@@ -408,10 +408,10 @@ impl LanguageType {
 
     /// Returns the block comment opener and the pragma words after it that
     /// make it code, as GHC's lexer reads `{-# INLINE f #-}`.
-    pub(crate) fn code_pragmas(self) -> Option<crate::language::pragma::CodePragmas> {
+    pub(crate) fn code_pragmas(self) -> Option<crate::language::dialects::haskell::CodePragmas> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.code_pragmas is defined %}Some(crate::language::pragma::CodePragmas {
+                {{key}} => {% if value.code_pragmas is defined %}Some(crate::language::dialects::haskell::CodePragmas {
                     open: "{{ value.code_pragmas.open }}",
                     words: &[{% for word in value.code_pragmas.words %}"{{ word }}",{% endfor %}],
                 }){% else %}None{% endif %},
@@ -421,20 +421,20 @@ impl LanguageType {
 
     /// Returns whose tags delimit the code inside the file's text, as PHP's
     /// `<?php … ?>` do.
-    pub(crate) fn code_tags(self) -> Option<crate::language::code_tags::CodeTags> {
+    pub(crate) fn code_tags(self) -> Option<crate::language::dialects::php::CodeTags> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.code_tags is defined and value.code_tags == "php" %}Some(crate::language::code_tags::CodeTags::Php){% else %}None{% endif %},
+                {{key}} => {% if value.code_tags is defined and value.code_tags == "php" %}Some(crate::language::dialects::php::CodeTags::Php){% else %}None{% endif %},
             {% endfor %}
         }
     }
 
     /// Returns whose rules decide where a POD block of whole lines starts and
     /// ends: Perl's (perlpod) or NQP's (its grammar's `pod_comment`).
-    pub(crate) fn pod(self) -> Option<crate::language::pod::PodSyntax> {
+    pub(crate) fn pod(self) -> Option<crate::language::dialects::perl::PodSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.pod is defined and value.pod == "perl" %}Some(crate::language::pod::PodSyntax::Perl){% elif value.pod is defined and value.pod == "nqp" %}Some(crate::language::pod::PodSyntax::Nqp){% else %}None{% endif %},
+                {{key}} => {% if value.pod is defined and value.pod == "perl" %}Some(crate::language::dialects::perl::PodSyntax::Perl){% elif value.pod is defined and value.pod == "nqp" %}Some(crate::language::dialects::perl::PodSyntax::Nqp){% else %}None{% endif %},
             {% endfor %}
         }
     }

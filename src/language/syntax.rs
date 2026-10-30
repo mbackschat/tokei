@@ -6,22 +6,23 @@ use log::Level::Trace;
 use once_cell::sync::Lazy;
 
 use super::blank_symbols::BlankSymbols;
-use super::block_scalar::{block_scalar_end, may_start_block_scalar};
-use super::code_tags::CodeTags;
-use super::dollar_quote::{self, DollarQuote};
+use super::dialects::haskell::CodePragmas;
+use super::dialects::haskell::QuasiQuoting;
+use super::dialects::jsx::JsxFrame;
+use super::dialects::markdown::FencedBlock;
+use super::dialects::perl::{pod_block_end, PodSyntax};
+use super::dialects::php::CodeTags;
+use super::dialects::rust::frontmatter_end;
+use super::dialects::sql::DollarQuote;
+use super::dialects::svelte::may_start_tag_comment;
+use super::dialects::yaml::may_start_block_scalar;
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
-use super::fenced_block::{fenced_blocks, FencedBlock};
-use super::frontmatter::frontmatter_end;
 use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, MarkupExpressions, OpenHole};
-use super::jsx::{element_starts, is_name_byte, JsxFrame};
-use super::plain_scalar::plain_scalar_end;
-use super::pod::{pod_block_end, PodSyntax};
-use super::pragma::CodePragmas;
 use super::quote_like::{
-    question_mark_character_len, quote_like_len, QuasiQuoting, QuestionMarkSyntax, QuoteLikeSyntax,
+    question_mark_character_len, quote_like_len, QuestionMarkSyntax, QuoteLikeSyntax,
 };
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{is_word_byte, regex_literal_len, RegexContext};
@@ -63,7 +64,7 @@ pub(crate) struct SyntaxCounter {
     pub(crate) text_end: usize,
     /// The bracket quotes that the file's pragmas turn on, read at the
     /// first quasi-quote opener of a language that has them.
-    quasi_quoting: Option<QuasiQuoting>,
+    pub(crate) quasi_quoting: Option<QuasiQuoting>,
     /// The end of the comment lines of a Perl POD block being read.
     comment_end: usize,
     /// Whether an end marker such as `__END__` has made the rest data.
@@ -72,15 +73,15 @@ pub(crate) struct SyntaxCounter {
     /// `<?php`.
     outside_code: bool,
     /// The YAML flow collections, `[…]` and `{…}`, open at this point.
-    flow_depth: usize,
+    pub(crate) flow_depth: usize,
     /// Whether a markup tag is open, in which quotes open strings.
     pub(crate) in_tag: bool,
     /// The delimiters of the dollar-quoted bodies read as SQL at this point,
     /// innermost last.
-    dollar_bodies: Vec<Vec<u8>>,
+    pub(crate) dollar_bodies: Vec<Vec<u8>>,
     /// Markdown's fenced code blocks, found at the first line that may open
     /// one.
-    fenced_blocks: Option<Vec<FencedBlock>>,
+    pub(crate) fenced_blocks: Option<Vec<FencedBlock>>,
     /// The JSX elements and expressions open at this point, innermost last.
     pub(crate) jsx: Vec<JsxFrame>,
     pub(crate) quote_is_doc_quote: bool,
@@ -770,22 +771,6 @@ impl SyntaxCounter {
         } else {
             false
         }
-    }
-
-    /// Opens the block comment at `lines[i..]` that a tag holds between its
-    /// attributes.
-    fn parse_tag_block_comment(&mut self, lines: &[u8], i: usize) -> Option<usize> {
-        let &(open, close) = self
-            .shared
-            .tag_multi_line_comments
-            .iter()
-            .find(|(open, _)| lines[i..].starts_with(open.as_bytes()))?;
-        if !may_start_tag_comment(&lines[..i]) {
-            return None;
-        }
-        trace!("Start {:?} in a tag", open);
-        self.stack.push(Cow::Borrowed(close));
-        Some(open.len())
     }
 
     /// Try to see if we can determine what a line is from examining the whole
@@ -1616,25 +1601,6 @@ impl SyntaxCounter {
             })
     }
 
-    /// Length of the text of a string gap at `lines[i]`, where a string has
-    /// gaps: the escape that closes a gap begun on an earlier line, which
-    /// therefore starts its line after whitespace, or a whole gap on one
-    /// line, an escape, whitespace and an escape (Haskell 2010 report, §2.6).
-    fn string_gap_len(&self, lines: &[u8], i: usize) -> Option<usize> {
-        let escape = self.shared.escape;
-        if !self.shared.string_gaps || self.quote_is_verbatim || lines[i] != escape {
-            return None;
-        }
-        if starts_line(lines, i) {
-            return Some(1);
-        }
-        let space = lines[i + 1..]
-            .iter()
-            .take_while(|b| matches!(b, b' ' | b'\t'))
-            .count();
-        (space > 0 && lines.get(i + 1 + space) == Some(&escape)).then_some(space + 2)
-    }
-
     fn escapes_here(&self) -> bool {
         self.quote.is_some() || !self.shared.backslash_operator
     }
@@ -1690,7 +1656,12 @@ impl SyntaxCounter {
 
     /// Suspends the string being read, if any, for a hole up to `close`,
     /// whose contents `language` reads, if given, instead of the host's.
-    fn open_hole(&mut self, close: &'static str, nest: u8, language: Option<LanguageType>) {
+    pub(crate) fn open_hole(
+        &mut self,
+        close: &'static str,
+        nest: u8,
+        language: Option<LanguageType>,
+    ) {
         self.holes.push(OpenHole {
             quote: self.quote.take(),
             quote_opener: std::mem::take(&mut self.quote_opener),
@@ -1707,27 +1678,6 @@ impl SyntaxCounter {
             self.in_tag = false;
             self.shared = SharedMatchers::new(language);
         }
-    }
-
-    /// Opens the markup expression at `window`, outside literals and
-    /// comments, whose contents the expression's language reads up to its
-    /// closer (Svelte, "Basic markup", text expressions and attributes).
-    fn parse_markup_expression(&mut self, window: &[u8]) -> Option<usize> {
-        let expressions = self.shared.markup_expressions?;
-        if !self.is_plain_mode()
-            || !window.starts_with(expressions.open.as_bytes())
-            || expressions.block_closer.is_some()
-                && window.get(expressions.open.len()).copied() == expressions.block_closer
-        {
-            return None;
-        }
-        trace!("Start markup expression {:?}", expressions.open);
-        self.open_hole(
-            expressions.close,
-            expressions.nest,
-            Some(expressions.language),
-        );
-        Some(expressions.open.len())
     }
 
     /// Inside a hole, outside its strings and comments, tracks nested brackets
@@ -1773,81 +1723,6 @@ impl SyntaxCounter {
             trace!("Start heredoc, body ends at {}", self.literal_end);
             Some(opening.len)
         })
-    }
-
-    /// Marks the content of the block scalar whose indicator is at
-    /// `lines[i]` as literal.
-    fn parse_block_scalar(&mut self, lines: &[u8], i: usize) -> bool {
-        if !self.shared.block_scalars || !self.is_plain_mode() {
-            return false;
-        }
-        let Some(end) = block_scalar_end(lines, i) else {
-            return false;
-        };
-        trace!("Start block scalar, content ends at {}", end);
-        self.literal_end = self.literal_end.max(end);
-        true
-    }
-
-    /// Whether a quote at `lines[i]` can open a string.
-    fn may_open_quote(&self, lines: &[u8], i: usize) -> bool {
-        let Some(after) = self.shared.quotes_after else {
-            return true;
-        };
-        let line_start = memchr::memrchr(b'\n', &lines[..i]).map_or(0, |n| n + 1);
-        let before = &lines[line_start..i];
-        let spaces = before
-            .iter()
-            .rev()
-            .take_while(|b| matches!(b, b' ' | b'\t'))
-            .count();
-        let code = &before[..before.len() - spaces];
-        let spaced = spaces > 0;
-        // `[`, `{` and `,` are flow indicators only inside a flow collection;
-        // in a plain scalar such as `a ["']` they are text.
-        code.is_empty()
-            || after.iter().any(|text| match text.strip_suffix(' ') {
-                Some(indicator) => spaced && code.ends_with(indicator.as_bytes()),
-                None => self.flow_depth > 0 && code.ends_with(text.as_bytes()),
-            })
-    }
-
-    /// Whether a YAML flow collection opens on `line`. A `[` or `{` elsewhere,
-    /// as in a plain scalar such as `Followers of %{name}`, is text, so such
-    /// lines keep the per-line fast path.
-    fn opens_flow_collection(&self, line: &[u8]) -> bool {
-        self.shared.quotes_after.is_some()
-            && memchr::memchr2_iter(b'[', b'{', line).any(|i| self.may_open_quote(line, i))
-    }
-
-    /// Opens a YAML flow collection at a `[` or `{` where a node may start,
-    /// and closes one at `]` or `}` (YAML 1.2.2 §7.4).
-    fn track_flow_collection(&mut self, lines: &[u8], i: usize) {
-        if self.shared.quotes_after.is_none() {
-            return;
-        }
-        match lines[i] {
-            b'[' | b'{' if self.may_open_quote(lines, i) => self.flow_depth += 1,
-            b']' | b'}' => self.flow_depth = self.flow_depth.saturating_sub(1),
-            _ => {}
-        }
-    }
-
-    /// Reads the end of a YAML line that did not start inside a literal: when
-    /// it ends in a plain scalar that continues on the next lines, those
-    /// lines are its text.
-    pub(crate) fn end_line(&mut self, lines: &[u8], start: usize) {
-        if !self.shared.block_scalars
-            || self.flow_depth > 0
-            || !self.is_plain_mode()
-            || self.literal_end > start
-        {
-            return;
-        }
-        if let Some(scalar_end) = plain_scalar_end(lines, start) {
-            trace!("Plain scalar continues to {}", scalar_end);
-            self.literal_end = scalar_end;
-        }
     }
 
     /// Whether a word can start at `lines[i]`: at the start of the text, or
@@ -1904,94 +1779,9 @@ impl SyntaxCounter {
         )
     }
 
-    /// Reads the dollar-quote delimiter at `lines[i..]`, outside literals and
-    /// comments: the closer of the innermost body read as SQL, or an opener.
-    fn dollar_quote(&mut self, lines: &[u8], i: usize) -> Option<DollarQuote> {
-        if !self.shared.dollar_quotes || lines[i] != b'$' || !self.is_plain_mode() {
-            return None;
-        }
-        if let Some(close) = self.dollar_bodies.last() {
-            if lines[i..].starts_with(close) {
-                let len = close.len();
-                self.dollar_bodies.pop();
-                return Some(DollarQuote::Code(len));
-            }
-        }
-        let delimiter = dollar_quote::opener_at(lines, i)?;
-        let quote = dollar_quote::classify(lines, i, delimiter)?;
-        if matches!(quote, DollarQuote::Code(_)) {
-            trace!("Start dollar-quoted body read as SQL");
-            self.dollar_bodies.push(delimiter.to_vec());
-        }
-        Some(quote)
-    }
-
-    /// The Markdown code block whose opening fence is on the line at `start`,
-    /// when the fork names its language: the first word of its info string,
-    /// or the first of that word's comma-separated parts, that names one.
-    /// Blocks in other languages are text.
-    fn parse_fenced_block(
-        &mut self,
-        lines: &[u8],
-        start: usize,
-        config: &Config,
-    ) -> Option<FileContext> {
-        if !matches!(
-            self.shared.language,
-            LanguageType::Markdown | LanguageType::UnrealDeveloperMarkdown
-        ) {
-            return None;
-        }
-        use std::str::FromStr;
-
-        let blocks = self
-            .fenced_blocks
-            .get_or_insert_with(|| fenced_blocks(lines));
-        // `start` follows the line's indentation, which the opening fence of
-        // a block in a list item has.
-        let at = blocks.partition_point(|block| block.line_start <= start);
-        let block = blocks[..at].last().filter(|block| {
-            memchr::memchr(b'\n', &lines[block.line_start..])
-                .map_or(true, |n| start < block.line_start + n)
-        })?;
-        let language = block
-            .info
-            .split_whitespace()
-            .next()?
-            .split(',')
-            .find_map(|part| LanguageType::from_str(part).ok())?;
-        trace!("{} block: {:?}", language, block.content);
-        Some(FileContext::new(
-            LanguageContext::Markdown {
-                balanced: block.fence_lines == 2,
-                language,
-            },
-            block.end,
-            language.parse_from_str(&block.content, config),
-        ))
-    }
-
-    /// The quasi-quotes that the file `lines` turns on, read once per file.
-    fn quasi_quoting(&mut self, lines: &[u8]) -> QuasiQuoting {
-        *self
-            .quasi_quoting
-            .get_or_insert_with(|| QuasiQuoting::of(lines))
-    }
-
-    /// Whether `line`, of the file `lines`, may open a Haskell quasi-quote,
-    /// whose `|` is too common in Haskell to search every line for: as
-    /// important syntax, it sent a sixth of pandoc's lines to the full
-    /// analysis, although few files turn quasi-quotes on (2026-10-30).
-    fn may_open_quasi_quote(&mut self, lines: &[u8], line: &[u8]) -> bool {
-        self.shared.quote_like == Some(QuoteLikeSyntax::HaskellQuasiQuote)
-            && memchr::memrchr(b'|', line)
-                .is_some_and(|bar| memchr::memchr(b'[', &line[..bar]).is_some())
-            && self.quasi_quoting(lines).any()
-    }
-
     /// The syntax that tells where an expression may start, for languages
     /// with regular expression literals.
-    fn expression_context(&self) -> Option<RegexContext<'static>> {
+    pub(crate) fn expression_context(&self) -> Option<RegexContext<'static>> {
         Some(RegexContext {
             keywords: self.shared.regex_keywords?,
             after_line_break: self.shared.regex_after_line_break,
@@ -2001,121 +1791,6 @@ impl SyntaxCounter {
             line_comments: self.shared.line_comments,
             multi_line_comments: self.shared.any_multi_line_comments,
         })
-    }
-
-    /// Reads JSX at `lines[i]`: the text and attributes of open elements,
-    /// the braces of their expressions, and the start of a new element.
-    /// Returns the bytes consumed, or `None` to lex the position as code.
-    fn parse_jsx(&mut self, lines: &[u8], i: usize) -> Option<usize> {
-        if !self.shared.jsx || !self.stack.is_empty() {
-            return None;
-        }
-        let window = &lines[i..];
-        let holes = self.holes.len();
-        match self.jsx.last_mut() {
-            Some(&mut JsxFrame::Tag { angles }) => self.parse_jsx_tag(window, angles),
-            Some(JsxFrame::Children) => Some(self.parse_jsx_children(window)),
-            Some(JsxFrame::Expression { depth, holes: open }) if *open == holes => {
-                match window[0] {
-                    b'{' => *depth += 1,
-                    b'}' if *depth == 0 => {
-                        self.jsx.pop();
-                        return Some(1);
-                    }
-                    b'}' => *depth -= 1,
-                    b'<' => return self.open_jsx_element(lines, i),
-                    _ => {}
-                }
-                None
-            }
-            Some(JsxFrame::Expression { .. }) => None,
-            None if window[0] == b'<' => self.open_jsx_element(lines, i),
-            None => None,
-        }
-    }
-
-    fn open_jsx_element(&mut self, lines: &[u8], i: usize) -> Option<usize> {
-        let context = self.expression_context()?;
-        if !context.expression_may_start(lines, i) || !element_starts(lines, i) {
-            return None;
-        }
-        trace!("Start JSX element");
-        self.jsx.push(JsxFrame::Tag { angles: 0 });
-        Some(1)
-    }
-
-    /// Reads an opening tag, where quotes open attribute strings without
-    /// escapes and comments may stand between attributes; `angles` counts the
-    /// type-argument brackets still open.
-    fn parse_jsx_tag(&mut self, window: &[u8], angles: usize) -> Option<usize> {
-        if window.starts_with(b"//") || window.starts_with(b"/*") {
-            return None;
-        }
-        Some(match window[0] {
-            b'"' | b'\'' => {
-                let quote = if window[0] == b'"' { "\"" } else { "'" };
-                self.quote = Some(Cow::Borrowed(quote));
-                self.quote_opener = quote;
-                self.quote_is_verbatim = true;
-                1
-            }
-            b'{' => {
-                self.push_jsx_expression();
-                1
-            }
-            b'/' if window.get(1) == Some(&b'>') => {
-                self.jsx.pop();
-                2
-            }
-            b'<' => {
-                *self.jsx.last_mut().expect("open tag") = JsxFrame::Tag { angles: angles + 1 };
-                1
-            }
-            b'>' => {
-                *self.jsx.last_mut().expect("open tag") = match angles.checked_sub(1) {
-                    Some(angles) => JsxFrame::Tag { angles },
-                    None => JsxFrame::Children,
-                };
-                1
-            }
-            _ => 1,
-        })
-    }
-
-    /// Reads the text between tags, which holds only expressions, elements
-    /// and the closing tag.
-    fn parse_jsx_children(&mut self, window: &[u8]) -> usize {
-        match window {
-            [b'{', ..] => {
-                self.push_jsx_expression();
-                1
-            }
-            [b'<', b'/', ..] => {
-                self.jsx.pop();
-                window
-                    .iter()
-                    .position(|b| *b == b'>')
-                    .map_or(window.len(), |n| n + 1)
-            }
-            [b'<', next, ..] if *next == b'>' || is_name_byte(*next) => {
-                self.jsx.push(JsxFrame::Tag { angles: 0 });
-                1
-            }
-            _ => 1,
-        }
-    }
-
-    fn push_jsx_expression(&mut self) {
-        self.jsx.push(JsxFrame::Expression {
-            depth: 0,
-            holes: self.holes.len(),
-        });
-    }
-
-    /// Whether the line starting here starts inside JSX text, which is not a
-    /// comment even when it starts with a comment marker.
-    pub(crate) fn in_jsx_text(&self) -> bool {
-        matches!(self.jsx.last(), Some(JsxFrame::Children))
     }
 
     #[inline]
@@ -2217,7 +1892,7 @@ fn spliced_lines_end(text: &[u8], mut from: usize) -> usize {
 }
 
 /// Whether nothing but spaces and tabs precede `lines[i]` on its line.
-fn starts_line(lines: &[u8], i: usize) -> bool {
+pub(crate) fn starts_line(lines: &[u8], i: usize) -> bool {
     lines[..i]
         .iter()
         .rev()
@@ -2243,17 +1918,6 @@ fn starts_tag(window: &[u8]) -> bool {
         && window
             .get(1)
             .is_some_and(|b| b.is_ascii_alphabetic() || b"/!?".contains(b))
-}
-
-/// Whether a comment may start after `before` in a tag: where an attribute
-/// may, after whitespace or another attribute's quoted value or expression,
-/// and not as an unquoted value after `=` (Svelte 5.53.0, `read_attribute`
-/// in `src/compiler/phases/1-parse/state/element.js`).
-fn may_start_tag_comment(before: &[u8]) -> bool {
-    before
-        .last()
-        .is_some_and(|b| b.is_ascii_whitespace() || b"\"'}".contains(b))
-        && before.iter().rev().find(|b| !b.is_ascii_whitespace()) != Some(&b'=')
 }
 
 /// The length of the template expression that starts `window`, such as
