@@ -242,9 +242,6 @@ fn rust_classes(text: &str) -> (Vec<u8>, usize) {
             if let Some(class) = class {
                 classes[pos..end].fill(class);
             }
-            if !matches!(token.kind, T::Whitespace) {
-                frontmatter = FrontmatterAllowed::No;
-            }
             pos = end;
         }
         break;
