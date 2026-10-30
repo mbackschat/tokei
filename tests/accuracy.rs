@@ -100,6 +100,20 @@ mod line_classes {
         );
     }
 
+    #[test]
+    fn classes_lines_of_embedded_elements_as_their_language_does() {
+        let text =
+            "<p>a</p>\n<script>\n// c\nlet a = 1;\n\n</script>\n<style>\n/* s */\n</style>\n";
+        let classes = LanguageType::Html.line_classes(text.as_bytes(), &Config::default());
+        use LineClass::*;
+        assert_eq!(
+            classes,
+            Some(vec![
+                Code, Code, Comment, Code, Blank, Code, Code, Comment, Code
+            ])
+        );
+    }
+
     /// The fork's own counts are the oracle: wherever `line_classes` answers,
     /// its classes must tally to them on every fixture.
     #[test]
@@ -115,7 +129,7 @@ mod line_classes {
             let Some(classes) = language.line_classes(&text, &config) else {
                 continue;
             };
-            let stats = language.parse_from_slice(&text, &config);
+            let stats = language.parse_from_slice(&text, &config).summarise();
             let tally = |class| classes.iter().filter(|c| **c == class).count();
             assert_eq!(
                 (

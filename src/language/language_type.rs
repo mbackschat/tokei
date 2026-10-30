@@ -34,6 +34,31 @@ impl Serialize for LanguageType {
     }
 }
 
+/// What `parse_lines` reports for each counted line.
+pub(crate) enum LineReport<'a> {
+    /// The line's class, or `None` when another embedded language counts it.
+    Class(Option<LineClass>),
+    /// The text of an element embedded in markup, from the end of its
+    /// opening tag to the start of its closing tag, whose lines its language
+    /// counts.
+    Embedded {
+        language: LanguageType,
+        text: &'a [u8],
+    },
+}
+
+/// The lines of an element's `text` that the element's language counts:
+/// those after the line of its opening tag, up to the line of its closing
+/// tag, which the host counts.
+fn embedded_lines(text: &[u8]) -> Range<usize> {
+    let after_first = text
+        .iter()
+        .position(|b| *b == b'\n')
+        .map_or(text.len(), |n| n + 1);
+    let last_start = text.iter().rposition(|b| *b == b'\n').map_or(0, |n| n + 1);
+    after_first..last_start
+}
+
 impl LanguageType {
     /// Parses a given [`Path`] using the [`LanguageType`]. Returning [`Report`]
     /// on success and giving back ownership of [`PathBuf`] on error.
@@ -176,18 +201,43 @@ impl LanguageType {
         if self == LinguaFranca {
             syntax.lf_embedded_language = self.find_lf_target_language(text);
         }
-        let mut classes = Some(Vec::new());
         // The simple parse of the lines before the first important syntax is
         // a shortcut that counts them as this full parse does.
+        self.collect_line_classes(config, text, syntax, 0..text.len())
+    }
+
+    /// The classes of the lines of `text` that start within `counted`, with
+    /// those of elements embedded in markup as their own language counts
+    /// them; `None` when another embedded language, such as a Markdown code
+    /// block, counts lines.
+    fn collect_line_classes(
+        self,
+        config: &Config,
+        text: &[u8],
+        syntax: SyntaxCounter,
+        counted: Range<usize>,
+    ) -> Option<Vec<LineClass>> {
+        let mut classes = Some(Vec::new());
         self.parse_lines(
             config,
             text,
             CodeStats::new(),
             syntax,
-            0..text.len(),
-            &mut |class| match (classes.as_mut(), class) {
-                (Some(list), Some(class)) => list.push(class),
-                _ => classes = None,
+            counted,
+            &mut |report| {
+                let lines = match report {
+                    LineReport::Class(class) => class.map(|class| vec![class]),
+                    LineReport::Embedded { language, text } => language.collect_line_classes(
+                        config,
+                        text,
+                        SyntaxCounter::new(language),
+                        embedded_lines(text),
+                    ),
+                };
+                match (classes.as_mut(), lines) {
+                    (Some(list), Some(lines)) => list.extend(lines),
+                    _ => classes = None,
+                }
             },
         );
         classes
@@ -199,25 +249,22 @@ impl LanguageType {
     /// the rest of the opening tag's line is still read, so a comment or
     /// string opened there carries on.
     pub(crate) fn parse_embedded(self, text: &[u8], config: &Config) -> CodeStats {
-        let after_first = text
-            .iter()
-            .position(|b| *b == b'\n')
-            .map_or(text.len(), |n| n + 1);
-        let last_start = text.iter().rposition(|b| *b == b'\n').map_or(0, |n| n + 1);
         let syntax = SyntaxCounter::new(self);
         self.parse_lines(
             config,
             text,
             CodeStats::new(),
             syntax,
-            after_first..last_start,
+            embedded_lines(text),
             &mut |_| {},
         )
     }
 
     /// Counts the lines of `lines` that start within `counted`; the others
     /// are read only for the state they leave. `on_line` receives the class
-    /// of each counted line, or `None` for lines an embedded language counts.
+    /// of each counted line, `None` for lines another embedded language
+    /// counts, and the text of each element embedded in markup after the
+    /// class of the line that opens it.
     #[inline]
     fn parse_lines(
         self,
@@ -226,13 +273,14 @@ impl LanguageType {
         mut stats: CodeStats,
         mut syntax: SyntaxCounter,
         mut counted: Range<usize>,
-        on_line: &mut impl FnMut(Option<LineClass>),
+        on_line: &mut impl FnMut(LineReport<'_>),
     ) -> CodeStats {
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
 
         while let Some((start, end)) = stepper.next(lines) {
             let before = (stats.code, stats.comments, stats.blanks);
             let mut embedded = false;
+            let mut element = None;
             let is_counted = counted.contains(&start);
             let whole_line = syntax.whole_line_class(lines, start, end);
             let reads_line = whole_line.is_none() && syntax.quote.is_none();
@@ -293,8 +341,12 @@ impl LanguageType {
                                     let child_lang = syntax.get_lf_target_language();
                                     *stats.blobs.entry(child_lang).or_default() += blob;
                                 }
-                                LanguageContext::Html { language } => {
+                                LanguageContext::Html {
+                                    language,
+                                    start: text_start,
+                                } => {
                                     stats.code += 1;
+                                    element = Some((language, &lines[text_start..end]));
                                     *stats.blobs.entry(language).or_default() += blob;
                                     // A closing tag on this line leaves the rest
                                     // of it, already counted, to be read.
@@ -335,8 +387,11 @@ impl LanguageType {
             }
             if !is_counted {
                 (stats.code, stats.comments, stats.blanks) = before;
+            } else if let Some((language, text)) = element {
+                on_line(LineReport::Class(Some(LineClass::Code)));
+                on_line(LineReport::Embedded { language, text });
             } else {
-                on_line(
+                on_line(LineReport::Class(
                     match (
                         stats.code - before.0,
                         stats.comments - before.1,
@@ -348,7 +403,7 @@ impl LanguageType {
                         (0, 0, 1, false) => Some(LineClass::Blank),
                         _ => None,
                     },
-                );
+                ));
             }
         }
 

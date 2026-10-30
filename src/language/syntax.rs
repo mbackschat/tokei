@@ -106,6 +106,8 @@ impl FileContext {
 pub(crate) enum LanguageContext {
     Html {
         language: LanguageType,
+        /// Where the element's text starts, after its opening tag.
+        start: usize,
     },
     LinguaFranca,
     Markdown {
@@ -1236,7 +1238,10 @@ impl SyntaxCounter {
 
                     let stats = language.parse_embedded(script_contents, config);
                     Some(FileContext::new(
-                        LanguageContext::Html { language },
+                        LanguageContext::Html {
+                            language,
+                            start: start_of_code,
+                        },
                         end_of_code,
                         stats,
                     ))
@@ -1260,7 +1265,10 @@ impl SyntaxCounter {
 
                     let stats = language.parse_embedded(style_contents, config);
                     Some(FileContext::new(
-                        LanguageContext::Html { language },
+                        LanguageContext::Html {
+                            language,
+                            start: start_of_code,
+                        },
                         end_of_code,
                         stats,
                     ))
@@ -1284,7 +1292,10 @@ impl SyntaxCounter {
                     }
                     let stats = language.parse_embedded(template_contents, config);
                     Some(FileContext::new(
-                        LanguageContext::Html { language },
+                        LanguageContext::Html {
+                            language,
+                            start: start_of_code,
+                        },
                         end_of_code,
                         stats,
                     ))
