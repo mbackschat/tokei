@@ -282,7 +282,7 @@ impl LanguageType {
     pub(crate) fn quote_like(self) -> Option<crate::language::quote_like::QuoteLikeSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% elif value.quote_like is defined and value.quote_like == "elixir_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ElixirSigil){% else %}None{% endif %},
+                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% elif value.quote_like is defined and value.quote_like == "elixir_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ElixirSigil){% elif value.quote_like is defined and value.quote_like == "haskell_quasi_quote" %}Some(crate::language::quote_like::QuoteLikeSyntax::HaskellQuasiQuote){% else %}None{% endif %},
             {% endfor %}
         }
     }
@@ -320,6 +320,30 @@ impl LanguageType {
         match self {
             {% for key, value in languages -%}
                 {{key}} => {% if value.escape_character is defined %}b'{{ value.escape_character }}'{% else %}b'\\'{% endif %},
+            {% endfor %}
+        }
+    }
+
+    /// Returns whether a string may hold gaps, a backslash, whitespace that
+    /// may span lines and a backslash, which the string skips, as Haskell's
+    /// (Haskell 2010 report, §2.6).
+    pub(crate) fn string_gaps(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.string_gaps | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
+    /// Returns the block comment opener and the pragma words after it that
+    /// make it code, as GHC's lexer reads `{-# INLINE f #-}`.
+    pub(crate) fn code_pragmas(self) -> Option<crate::language::pragma::CodePragmas> {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.code_pragmas is defined %}Some(crate::language::pragma::CodePragmas {
+                    open: "{{ value.code_pragmas.open }}",
+                    words: &[{% for word in value.code_pragmas.words %}"{{ word }}",{% endfor %}],
+                }){% else %}None{% endif %},
             {% endfor %}
         }
     }

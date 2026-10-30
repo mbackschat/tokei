@@ -797,6 +797,9 @@
       "nested": true,
       "line_comment": ["--"],
       "multi_line_comments": [["{-", "-}"]],
+      "string_gaps": true,
+      "quote_like": "haskell_quasi_quote",
+      "code_pragmas": {"open": "{-#", "words": ["ann", "column", "complete", "ctype", "deprecated", "incoherent", "inlinable", "inline", "inlineable", "line", "minimal", "noinline", "notinline", "nounpack", "opaque", "overlappable", "overlapping", "overlaps", "rules", "scc", "source", "specialise", "specialize", "unpack", "warning"]},
       "extensions": ["hs"]
     },
     "Haxe": {

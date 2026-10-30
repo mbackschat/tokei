@@ -18,8 +18,9 @@ use super::interpolation::{Interpolation, OpenHole};
 use super::jsx::{element_starts, is_name_byte, JsxFrame};
 use super::plain_scalar::plain_scalar_end;
 use super::pod::{pod_block_end, PodSyntax};
+use super::pragma::CodePragmas;
 use super::quote_like::{
-    question_mark_character_len, quote_like_len, QuestionMarkSyntax, QuoteLikeSyntax,
+    question_mark_character_len, quote_like_len, QuasiQuoting, QuestionMarkSyntax, QuoteLikeSyntax,
 };
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{is_word_byte, regex_literal_len, RegexContext};
@@ -56,6 +57,9 @@ pub(crate) struct SyntaxCounter {
     /// The end of the last heredoc or block scalar body; lines before it are
     /// literal.
     pub(crate) literal_end: usize,
+    /// The bracket quotes that the file's pragmas turn on, read at the
+    /// first quasi-quote opener of a language that has them.
+    quasi_quoting: Option<QuasiQuoting>,
     /// The end of the comment lines of a Perl POD block being read.
     comment_end: usize,
     /// Whether an end marker such as `__END__` has made the rest data.
@@ -129,6 +133,7 @@ pub(crate) struct SharedMatchers {
     pub identifier_quote_prefix: Option<&'static str>,
     pub line_directives: &'static [&'static str],
     pub backslash_operator: bool,
+    pub string_gaps: bool,
     pub escape: u8,
     pub quote_like: Option<QuoteLikeSyntax>,
     pub end_markers: &'static [&'static str],
@@ -138,6 +143,7 @@ pub(crate) struct SharedMatchers {
     pub string_literals: &'static [(&'static str, &'static str)],
     pub character_literals: &'static [(&'static str, &'static str)],
     pub code_tokens: &'static [&'static str],
+    pub code_pragmas: Option<CodePragmas>,
     pub blank_symbols: BlankSymbols,
     pub doubled_quote_escapes: &'static [&'static str],
     pub verbatim_string_literals: &'static [(&'static str, &'static str)],
@@ -277,6 +283,11 @@ impl SharedMatchers {
             Some(QuoteLikeSyntax::ElixirSigil) => {
                 opener_pairs.allow_any(b'~');
             }
+            Some(QuoteLikeSyntax::HaskellQuasiQuote) => {
+                for b in (b'a'..=b'z').chain(b'A'..=b'Z').chain([b'_']) {
+                    opener_pairs.allow(b'[', b);
+                }
+            }
             None => {}
         }
         if language.quotes_after().is_some() {
@@ -331,6 +342,8 @@ impl SharedMatchers {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
                     Some(QuoteLikeSyntax::RubyPercent) => vec!["%"],
                     Some(QuoteLikeSyntax::ElixirSigil) => vec!["~"],
+                    // A quasi-quote's opener ends in `|`.
+                    Some(QuoteLikeSyntax::HaskellQuasiQuote) => vec!["|"],
                     None => vec![],
                 }
                 .into_iter()
@@ -360,6 +373,7 @@ impl SharedMatchers {
             identifier_quote_prefix: language.identifier_quote_prefix(),
             line_directives: language.line_directives(),
             backslash_operator: language.backslash_operator(),
+            string_gaps: language.string_gaps(),
             escape: language.escape_character(),
             quote_like: language.quote_like(),
             end_markers: language.end_markers(),
@@ -369,6 +383,7 @@ impl SharedMatchers {
             string_literals: language.quotes(),
             character_literals: language.character_literals(),
             code_tokens: language.code_tokens(),
+            code_pragmas: language.code_pragmas(),
             blank_symbols: BlankSymbols::new(language.blank_symbols()),
             doubled_quote_escapes: language.doubled_quote_escapes(),
             verbatim_string_literals: language.verbatim_quotes(),
@@ -474,6 +489,7 @@ impl SyntaxCounter {
             quote_opener: "",
             holes: Vec::new(),
             literal_end: 0,
+            quasi_quoting: None,
             comment_end: 0,
             in_data_section: false,
             outside_code: language.code_tags().is_some(),
@@ -825,8 +841,8 @@ impl SyntaxCounter {
                     self.shared.opener_pairs.allows(window[0], next)
                 });
             if may_open {
-                if let Some(token) = self.code_token(window) {
-                    skip!(token.len());
+                if let Some(len) = self.code_token(window) {
+                    skip!(len);
                     continue;
                 }
 
@@ -1327,17 +1343,22 @@ impl SyntaxCounter {
             .find_map(|(start, end, verbatim)| Some((start, end, verbatim, quote_len(start)?)))
     }
 
-    /// The code token starting `window` that only looks like a comment or
-    /// string opener.
-    pub(crate) fn code_token(&self, window: &[u8]) -> Option<&'static str> {
+    /// Length of the code token starting `window` that only looks like a
+    /// comment or string opener, a declared token or a code pragma.
+    pub(crate) fn code_token(&self, window: &[u8]) -> Option<usize> {
         if !self.is_plain_mode() {
             return None;
         }
         self.shared
-            .code_tokens
-            .iter()
-            .copied()
-            .find(|e| window.starts_with(e.as_bytes()))
+            .code_pragmas
+            .and_then(|pragmas| pragmas.code_len(window))
+            .or_else(|| {
+                self.shared
+                    .code_tokens
+                    .iter()
+                    .find(|e| window.starts_with(e.as_bytes()))
+                    .map(|e| e.len())
+            })
     }
 
     /// Length of the character literal starting `window`: an escape running to
@@ -1407,6 +1428,8 @@ impl SyntaxCounter {
             self.quote_opener = "";
             self.quote_is_verbatim = false;
             Some(len)
+        } else if let Some(len) = self.string_gap_len(lines, i) {
+            Some(len)
         } else if let Some(escape) = self
             .quote_escape
             .as_deref()
@@ -1460,6 +1483,25 @@ impl SyntaxCounter {
                     && window[alias.len()..].starts_with(rest.as_bytes()))
                 .then_some(alias.len() + rest.len())
             })
+    }
+
+    /// Length of the text of a string gap at `lines[i]`, where a string has
+    /// gaps: the escape that closes a gap begun on an earlier line, which
+    /// therefore starts its line after whitespace, or a whole gap on one
+    /// line, an escape, whitespace and an escape (Haskell 2010 report, §2.6).
+    fn string_gap_len(&self, lines: &[u8], i: usize) -> Option<usize> {
+        let escape = self.shared.escape;
+        if !self.shared.string_gaps || self.quote_is_verbatim || lines[i] != escape {
+            return None;
+        }
+        if starts_line(lines, i) {
+            return Some(1);
+        }
+        let space = lines[i + 1..]
+            .iter()
+            .take_while(|b| matches!(b, b' ' | b'\t'))
+            .count();
+        (space > 0 && lines.get(i + 1 + space) == Some(&escape)).then_some(space + 2)
     }
 
     fn escapes_here(&self) -> bool {
@@ -1662,12 +1704,24 @@ impl SyntaxCounter {
 
     /// Length of the literal with chosen delimiters at `lines[i]`, such as
     /// Perl's `qw(…)` or Ruby's `%w[…]`, in plain mode.
-    fn parse_quote_like(&self, lines: &[u8], i: usize) -> Option<usize> {
+    fn parse_quote_like(&mut self, lines: &[u8], i: usize) -> Option<usize> {
         if !self.is_plain_mode() {
             return None;
         }
         let syntax = self.shared.quote_like?;
-        quote_like_len(lines, i, syntax, self.expression_context().as_ref())
+        let quoting = match syntax {
+            QuoteLikeSyntax::HaskellQuasiQuote => *self
+                .quasi_quoting
+                .get_or_insert_with(|| QuasiQuoting::of(lines)),
+            _ => QuasiQuoting::default(),
+        };
+        quote_like_len(
+            lines,
+            i,
+            syntax,
+            self.expression_context().as_ref(),
+            quoting,
+        )
     }
 
     /// The syntax that tells where an expression may start, for languages

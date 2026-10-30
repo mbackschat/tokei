@@ -10,6 +10,7 @@ pub mod language_type;
 pub mod languages;
 mod plain_scalar;
 mod pod;
+mod pragma;
 mod quote_like;
 mod raw_delimiter;
 mod regex_literal;
