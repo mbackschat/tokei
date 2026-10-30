@@ -65,6 +65,7 @@ Engine changes, each with a regression file in `tests/data`:
 | `line_classes` classes the lines of an embedded script or style element as its own language counts them. | `3eda0aa` | Not offered yet |
 | `markup_expressions`: an expression in markup text or a tag, such as Svelte's `{…}`, is read with another language's syntax up to its closer; an `interpolations` hole may name such a language too. `tag_line_comments` and `tag_multi_line_comments`: comments a tag holds where an attribute may start. | `3d035cd` | Not offered yet |
 | `code_line_markers`: outside literals and comments, the rest of the line after the marker is code, as after the backslash of a psql meta-command. `dollar_quotes`: PostgreSQL's `$tag$…$tag$` strings, whose body is code when it lexes as SQL and a literal otherwise. The `hash` shebang: any first line starting with `#`. | `25583bf`, `64d070b` | Not offered yet |
+| Markdown's fenced code blocks are found by a CommonMark parser, pulldown-cmark, in the whole file: `~~~` fences too, none inside paragraphs or other blocks, and the content of a block in a list item or block quote without their prefixes; its blank lines count. | `bdc6aff` | Not offered yet |
 
 Declarations in `languages.json`, each grounded in the cited specification or reference lexer:
 
@@ -124,6 +125,8 @@ Declarations in `languages.json`, each grounded in the cited specification or re
 | Svelte | `{…}` in text and attributes as TypeScript expressions, `{/…}` as a block's end tag; `//` and `/* */` comments between attributes | `3d035cd` | [Svelte, Basic markup](https://svelte.dev/docs/svelte/basic-markup), [Svelte 5.53.0 changelog, comments in tags](https://github.com/sveltejs/svelte/pull/17671) |
 | Lua | A first line starting with `#` is a comment, as `luaL_loadfile` skips it | `64d070b` | [Lua 5.4 `lauxlib.c`, `skipcomment`](https://www.lua.org/source/5.4/lauxlib.c.html#skipcomment), unchanged in 5.5 |
 | SQL | `'…'` strings without backslash escapes, `E'…'` strings with them, `"…"` identifiers, nested `/* */` comments and `$tag$…$tag$` dollar quotes, as PostgreSQL's scanner reads them; a dollar-quoted body that lexes as SQL, such as a PL/pgSQL function's, is code; a psql meta-command's line is code | `25583bf` | [PostgreSQL, lexical structure](https://www.postgresql.org/docs/current/sql-syntax-lexical.html), [psql meta-commands](https://www.postgresql.org/docs/current/app-psql.html#APP-PSQL-META-COMMANDS) |
+| YAML | A line of whitespace past a block scalar's indentation is its content | `150abcf` | [YAML 1.2.2 §8.1.2](https://yaml.org/spec/1.2.2/#812-literal-style) |
+| Markdown | Fenced code blocks as CommonMark finds them | `bdc6aff` | [CommonMark 0.31.2 §4.5](https://spec.commonmark.org/0.31.2/#fenced-code-blocks) |
 
 `locmetry-spike/` holds the development harness that compares these counts with tree-sitter on public repositories; it is not part of the crate.
 
