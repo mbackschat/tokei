@@ -8,6 +8,7 @@ use once_cell::sync::Lazy;
 use super::blank_symbols::BlankSymbols;
 use super::block_scalar::{block_scalar_end, may_start_block_scalar};
 use super::code_tags::CodeTags;
+use super::dollar_quote::{self, DollarQuote};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
     END_TEMPLATE,
@@ -74,6 +75,9 @@ pub(crate) struct SyntaxCounter {
     flow_depth: usize,
     /// Whether a markup tag is open, in which quotes open strings.
     pub(crate) in_tag: bool,
+    /// The delimiters of the dollar-quoted bodies read as SQL at this point,
+    /// innermost last.
+    dollar_bodies: Vec<Vec<u8>>,
     /// The JSX elements and expressions open at this point, innermost last.
     pub(crate) jsx: Vec<JsxFrame>,
     pub(crate) quote_is_doc_quote: bool,
@@ -149,11 +153,13 @@ pub(crate) struct SharedMatchers {
     pub nested_comments: &'static [(&'static str, &'static str)],
     pub text_sections: &'static [(&'static str, &'static str)],
     pub markup_expressions: Option<MarkupExpressions>,
+    pub dollar_quotes: bool,
     pub tag_line_comments: &'static [&'static str],
     pub tag_multi_line_comments: &'static [(&'static str, &'static str)],
     pub string_literals: &'static [(&'static str, &'static str)],
     pub character_literals: &'static [(&'static str, &'static str)],
     pub code_tokens: &'static [&'static str],
+    pub code_line_markers: &'static [&'static str],
     pub code_pragmas: Option<CodePragmas>,
     pub blank_symbols: BlankSymbols,
     pub doubled_quote_escapes: &'static [&'static str],
@@ -259,6 +265,7 @@ impl SharedMatchers {
             .chain(starts(language.verbatim_quotes()))
             .chain(starts(language.character_literals()))
             .chain(language.code_tokens().iter().copied())
+            .chain(language.code_line_markers().iter().copied())
         {
             match *opener.as_bytes() {
                 [] => opener_pairs = OpenerPairs::any(),
@@ -316,6 +323,9 @@ impl SharedMatchers {
         }
         if let Some(expressions) = language.markup_expressions() {
             opener_pairs.allow_any(expressions.open.as_bytes()[0]);
+        }
+        if language.dollar_quotes() {
+            opener_pairs.allow_any(b'$');
         }
         for open in language
             .tag_line_comments()
@@ -383,6 +393,7 @@ impl SharedMatchers {
             .chain(language.end_markers().iter().map(|m| (*m).to_owned()))
             .chain(starts(language.text_sections()).map(str::to_owned))
             .chain(language.markup_expressions().map(|e| e.open.to_owned()))
+            .chain(language.dollar_quotes().then(|| "$".to_owned()))
             .collect();
         let important_syntax = without_superstrings(important_syntax);
 
@@ -415,11 +426,13 @@ impl SharedMatchers {
             nested_comments: language.nested_comments(),
             text_sections: language.text_sections(),
             markup_expressions: language.markup_expressions(),
+            dollar_quotes: language.dollar_quotes(),
             tag_line_comments: language.tag_line_comments(),
             tag_multi_line_comments: language.tag_multi_line_comments(),
             string_literals: language.quotes(),
             character_literals: language.character_literals(),
             code_tokens: language.code_tokens(),
+            code_line_markers: language.code_line_markers(),
             code_pragmas: language.code_pragmas(),
             blank_symbols,
             doubled_quote_escapes: language.doubled_quote_escapes(),
@@ -533,6 +546,7 @@ impl SyntaxCounter {
             outside_code: language.code_tags().is_some(),
             flow_depth: 0,
             in_tag: false,
+            dollar_bodies: Vec::new(),
             jsx: Vec::new(),
             line_has_code: false,
         }
@@ -1012,6 +1026,23 @@ impl SyntaxCounter {
                 continue;
             }
 
+            match self.dollar_quote(lines, i) {
+                Some(DollarQuote::Code(len)) => {
+                    skip!(len);
+                    continue;
+                }
+                Some(DollarQuote::Literal(len)) => {
+                    if lines[i..i + len].contains(&b'\n') {
+                        trace!("Start dollar-quoted literal, ends at {}", i + len);
+                        self.literal_end = i + len;
+                        break;
+                    }
+                    skip!(len);
+                    continue;
+                }
+                None => {}
+            }
+
             if self.shared.quotes_in_tags && !self.in_tag {
                 if let Some(skip_amount) = self.parse_multi_line_comment(window) {
                     skip!(skip_amount);
@@ -1478,6 +1509,17 @@ impl SyntaxCounter {
                     .find(|e| window.starts_with(e.as_bytes()))
                     .map(|e| e.len())
             })
+            .or_else(|| {
+                // psql reads a dollar-quoted body as a string, without
+                // meta-commands (src/bin/psql/psqlscan.l, `xdolq`).
+                (self.dollar_bodies.is_empty()
+                    && self
+                        .shared
+                        .code_line_markers
+                        .iter()
+                        .any(|m| window.starts_with(m.as_bytes())))
+                .then(|| memchr::memchr(b'\n', window).unwrap_or(window.len()))
+            })
     }
 
     /// Length of the character literal starting `window`: an escape running to
@@ -1890,6 +1932,28 @@ impl SyntaxCounter {
                 + memchr::memmem::find(text, close.as_bytes())
                     .map_or(text.len(), |at| at + close.len()),
         )
+    }
+
+    /// Reads the dollar-quote delimiter at `lines[i..]`, outside literals and
+    /// comments: the closer of the innermost body read as SQL, or an opener.
+    fn dollar_quote(&mut self, lines: &[u8], i: usize) -> Option<DollarQuote> {
+        if !self.shared.dollar_quotes || lines[i] != b'$' || !self.is_plain_mode() {
+            return None;
+        }
+        if let Some(close) = self.dollar_bodies.last() {
+            if lines[i..].starts_with(close) {
+                let len = close.len();
+                self.dollar_bodies.pop();
+                return Some(DollarQuote::Code(len));
+            }
+        }
+        let delimiter = dollar_quote::opener_at(lines, i)?;
+        let quote = dollar_quote::classify(lines, i, delimiter)?;
+        if matches!(quote, DollarQuote::Code(_)) {
+            trace!("Start dollar-quoted body read as SQL");
+            self.dollar_bodies.push(delimiter.to_vec());
+        }
+        Some(quote)
     }
 
     /// The quasi-quotes that the file `lines` turns on, read once per file.

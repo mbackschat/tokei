@@ -189,6 +189,15 @@ impl LanguageType {
         }
     }
 
+    /// Whether a language has PostgreSQL's dollar-quoted strings, `$tag$…$tag$`.
+    pub(crate) fn dollar_quotes(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.dollar_quotes | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns the sections of character data in a markup language, whose
     /// text holds no markup up to the closer, such as XML's
     /// `<![CDATA[`…`]]>`; their lines are code, or blank when only whitespace.
@@ -666,6 +675,20 @@ impl LanguageType {
         }
     }
 
+    /// Returns the markers after which the rest of a line is code, outside
+    /// literals and comments, such as the backslash of a psql meta-command.
+    pub(crate) fn code_line_markers(self) -> &'static [&'static str] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[
+                    {%- for item in value.code_line_markers | default(value=[]) -%}
+                        "{{item}}",
+                    {%- endfor -%}
+                ],
+            {% endfor %}
+        }
+    }
+
     /// Returns the tokens of a language that start like a comment or a string
     /// but are code, such as PHP's `#[` attributes, F#'s `(*)` operator or
     /// Ruby's `$'` global.
@@ -798,7 +821,7 @@ impl LanguageType {
                 {%- set starting_doc_quotes = value.doc_quotes | default(value=[]) | map(attribute="0") -%}
                 {#- A line that only opens a verbatim quote, such as a Go backtick, must not skip analysis. -#}
                 {%- set starting_verbatim_quotes = value.verbatim_quotes | default(value=[]) | map(attribute="0") -%}
-                {%- set code_tokens = value.code_tokens | default(value=[]) -%}
+                {%- set code_tokens = value.code_tokens | default(value=[]) | concat(with=value.code_line_markers | default(value=[])) -%}
                 {%- set starting_multi_line_comments = value.multi_line_comments | default(value=[]) | map(attribute="0") -%}
                 {%- set starting_nested_comments = value.nested_comments | default(value=[]) | map(attribute="0") -%}
                 {%- set important_syntax = value.important_syntax | default(value=[]) -%}

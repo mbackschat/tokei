@@ -1859,9 +1859,14 @@
     },
     "Sql": {
       "name": "SQL",
+      "backslash_operator": true,
+      "dollar_quotes": true,
+      "code_line_markers": ["\\\\"],
       "line_comment": ["--"],
-      "multi_line_comments": [["/*", "*/"]],
-      "quotes": [["'", "'"]],
+      "nested_comments": [["/*", "*/"]],
+      "doubled_quote_escapes": ["'", "\\\""],
+      "verbatim_quotes": [["'", "'"], ["\\\"", "\\\""]],
+      "quotes": [["E'", "'"], ["e'", "'"]],
       "extensions": ["sql"]
     },
     "Sqf": {
