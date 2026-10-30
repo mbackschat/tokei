@@ -493,6 +493,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether a line whose first command is cmd.exe's `rem` is a
+    /// comment, as `batch::starts_remark` reads it.
+    pub(crate) fn batch_remarks(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.batch_remarks | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns the bytes that, with blanks among them, may come before a line
     /// comment at the start of a line and belong to it, as make's recipe
     /// flags `@`, `-` and `+` do (`start_job_command` in GNU make 4.4.1's

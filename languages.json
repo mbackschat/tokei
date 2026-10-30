@@ -170,7 +170,9 @@
       "extensions": ["bash"]
     },
     "Batch": {
-      "line_comment": ["REM", "::"],
+      "line_start_comments": ["::"],
+      "line_comment_flags": "@",
+      "batch_remarks": true,
       "extensions": ["bat", "btm", "cmd"]
     },
     "Bazel": {

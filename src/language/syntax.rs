@@ -15,7 +15,7 @@ use super::dialects::rust::frontmatter_end;
 use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
-use super::dialects::{elixir, haskell, make, perl, ruby};
+use super::dialects::{batch, elixir, haskell, make, perl, ruby};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
@@ -136,6 +136,7 @@ pub(crate) struct SharedMatchers {
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
     pub line_comment_flags: &'static [u8],
+    pub batch_remarks: bool,
     pub line_start_closers: &'static [&'static str],
     pub pod: Option<PodSyntax>,
     pub code_tags: Option<CodeTags>,
@@ -235,8 +236,9 @@ impl SharedMatchers {
     }
 
     /// Whether `text`, with nothing but comments before it on its line, opens
-    /// a comment that opens one only there: a line-start comment, or a line
-    /// comment after line comment flags.
+    /// a comment that opens one only there: a line-start comment or a batch
+    /// remark, either after any line comment flags, or a line comment after
+    /// at least one.
     pub(crate) fn starts_with_line_start_comment(&self, text: &[u8]) -> bool {
         let flags = match self.line_comment_flags {
             [] => 0,
@@ -245,14 +247,16 @@ impl SharedMatchers {
                 .take_while(|b| flags.contains(b) || matches!(b, b' ' | b'\t'))
                 .count(),
         };
+        let flagless = &text[flags..];
         self.line_start_comments
             .iter()
-            .any(|c| text.starts_with(c.as_bytes()))
+            .any(|c| flagless.starts_with(c.as_bytes()))
+            || (self.batch_remarks && batch::starts_remark(flagless))
             || (flags > 0
                 && self
                     .line_comments
                     .iter()
-                    .any(|c| text[flags..].starts_with(c.as_bytes())))
+                    .any(|c| flagless.starts_with(c.as_bytes())))
     }
 
     pub fn new(language: LanguageType) -> Arc<Self> {
@@ -464,6 +468,7 @@ impl SharedMatchers {
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
             line_comment_flags: language.line_comment_flags(),
+            batch_remarks: language.batch_remarks(),
             line_start_closers: language.line_start_closers(),
             pod: language.pod(),
             code_tags: language.code_tags(),
