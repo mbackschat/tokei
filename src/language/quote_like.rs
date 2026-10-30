@@ -62,6 +62,11 @@ impl QuasiQuoting {
         quoting
     }
 
+    /// Whether any `[quoter|` opens a quasi-quote.
+    pub(crate) fn any(self) -> bool {
+        self.quasi_quotes
+    }
+
     /// Whether `[quoter|` opens a quasi-quote: with Template Haskell's
     /// quotes on, `[e|`, `[d|`, `[t|` and `[p|` open quotes of code.
     fn quotes(self, quoter: &[u8]) -> bool {
@@ -83,7 +88,7 @@ pub(crate) fn quote_like_len(
     i: usize,
     syntax: QuoteLikeSyntax,
     context: Option<&RegexContext>,
-    quoting: QuasiQuoting,
+    quoting: impl FnOnce() -> QuasiQuoting,
 ) -> Option<usize> {
     let (open, parts) = match syntax {
         QuoteLikeSyntax::Perl => perl_operator(lines, i)?,
@@ -211,7 +216,12 @@ fn elixir_sigil_len(lines: &[u8], i: usize) -> Option<usize> {
 /// variable name that modules may qualify, as in `[r|` or `[Q.str|`, then
 /// `|` and text up to the first `|]` (GHC User's Guide, "Template Haskell",
 /// quasi-quotation; GHC 9.14.1 `GHC.Parser.Lexer`, `@varid` and `@qvarid`).
-fn quasi_quote_len(lines: &[u8], i: usize, quoting: QuasiQuoting) -> Option<usize> {
+/// The file's `quoting` is read only once such an opener is found.
+fn quasi_quote_len(
+    lines: &[u8],
+    i: usize,
+    quoting: impl FnOnce() -> QuasiQuoting,
+) -> Option<usize> {
     let rest = lines[i..].strip_prefix(b"[")?;
     let mut name = 0;
     loop {
@@ -230,7 +240,7 @@ fn quasi_quote_len(lines: &[u8], i: usize, quoting: QuasiQuoting) -> Option<usiz
         }
     }
     let quoter = &rest[..name];
-    if rest.get(name) != Some(&b'|') || !quoting.quotes(quoter) {
+    if rest.get(name) != Some(&b'|') || !quoting().quotes(quoter) {
         return None;
     }
     let close = memchr::memmem::find(&rest[name + 1..], b"|]")?;

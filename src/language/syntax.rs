@@ -314,9 +314,17 @@ impl SharedMatchers {
             }
             hole_bytes[usize::from(language.escape_character())] = true;
         }
+        let blank_symbols = BlankSymbols::new(language.blank_symbols());
+        // A run of passed-over bytes skips the checks for blank symbols and
+        // code tags that the analysis makes before it, so their bytes end it.
+        let close_tag = language.code_tags().map(|tags| tags.close().as_bytes()[0]);
         let pair_inert_bytes: [bool; 256] = std::array::from_fn(|i| {
             let b = i as u8;
-            !hole_bytes[i] && b != language.escape_character() && !(language.jsx() && b == b'<')
+            !hole_bytes[i]
+                && b != language.escape_character()
+                && !(language.jsx() && b == b'<')
+                && !blank_symbols.may_start(b)
+                && Some(b) != close_tag
         });
         let inert_bytes = std::array::from_fn(|i| pair_inert_bytes[i] && !opener_bytes[i]);
         let important_syntax: Vec<String> = language
@@ -342,9 +350,9 @@ impl SharedMatchers {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
                     Some(QuoteLikeSyntax::RubyPercent) => vec!["%"],
                     Some(QuoteLikeSyntax::ElixirSigil) => vec!["~"],
-                    // A quasi-quote's opener ends in `|`.
-                    Some(QuoteLikeSyntax::HaskellQuasiQuote) => vec!["|"],
-                    None => vec![],
+                    // Only files that turn quasi-quotes on search for their
+                    // `|`, which `may_open_quasi_quote` does.
+                    Some(QuoteLikeSyntax::HaskellQuasiQuote) | None => vec![],
                 }
                 .into_iter()
                 .map(str::to_owned),
@@ -384,7 +392,7 @@ impl SharedMatchers {
             character_literals: language.character_literals(),
             code_tokens: language.code_tokens(),
             code_pragmas: language.code_pragmas(),
-            blank_symbols: BlankSymbols::new(language.blank_symbols()),
+            blank_symbols,
             doubled_quote_escapes: language.doubled_quote_escapes(),
             verbatim_string_literals: language.verbatim_quotes(),
             raw_strings: language.raw_strings(),
@@ -579,17 +587,19 @@ impl SyntaxCounter {
     /// they cost Tokio `6470b5e` 42M of 503M instructions (measured
     /// 2026-10-29).
     pub(crate) fn opens_with_whole_lines(&self, text: &[u8]) -> bool {
-        let first_line = text.iter().position(|b| !b.is_ascii_whitespace()).map(|n| {
-            text[..n]
-                .iter()
-                .rposition(|b| *b == b'\n')
-                .map_or(0, |m| m + 1)
-        });
+        let first_line = || {
+            text.iter().position(|b| !b.is_ascii_whitespace()).map(|n| {
+                text[..n]
+                    .iter()
+                    .rposition(|b| *b == b'\n')
+                    .map_or(0, |m| m + 1)
+            })
+        };
         self.shared
             .shebang
             .is_some_and(|syntax| shebang_len(text, syntax).is_some())
             || (self.shared.frontmatter
-                && first_line.is_some_and(|start| frontmatter_end(text, start).is_some()))
+                && first_line().is_some_and(|start| frontmatter_end(text, start).is_some()))
     }
 
     /// Returns whether the syntax is currently in plain mode, outside every
@@ -598,38 +608,56 @@ impl SyntaxCounter {
         self.quote.is_none() && self.stack.is_empty() && !self.outside_code
     }
 
-    /// Whether `byte` leaves the analysis as it is, so the per-byte checks
-    /// are passed over: in a string, a byte that neither closes
-    /// nor escapes it nor opens a hole; in code outside every hole and JSX
-    /// frame, a byte that starts nothing, unless the file `embeds` other
-    /// languages. Passing over them cut the instructions for RuboCop
+    /// How many bytes from `i` on, short of `end`, leave the analysis as it
+    /// is, so the per-byte checks are passed over: in a string, bytes that
+    /// neither close nor escape it nor open a hole; in code outside every
+    /// hole and JSX frame, bytes that start nothing, unless the file `embeds`
+    /// other languages. Passing over them cut the instructions for RuboCop
     /// `28b550d` from 1,585M to 1,361M, and for Symfony `5c0e37bf` from
-    /// 18,019M to 14,893M (measured 2026-10-29).
-    fn passes_over(&self, window: &[u8], embeds: bool) -> bool {
-        let byte = window[0];
-        if byte == self.shared.escape || !self.stack.is_empty() {
-            return false;
+    /// 18,019M to 14,893M (measured 2026-10-29). Taking each run at once,
+    /// rather than byte by byte, cut Symfony `92216211` from 1.887 s to
+    /// 1.117 s of user time and pandoc's Haskell files from 2.9 to 1.9 times
+    /// v15.0.0's time, whose Haskell has no quotes (`judges/speed/check.py`,
+    /// measured 2026-10-30).
+    fn passed_over_len(&self, lines: &[u8], i: usize, end: usize, embeds: bool) -> usize {
+        if !self.stack.is_empty() {
+            return 0;
         }
-        let starts = |text: &str| text.as_bytes().first() == Some(&byte);
-        match self.quote.as_deref() {
+        let escape = self.shared.escape;
+        let span = &lines[i..end];
+        let stops = match self.quote.as_deref() {
             Some(quote) => {
-                !starts(quote)
-                    && !self.quote_escape.as_deref().is_some_and(starts)
-                    && !self.shared.hole_bytes[usize::from(byte)]
-                    && !self.shared.alias_bytes[usize::from(byte)]
+                let quote = quote.as_bytes().first().copied();
+                let quote_escape = self
+                    .quote_escape
+                    .as_deref()
+                    .and_then(|text| text.as_bytes().first().copied());
+                span.iter().position(|&b| {
+                    b == escape
+                        || Some(b) == quote
+                        || Some(b) == quote_escape
+                        || self.shared.hole_bytes[usize::from(b)]
+                        || self.shared.alias_bytes[usize::from(b)]
+                })
             }
             None => {
-                !embeds
-                    && (self.shared.inert_bytes[usize::from(byte)]
-                        || self.shared.pair_inert_bytes[usize::from(byte)]
-                            && window
-                                .get(1)
-                                .is_some_and(|&next| !self.shared.opener_pairs.allows(byte, next)))
-                    && self.quote_escape.is_none()
-                    && self.holes.is_empty()
-                    && self.jsx.is_empty()
+                if embeds
+                    || self.quote_escape.is_some()
+                    || !self.holes.is_empty()
+                    || !self.jsx.is_empty()
+                {
+                    return 0;
+                }
+                span.iter().enumerate().position(|(at, &b)| {
+                    !(self.shared.inert_bytes[usize::from(b)]
+                        || self.shared.pair_inert_bytes[usize::from(b)]
+                            && lines
+                                .get(i + at + 1)
+                                .is_some_and(|&next| !self.shared.opener_pairs.allows(b, next)))
+                })
             }
-        }
+        };
+        stops.unwrap_or(span.len())
     }
 
     /// Returns whether the syntax is currently in string mode.
@@ -683,7 +711,8 @@ impl SyntaxCounter {
     /// Try to see if we can determine what a line is from examining the whole
     /// line at once. Returns `true` if successful.
     pub(crate) fn try_perform_single_line_analysis(
-        &self,
+        &mut self,
+        lines: &[u8],
         line: &[u8],
         stats: &mut crate::stats::CodeStats,
     ) -> bool {
@@ -711,6 +740,7 @@ impl SyntaxCounter {
             || self.in_tag
             || self.flow_depth > 0
             || self.shared.important_syntax.is_match(line)
+            || self.may_open_quasi_quote(lines, line)
             || self.opens_flow_collection(line)
             || (self.shared.block_scalars && may_start_block_scalar(line))
         {
@@ -745,13 +775,6 @@ impl SyntaxCounter {
         config: &Config,
     ) -> AnalysisReport {
         let mut ended_with_comments = false;
-        let mut skip = 0;
-        macro_rules! skip {
-            ($skip:expr) => {{
-                skip = $skip - 1;
-            }};
-        }
-
         let regex_cache = RegexCache::build(self.shared.language, lines, start, end);
         let embeds = regex_cache.family().is_some();
 
@@ -768,16 +791,19 @@ impl SyntaxCounter {
             }};
         }
 
-        for i in start..end {
-            if skip != 0 {
-                skip -= 1;
-                continue;
+        let mut positions = start..end;
+        while let Some(i) = positions.next() {
+            // Resumes the analysis after the `len` bytes from `i` on.
+            macro_rules! skip {
+                ($len:expr) => {{
+                    positions.start = i + $len;
+                }};
             }
             settle!();
 
             let window = &lines[i..];
 
-            if window.trim().is_empty() {
+            if window[..1].trim().is_empty() && window.trim().is_empty() {
                 break;
             }
             if let Some(symbol) = self
@@ -811,7 +837,16 @@ impl SyntaxCounter {
             pending = Some((window[0], !self.stack.is_empty()));
 
             ended_with_comments = false;
-            if self.passes_over(window, embeds) {
+            let passed = self.passed_over_len(lines, i, end, embeds);
+            if passed != 0 {
+                if lines[i..i + passed]
+                    .iter()
+                    .any(|b| !b.is_ascii_whitespace())
+                {
+                    self.line_has_code = true;
+                }
+                pending = None;
+                skip!(passed);
                 continue;
             }
             let is_end_of_quote_or_multi_line = self
@@ -1709,19 +1744,28 @@ impl SyntaxCounter {
             return None;
         }
         let syntax = self.shared.quote_like?;
-        let quoting = match syntax {
-            QuoteLikeSyntax::HaskellQuasiQuote => *self
-                .quasi_quoting
-                .get_or_insert_with(|| QuasiQuoting::of(lines)),
-            _ => QuasiQuoting::default(),
-        };
-        quote_like_len(
-            lines,
-            i,
-            syntax,
-            self.expression_context().as_ref(),
-            quoting,
-        )
+        let context = self.expression_context();
+        quote_like_len(lines, i, syntax, context.as_ref(), || {
+            self.quasi_quoting(lines)
+        })
+    }
+
+    /// The quasi-quotes that the file `lines` turns on, read once per file.
+    fn quasi_quoting(&mut self, lines: &[u8]) -> QuasiQuoting {
+        *self
+            .quasi_quoting
+            .get_or_insert_with(|| QuasiQuoting::of(lines))
+    }
+
+    /// Whether `line`, of the file `lines`, may open a Haskell quasi-quote,
+    /// whose `|` is too common in Haskell to search every line for: as
+    /// important syntax, it sent a sixth of pandoc's lines to the full
+    /// analysis, although few files turn quasi-quotes on (2026-10-30).
+    fn may_open_quasi_quote(&mut self, lines: &[u8], line: &[u8]) -> bool {
+        self.shared.quote_like == Some(QuoteLikeSyntax::HaskellQuasiQuote)
+            && memchr::memrchr(b'|', line)
+                .is_some_and(|bar| memchr::memchr(b'[', &line[..bar]).is_some())
+            && self.quasi_quoting(lines).any()
     }
 
     /// The syntax that tells where an expression may start, for languages

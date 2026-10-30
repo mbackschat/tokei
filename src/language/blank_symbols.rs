@@ -24,6 +24,11 @@ impl BlankSymbols {
         }
     }
 
+    /// Whether a blank symbol may start with `byte`.
+    pub(crate) fn may_start(&self, byte: u8) -> bool {
+        self.first_bytes[usize::from(byte)]
+    }
+
     /// The blank symbol `window` starts with.
     pub(crate) fn at(&self, window: &[u8]) -> Option<&'static str> {
         if !self.first_bytes[usize::from(*window.first()?)] {
