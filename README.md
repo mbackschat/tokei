@@ -63,6 +63,7 @@ Engine changes, each with a regression file in `tests/data`:
 | `text_sections`: a section of character data whose text holds no markup up to its closer, such as XML's `<![CDATA[`…`]]>`; its lines are code, or blank when only whitespace. | `cfdcdc5` | Not offered yet |
 | Inside a comment that does not nest, an opener no longer hides a closer it overlaps, so `<!-->` ends an HTML comment and `/*/` a C one. | `a0c8f52` | Not offered yet |
 | `line_classes` classes the lines of an embedded script or style element as its own language counts them. | `3eda0aa` | Not offered yet |
+| `markup_expressions`: an expression in markup text or a tag, such as Svelte's `{…}`, is read with another language's syntax up to its closer; an `interpolations` hole may name such a language too. `tag_line_comments` and `tag_multi_line_comments`: comments a tag holds where an attribute may start. | `3d035cd` | Not offered yet |
 
 Declarations in `languages.json`, each grounded in the cited specification or reference lexer:
 
@@ -119,6 +120,7 @@ Declarations in `languages.json`, each grounded in the cited specification or re
 | CSS | No `//` line comments | `76b5c44` | [CSS Syntax Level 3 §4.3.2](https://www.w3.org/TR/css-syntax-3/#consume-comment) |
 | HTML | `<?…>` as a bogus comment; a script of a type neither JavaScript's nor a language's is a data block, counted as the page's text; `text/babel` and `text/jsx` scripts as JavaScript | `ecf6858`, `f5768c9` | [HTML Living Standard, tag open state](https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state), [the script element](https://html.spec.whatwg.org/multipage/scripting.html#the-script-element), [Babel standalone](https://babeljs.io/docs/babel-standalone) |
 | Vue, Svelte, HTML | A `lang` attribute names a language by name or file extension, as `<style lang="scss">` does | `0772c2f` | [Vue SFC specification, pre-processors](https://vuejs.org/api/sfc-spec.html#pre-processors) |
+| Svelte | `{…}` in text and attributes as TypeScript expressions, `{/…}` as a block's end tag; `//` and `/* */` comments between attributes | `3d035cd` | [Svelte, Basic markup](https://svelte.dev/docs/svelte/basic-markup), [Svelte 5.53.0 changelog, comments in tags](https://github.com/sveltejs/svelte/pull/17671) |
 
 `locmetry-spike/` holds the development harness that compares these counts with tree-sitter on public repositories; it is not part of the crate.
 
