@@ -18,7 +18,9 @@ use super::interpolation::{Interpolation, OpenHole};
 use super::jsx::{element_starts, is_name_byte, JsxFrame};
 use super::plain_scalar::plain_scalar_end;
 use super::pod::{pod_block_end, PodSyntax};
-use super::quote_like::{quote_like_len, ruby_character_len, QuoteLikeSyntax};
+use super::quote_like::{
+    question_mark_character_len, quote_like_len, QuestionMarkSyntax, QuoteLikeSyntax,
+};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{is_word_byte, regex_literal_len, RegexContext};
 use super::shebang::{shebang_len, ShebangSyntax};
@@ -117,6 +119,7 @@ pub(crate) struct SharedMatchers {
     pub is_literate: bool,
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
+    pub line_start_closers: &'static [&'static str],
     pub pod: Option<PodSyntax>,
     pub code_tags: Option<CodeTags>,
     pub frontmatter: bool,
@@ -149,7 +152,7 @@ pub(crate) struct SharedMatchers {
     pub regex_spans_lines: bool,
     pub regex_operator_symbols: bool,
     pub regex_command_arguments: bool,
-    pub question_mark_characters: bool,
+    pub question_mark_characters: Option<QuestionMarkSyntax>,
     pub quotes_in_tags: bool,
     pub template_expressions: &'static [(&'static str, &'static str)],
     pub word_delimiters: &'static [u8],
@@ -244,7 +247,7 @@ impl SharedMatchers {
         for b in raw().flat_map(RawDelimiter::first_bytes) {
             opener_pairs.allow_any(b);
         }
-        if language.question_mark_characters() {
+        if language.question_mark_characters().is_some() {
             opener_pairs.allow_any(b'?');
         }
         if language.regex_keywords().is_some() {
@@ -265,6 +268,9 @@ impl SharedMatchers {
             }
             Some(QuoteLikeSyntax::RubyPercent) => {
                 opener_pairs.allow_any(b'%');
+            }
+            Some(QuoteLikeSyntax::ElixirSigil) => {
+                opener_pairs.allow_any(b'~');
             }
             None => {}
         }
@@ -319,6 +325,7 @@ impl SharedMatchers {
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
                     Some(QuoteLikeSyntax::RubyPercent) => vec!["%"],
+                    Some(QuoteLikeSyntax::ElixirSigil) => vec!["~"],
                     None => vec![],
                 }
                 .into_iter()
@@ -338,6 +345,7 @@ impl SharedMatchers {
             any_comments: language.any_comments(),
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
+            line_start_closers: language.line_start_closers(),
             pod: language.pod(),
             code_tags: language.code_tags(),
             frontmatter: language.frontmatter(),
@@ -777,7 +785,7 @@ impl SyntaxCounter {
                 continue;
             }
             let is_end_of_quote_or_multi_line = self
-                .parse_end_of_quote(window)
+                .parse_end_of_quote(lines, i)
                 .or_else(|| self.parse_end_of_multi_line(window));
 
             if let Some(skip_amount) = is_end_of_quote_or_multi_line {
@@ -813,9 +821,11 @@ impl SyntaxCounter {
                     continue;
                 }
 
-                if let Some(len) = (self.shared.question_mark_characters && self.is_plain_mode())
-                    .then(|| ruby_character_len(lines, i))
-                    .flatten()
+                if let Some(len) = self
+                    .shared
+                    .question_mark_characters
+                    .filter(|_| self.is_plain_mode())
+                    .and_then(|syntax| question_mark_character_len(lines, i, syntax))
                 {
                     skip!(len);
                     continue;
@@ -1352,7 +1362,8 @@ impl SyntaxCounter {
     }
 
     #[inline]
-    pub(crate) fn parse_end_of_quote(&mut self, window: &[u8]) -> Option<usize> {
+    pub(crate) fn parse_end_of_quote(&mut self, lines: &[u8], i: usize) -> Option<usize> {
+        let window = &lines[i..];
         #[allow(clippy::if_same_then_else)]
         if let Some(quote) = self
             .quote
@@ -1360,6 +1371,10 @@ impl SyntaxCounter {
             .filter(|quote| window.starts_with(quote.as_bytes()))
         {
             let len = quote.len();
+            // Elsewhere on its line, a heredoc's closer is text.
+            if self.shared.line_start_closers.contains(&quote) && !starts_line(lines, i) {
+                return Some(1);
+            }
             // A run of more quotes closes at its end, the ones before the
             // closer being text (Kotlin grammar, TRIPLE_QUOTE_CLOSE).
             if self.shared.run_closers.contains(&quote)
@@ -1836,6 +1851,15 @@ fn spliced_lines_end(text: &[u8], mut from: usize) -> usize {
         }
         from = newline + 1;
     }
+}
+
+/// Whether nothing but spaces and tabs precede `lines[i]` on its line.
+fn starts_line(lines: &[u8], i: usize) -> bool {
+    lines[..i]
+        .iter()
+        .rev()
+        .take_while(|b| **b != b'\n')
+        .all(|b| matches!(b, b' ' | b'\t'))
 }
 
 /// Whether `window` starts with `text`, comparing the first byte before the

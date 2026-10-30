@@ -282,7 +282,7 @@ impl LanguageType {
     pub(crate) fn quote_like(self) -> Option<crate::language::quote_like::QuoteLikeSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% else %}None{% endif %},
+                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% elif value.quote_like is defined and value.quote_like == "elixir_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ElixirSigil){% else %}None{% endif %},
             {% endfor %}
         }
     }
@@ -417,12 +417,25 @@ impl LanguageType {
         }
     }
 
-    /// Returns whether `?` and one character form a character literal, as in
-    /// Ruby.
-    pub(crate) fn question_mark_characters(self) -> bool {
+    /// Returns whose rule makes `?` and one character a character literal, as
+    /// in Ruby and Elixir.
+    pub(crate) fn question_mark_characters(
+        self,
+    ) -> Option<crate::language::quote_like::QuestionMarkSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {{ value.question_mark_characters | default(value=false) }},
+                {{key}} => {% if value.question_mark_characters is defined and value.question_mark_characters == "ruby" %}Some(crate::language::quote_like::QuestionMarkSyntax::Ruby){% elif value.question_mark_characters is defined and value.question_mark_characters == "elixir" %}Some(crate::language::quote_like::QuestionMarkSyntax::Elixir){% else %}None{% endif %},
+            {% endfor %}
+        }
+    }
+
+    /// Returns the closers that close a literal only after nothing but
+    /// whitespace on their line, as an Elixir heredoc's `"""` does (Elixir
+    /// guide, "Binaries, strings, and charlists": heredocs).
+    pub(crate) fn line_start_closers(self) -> &'static [&'static str] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[{% for item in value.line_start_closers | default(value=[]) %}"{{ item }}",{% endfor %}],
             {% endfor %}
         }
     }
