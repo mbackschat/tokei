@@ -16,3 +16,4 @@ speed/upstream/
 lua/judge-linux
 shell/judge-linux
 groovy/out/
+toml/target/
