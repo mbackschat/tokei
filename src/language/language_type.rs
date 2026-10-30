@@ -152,6 +152,10 @@ impl LanguageType {
             let is_fortran = syntax.shared.is_fortran;
             let is_literate = syntax.shared.is_literate;
             let comments = syntax.shared.line_comments;
+            // A marker that opens a comment only at the start of a line,
+            // such as Dockerfile's `#`, opens one here, where every line
+            // starts with nothing before it.
+            let line_start_comments = syntax.shared.line_start_comments;
             let blank_symbols = syntax.shared.blank_symbols;
             trace!(
                 "Using Simple Parse on {:?}",
@@ -178,7 +182,10 @@ impl LanguageType {
                         if blank_symbols.trim_start(line).is_empty() {
                             (1, 0, 0)
                         } else if is_literate
-                            || comments.iter().any(|c| line.starts_with(c.as_bytes()))
+                            || comments
+                                .iter()
+                                .chain(line_start_comments)
+                                .any(|c| line.starts_with(c.as_bytes()))
                         {
                             (0, 0, 1)
                         } else {

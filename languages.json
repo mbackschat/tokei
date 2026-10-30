@@ -491,10 +491,10 @@
       "extensions": ["dj", "djot"]
     },
     "Dockerfile": {
-      "line_comment": ["#"],
+      "line_start_comments": ["#"],
+      "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "adjacent", "word": "shell", "closer": "line"}],
       "extensions": ["dockerfile", "dockerignore"],
-      "filenames": ["dockerfile"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]]
+      "filenames": ["dockerfile"]
     },
     "DotNetResource": {
       "name": ".NET Resource",
