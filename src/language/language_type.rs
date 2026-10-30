@@ -124,8 +124,11 @@ impl LanguageType {
         // A YAML line can continue the plain scalar of the line before it, so
         // no YAML line can be classified on its own; a shebang or frontmatter
         // is read by the full parse only, and so is a line before PHP's code
-        // tags, which is output text.
+        // tags, which is output text. Whether a Markdown line opens a code
+        // block depends on the lines before it, such as the list item that
+        // holds its fence, so a Markdown file is read whole.
         let simple_prefix = !syntax.shared.block_scalars
+            && !matches!(self, Markdown | UnrealDeveloperMarkdown)
             && syntax.shared.code_tags.is_none()
             && !syntax.opens_with_whole_lines(text);
         if let Some(end) = simple_prefix

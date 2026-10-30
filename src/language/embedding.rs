@@ -31,9 +31,6 @@ pub static START_TEMPLATE: Lazy<Regex> = Lazy::new(|| {
 pub static END_TEMPLATE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)</template[\t\n\x0C\r />]"#).unwrap());
 
-pub static STARTING_MARKDOWN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"```\S+\s"#).unwrap());
-pub static ENDING_MARKDOWN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"```\s?"#).unwrap());
-
 pub static STARTING_LF_BLOCK_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"\{="#).unwrap());
 pub static ENDING_LF_BLOCK_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"=}"#).unwrap());
 
@@ -80,7 +77,6 @@ pub(crate) struct RegexCache<'a> {
 pub(crate) enum RegexFamily<'a> {
     HtmlLike(HtmlLike<'a>),
     LinguaFranca(SimpleCapture<'a>),
-    Markdown(SimpleCapture<'a>),
 }
 
 pub(crate) struct HtmlLike<'a> {
@@ -177,10 +173,6 @@ impl<'a> RegexCache<'a> {
     /// zero for their start as the given `start` argument.
     pub(crate) fn build(lang: LanguageType, lines: &'a [u8], start: usize, end: usize) -> Self {
         let inner = match lang {
-            LanguageType::Markdown | LanguageType::UnrealDeveloperMarkdown => {
-                SimpleCapture::make_capture(&STARTING_MARKDOWN_REGEX, lines, start, end)
-                    .map(RegexFamily::Markdown)
-            }
             LanguageType::LinguaFranca => {
                 SimpleCapture::make_capture(&STARTING_LF_BLOCK_REGEX, lines, start, end)
                     .map(RegexFamily::LinguaFranca)

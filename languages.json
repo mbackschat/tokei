@@ -1193,7 +1193,7 @@
     },
     "Markdown": {
       "literate": true,
-      "important_syntax": ["```"],
+      "important_syntax": ["```", "~~~"],
       "extensions": ["md", "markdown"]
     },
     "Max": {

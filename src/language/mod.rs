@@ -3,6 +3,7 @@ mod block_scalar;
 mod code_tags;
 mod dollar_quote;
 mod embedding;
+mod fenced_block;
 mod frontmatter;
 mod heredoc;
 mod interpolation;

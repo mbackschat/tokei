@@ -10,9 +10,9 @@ use super::block_scalar::{block_scalar_end, may_start_block_scalar};
 use super::code_tags::CodeTags;
 use super::dollar_quote::{self, DollarQuote};
 use super::embedding::{
-    RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, ENDING_MARKDOWN_REGEX, END_SCRIPT, END_STYLE,
-    END_TEMPLATE,
+    RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
+use super::fenced_block::{fenced_blocks, FencedBlock};
 use super::frontmatter::frontmatter_end;
 use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, MarkupExpressions, OpenHole};
@@ -78,6 +78,9 @@ pub(crate) struct SyntaxCounter {
     /// The delimiters of the dollar-quoted bodies read as SQL at this point,
     /// innermost last.
     dollar_bodies: Vec<Vec<u8>>,
+    /// Markdown's fenced code blocks, found at the first line that may open
+    /// one.
+    fenced_blocks: Option<Vec<FencedBlock>>,
     /// The JSX elements and expressions open at this point, innermost last.
     pub(crate) jsx: Vec<JsxFrame>,
     pub(crate) quote_is_doc_quote: bool,
@@ -547,6 +550,7 @@ impl SyntaxCounter {
             flow_depth: 0,
             in_tag: false,
             dollar_bodies: Vec::new(),
+            fenced_blocks: None,
             jsx: Vec::new(),
             line_has_code: false,
         }
@@ -850,6 +854,9 @@ impl SyntaxCounter {
         end: usize,
         config: &Config,
     ) -> AnalysisReport {
+        if let Some(child) = self.parse_fenced_block(lines, start, config) {
+            return AnalysisReport::ChildLanguage(child);
+        }
         let mut ended_with_comments = false;
         let regex_cache = RegexCache::build(self.shared.language, lines, start, end);
         let embeds = regex_cache.family().is_some();
@@ -1242,49 +1249,12 @@ impl SyntaxCounter {
         config: &Config,
         regex_cache: &RegexCache,
     ) -> Option<FileContext> {
-        use std::str::FromStr;
-
         // static TYPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"type="(.*)".*>"#).unwrap());
         if self.quote.is_some() || !self.stack.is_empty() {
             return None;
         }
 
         match regex_cache.family()? {
-            RegexFamily::Markdown(md) => {
-                if !lines[start..end].contains_slice(b"```") {
-                    return None;
-                }
-
-                let opening_fence = md.starts_in_range(start, end)?;
-                let start_of_code = opening_fence.end();
-                let closing_fence = ENDING_MARKDOWN_REGEX.find(&lines[start_of_code..]);
-                if let Some(m) = &closing_fence {
-                    trace!("{:?}", String::from_utf8_lossy(m.as_bytes()));
-                }
-                let end_of_code = closing_fence
-                    .map_or_else(|| lines.len(), |fence| start_of_code + fence.start());
-                let end_of_code_block =
-                    closing_fence.map_or_else(|| lines.len(), |fence| start_of_code + fence.end());
-                let balanced = closing_fence.is_some();
-                let identifier = &opening_fence.as_bytes().trim()[3..];
-
-                let language = identifier
-                    .split(|&b| b == b',')
-                    .find_map(|s| LanguageType::from_str(&String::from_utf8_lossy(s)).ok())?;
-                trace!(
-                    "{} BLOCK: {:?}",
-                    language,
-                    String::from_utf8_lossy(&lines[start_of_code..end_of_code])
-                );
-                let stats =
-                    language.parse_from_slice(lines[start_of_code..end_of_code].trim(), config);
-
-                Some(FileContext::new(
-                    LanguageContext::Markdown { balanced, language },
-                    end_of_code_block,
-                    stats,
-                ))
-            }
             RegexFamily::LinguaFranca(lf) => {
                 let opening_fence = lf.starts_in_range(start, end)?;
                 let start_of_code = opening_fence.end();
@@ -1954,6 +1924,51 @@ impl SyntaxCounter {
             self.dollar_bodies.push(delimiter.to_vec());
         }
         Some(quote)
+    }
+
+    /// The Markdown code block whose opening fence is on the line at `start`,
+    /// when the fork names its language: the first word of its info string,
+    /// or the first of that word's comma-separated parts, that names one.
+    /// Blocks in other languages are text.
+    fn parse_fenced_block(
+        &mut self,
+        lines: &[u8],
+        start: usize,
+        config: &Config,
+    ) -> Option<FileContext> {
+        if !matches!(
+            self.shared.language,
+            LanguageType::Markdown | LanguageType::UnrealDeveloperMarkdown
+        ) {
+            return None;
+        }
+        use std::str::FromStr;
+
+        let blocks = self
+            .fenced_blocks
+            .get_or_insert_with(|| fenced_blocks(lines));
+        // `start` follows the line's indentation, which the opening fence of
+        // a block in a list item has.
+        let at = blocks.partition_point(|block| block.line_start <= start);
+        let block = blocks[..at].last().filter(|block| {
+            memchr::memchr(b'\n', &lines[block.line_start..])
+                .map_or(true, |n| start < block.line_start + n)
+        })?;
+        let language = block
+            .info
+            .split_whitespace()
+            .next()?
+            .split(',')
+            .find_map(|part| LanguageType::from_str(part).ok())?;
+        trace!("{} block: {:?}", language, block.content);
+        Some(FileContext::new(
+            LanguageContext::Markdown {
+                balanced: block.fence_lines == 2,
+                language,
+            },
+            block.end,
+            language.parse_from_str(&block.content, config),
+        ))
     }
 
     /// The quasi-quotes that the file `lines` turns on, read once per file.
