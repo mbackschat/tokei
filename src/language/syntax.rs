@@ -1166,9 +1166,9 @@ impl SyntaxCounter {
     ///  1. Check if string literal is a doc string and whether tokei has
     ///     been configured to treat them as comments.
     ///     - Yes: When the line starts with the doc string or when we are
-    ///            continuing from a previous line.
+    ///       continuing from a previous line.
     ///  - No: The string is a normal string literal or tokei isn't
-    ///        configured to count them as comments.
+    ///    configured to count them as comments.
     /// 2. If we're not in string mode, check if we left it this on this line.
     ///    - Yes: When we found a doc quote and we started in comments.
     /// 3. No: When the line starts inside a literal.
@@ -1220,7 +1220,7 @@ impl SyntaxCounter {
             if self.quote_is_doc_quote && config.treat_doc_strings_as_comments == Some(true) {
                 self.quote
                     .as_deref()
-                    .map_or(false, |q| line.starts_with(q.as_bytes()))
+                    .is_some_and(|q| line.starts_with(q.as_bytes()))
                     || (self.quote.is_some())
             } else {
                 false
