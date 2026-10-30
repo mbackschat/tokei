@@ -1584,6 +1584,9 @@
     },
     "R": {
       "line_comment": ["#"],
+      "line_directives": ["#line"],
+      "raw_strings": [{"start": "r\\\"", "repeat": "-", "open": "(", "close": ")", "end": "\\\""}, {"start": "r\\\"", "repeat": "-", "open": "[", "close": "]", "end": "\\\""}, {"start": "r\\\"", "repeat": "-", "open": "{", "close": "}", "end": "\\\""}, {"start": "r'", "repeat": "-", "open": "(", "close": ")", "end": "'"}, {"start": "r'", "repeat": "-", "open": "[", "close": "]", "end": "'"}, {"start": "r'", "repeat": "-", "open": "{", "close": "}", "end": "'"}, {"start": "R\\\"", "repeat": "-", "open": "(", "close": ")", "end": "\\\""}, {"start": "R\\\"", "repeat": "-", "open": "[", "close": "]", "end": "\\\""}, {"start": "R\\\"", "repeat": "-", "open": "{", "close": "}", "end": "\\\""}, {"start": "R'", "repeat": "-", "open": "(", "close": ")", "end": "'"}, {"start": "R'", "repeat": "-", "open": "[", "close": "]", "end": "'"}, {"start": "R'", "repeat": "-", "open": "{", "close": "}", "end": "'"}],
+      "quotes": [["\\\"", "\\\""], ["'", "'"], ["`", "`"]],
       "extensions": ["r"]
     },
     "Racket": {

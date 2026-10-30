@@ -120,6 +120,7 @@ pub(crate) struct SharedMatchers {
     pub shebang: Option<ShebangSyntax>,
     pub run_closers: &'static [&'static str],
     pub identifier_quote_prefix: Option<&'static str>,
+    pub line_directives: &'static [&'static str],
     pub backslash_operator: bool,
     pub quote_like: Option<QuoteLikeSyntax>,
     pub end_markers: &'static [&'static str],
@@ -361,6 +362,7 @@ impl SharedMatchers {
             shebang: language.shebang(),
             run_closers: language.run_closers(),
             identifier_quote_prefix: language.identifier_quote_prefix(),
+            line_directives: language.line_directives(),
             backslash_operator: language.backslash_operator(),
             quote_like: language.quote_like(),
             end_markers: language.end_markers(),
@@ -518,6 +520,15 @@ impl SyntaxCounter {
             }
         }
         let line = &lines[start..end];
+        if self
+            .shared
+            .line_directives
+            .iter()
+            .any(|directive| line.starts_with(directive.as_bytes()))
+        {
+            trace!("Line directive");
+            return Some(LineClass::Code);
+        }
         if self.in_data_section {
             return Some(if line.trim().is_empty() {
                 LineClass::Blank

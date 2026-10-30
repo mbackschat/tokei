@@ -343,6 +343,17 @@ impl LanguageType {
         }
     }
 
+    /// Returns the texts that, at the very start of a line, make it a
+    /// directive, code to its end, as R's `#line` does (R's `gram.y`,
+    /// `SkipComment` and `processLineDirective`).
+    pub(crate) fn line_directives(self) -> &'static [&'static str] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[{% for item in value.line_directives | default(value=[]) %}"{{ item }}",{% endfor %}],
+            {% endfor %}
+        }
+    }
+
     /// Returns the declared opener prefix, such as Scala's `s`, that a quote
     /// written directly after any identifier opens as: Scala reads `id"…"`
     /// as an interpolated string for every identifier `id` (Scala 3
