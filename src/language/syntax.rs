@@ -80,6 +80,8 @@ pub(crate) struct SyntaxCounter {
     pub(crate) dollar_bodies: Vec<Vec<u8>>,
     /// The JSX elements and expressions open at this point, innermost last.
     pub(crate) jsx: Vec<JsxFrame>,
+    /// How far the makefile's `define` bodies have been read.
+    pub(crate) make_defines: make::Defines,
     pub(crate) quote_is_doc_quote: bool,
     pub(crate) stack: Vec<Cow<'static, str>>,
     pub(crate) quote_is_verbatim: bool,
@@ -123,7 +125,10 @@ pub(crate) struct SharedMatchers {
     pub language: LanguageType,
     pub allows_nested: bool,
     pub doc_quotes: &'static [(&'static str, &'static str)],
-    pub important_syntax: AhoCorasick,
+    /// None for a language without any: searching an automaton of no patterns
+    /// still reads every byte, which took half the time of Linux's makefiles
+    /// at `d89e1d1`, concatenated (measured 2026-10-30).
+    pub important_syntax: Option<AhoCorasick>,
     #[allow(dead_code)]
     pub any_comments: &'static [&'static str],
     pub is_fortran: bool,
@@ -396,7 +401,12 @@ impl SharedMatchers {
             // A regular expression that spans lines decides the next line.
             .chain(language.regex_spans_lines().then(|| "/".to_owned()))
             // A line comment that a splice continues decides the next line.
-            .chain(language.line_splices().map(|_| "\\".to_owned()))
+            .chain(
+                language
+                    .line_splices()
+                    .and_then(LineSplices::important_syntax)
+                    .map(str::to_owned),
+            )
             .chain(
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
@@ -426,7 +436,8 @@ impl SharedMatchers {
             doc_quotes: language.doc_quotes(),
             is_fortran: language.is_fortran(),
             is_literate: language.is_literate(),
-            important_syntax: init_corasick(&important_syntax),
+            important_syntax: (!important_syntax.is_empty())
+                .then(|| init_corasick(&important_syntax)),
             any_comments: language.any_comments(),
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
@@ -571,6 +582,7 @@ impl SyntaxCounter {
             in_tag: false,
             dollar_bodies: Vec::new(),
             jsx: Vec::new(),
+            make_defines: make::Defines::default(),
             line_has_code: false,
         }
     }
@@ -822,7 +834,12 @@ impl SyntaxCounter {
             || !self.jsx.is_empty()
             || self.in_tag
             || self.flow_depth > 0
-            || self.shared.important_syntax.is_match(line)
+            || self
+                .shared
+                .important_syntax
+                .as_ref()
+                .is_some_and(|syntax| syntax.is_match(line))
+            || (self.shared.line_splices == Some(LineSplices::Make) && make::needs_full_parse(line))
             || self.may_open_quasi_quote(lines, line)
             || self.opens_flow_collection(line)
             || (self.shared.block_scalars && may_start_block_scalar(line))
@@ -1076,7 +1093,8 @@ impl SyntaxCounter {
                     }
                 }
                 if let Some(splices) = self.shared.line_splices {
-                    self.comment_end = self.comment_end.max(splices.comment_end(lines, i));
+                    let end = splices.comment_end(lines, i, &mut self.make_defines);
+                    self.comment_end = self.comment_end.max(end);
                 }
                 pending = None;
                 ended_with_comments = true;

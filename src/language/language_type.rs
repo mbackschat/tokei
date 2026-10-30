@@ -135,7 +135,7 @@ impl LanguageType {
             && syntax.shared.code_tags.is_none()
             && !syntax.opens_with_whole_lines(text);
         if let Some(end) = simple_prefix
-            .then(|| syntax.shared.important_syntax.find(text))
+            .then(|| syntax.shared.important_syntax.as_ref()?.find(text))
             .flatten()
             .and_then(|m| {
                 // Get the position of the last line before the important

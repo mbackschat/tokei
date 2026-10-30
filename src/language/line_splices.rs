@@ -21,9 +21,24 @@ pub(crate) enum LineSplices {
 }
 
 impl LineSplices {
+    /// The text that sends a line to the full parse, as a comment it ends
+    /// may continue: C's backslash. Make's lines go by
+    /// `make::needs_full_parse` instead.
+    pub(crate) fn important_syntax(self) -> Option<&'static str> {
+        match self {
+            LineSplices::C => Some("\\"),
+            LineSplices::Make => None,
+        }
+    }
+
     /// The end of the line comment at `text[from]`: the end of its line and
     /// of each following line that a splice joins to it.
-    pub(crate) fn comment_end(self, text: &[u8], mut from: usize) -> usize {
+    pub(crate) fn comment_end(
+        self,
+        text: &[u8],
+        mut from: usize,
+        defines: &mut make::Defines,
+    ) -> usize {
         if self == LineSplices::Make {
             let line_end = memchr::memchr(b'\n', &text[from..]).map_or(text.len(), |n| from + n);
             if !self.splices(&text[from..line_end]) {
@@ -32,7 +47,7 @@ impl LineSplices {
             // A `define` body may be read as a recipe; the scan for its
             // `define` runs only for the rare comment that a splice continues.
             let start = self.logical_line_start(text, from);
-            if text.get(start) == Some(&b'\t') || make::in_define_body(text, start) {
+            if text.get(start) == Some(&b'\t') || defines.contain(text, start) {
                 return line_end;
             }
         }
