@@ -66,14 +66,14 @@ fn data_line_classes(text: &[u8]) -> impl Iterator<Item = LineClass> + '_ {
 
 /// The lines of an element's `text` that the element's language counts:
 /// those after the line of its opening tag, up to the line of its closing
-/// tag, which the host counts.
+/// tag, which the host counts; none for an element on one line.
 fn embedded_lines(text: &[u8]) -> Range<usize> {
     let after_first = text
         .iter()
         .position(|b| *b == b'\n')
         .map_or(text.len(), |n| n + 1);
     let last_start = text.iter().rposition(|b| *b == b'\n').map_or(0, |n| n + 1);
-    after_first..last_start
+    after_first..last_start.max(after_first)
 }
 
 impl LanguageType {

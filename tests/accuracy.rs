@@ -114,6 +114,14 @@ mod line_classes {
         );
     }
 
+    #[test]
+    fn classes_an_embedded_element_that_opens_and_closes_on_one_line() {
+        let text = "<p>a</p>\n<script type=\"text/markdown\">## Hi</script>\n<p>b</p>\n";
+        let classes = LanguageType::Html.line_classes(text.as_bytes(), &Config::default());
+        use LineClass::*;
+        assert_eq!(classes, Some(vec![Code, Code, Code]));
+    }
+
     /// The fork's own counts are the oracle: wherever `line_classes` answers,
     /// its classes must tally to them on every fixture.
     #[test]
