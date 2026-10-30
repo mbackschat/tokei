@@ -121,7 +121,7 @@
     },
     "Autoconf": {
       "line_comment": ["#", "dnl"],
-      "extensions": ["in"]
+      "filenames": ["configure.ac", "configure.in"]
     },
     "Autoit": {
       "line_comment": [";"],
@@ -182,7 +182,7 @@
       "doc_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["'''", "'''"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["bzl", "bazel", "bzlmod"],
-      "filenames": ["build", "workspace", "module"]
+      "exact_filenames": ["BUILD", "WORKSPACE"]
     },
     "Bean": {
       "line_comment": [";"],
@@ -199,7 +199,8 @@
       "name": "Bitbake",
       "line_comment": ["#"],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "extensions": ["bb", "bbclass", "bbappend", "inc"]
+      "extensions": ["bb", "bbclass", "bbappend"],
+      "content_checked_extensions": {"inc": ["^(?:inherit(?:[ \\t]+[\\w.${}-]+)+[ \\t\\r]*$|require[ \\t]+[\\w.${}/-]+[ \\t\\r]*$|addtask[ \\t]+\\w|(?:python[ \\t]+)?do_\\w+(?::[\\w${}-]+)*[ \\t]*\\(\\)[ \\t]*\\{|(?:export[ \\t]+)?[A-Za-z_][\\w${}+-]*(?::[\\w${}+-]+)*(?:\\[[\\w-]+\\])?[ \\t]+(?:\\?\\?=|\\?=|:=|\\+=|=\\+|\\.=|=\\.|=)[ \\t]+\")"]}
     },
     "Blade": {
       "quotes_in_tags": true,
@@ -1738,7 +1739,7 @@
     "RPMSpecfile": {
       "name": "RPM Specfile",
       "line_comment": ["#"],
-      "extensions": ["spec"]
+      "content_checked_extensions": {"spec": ["^[ \\t]*(?i:Name):[ \\t]*[^ \\t\\r\\n]", "^[ \\t]*(?i:Version|Release):[ \\t]*[^ \\t\\r\\n]", "^[ \\t]*%(?:description|prep|build|install|files|changelog)(?:[ \\t]|\\r?$)"]}
     },
     "Ruby": {
       "heredocs": [{"start": "<<", "indent_flags": "-~", "spacing": "adjacent", "word": "identifier", "closer": "line"}],
@@ -1860,7 +1861,8 @@
       "line_comment": ["#"],
       "doc_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["'''", "'''"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "extensions": ["smk", "rules"],
+      "extensions": ["smk"],
+      "content_checked_extensions": {"rules": ["^(?:(?:rule|checkpoint|module)[ \\t]+\\w+[ \\t]*:|use[ \\t]+rule[ \\t]|(?:include|configfile|workdir|localrules|ruleorder|wildcard_constraints|onstart|onsuccess|onerror|container|envvars|pepfile)[ \\t]*:)"]},
       "filenames": ["snakefile"]
     },
     "Solidity": {

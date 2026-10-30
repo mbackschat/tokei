@@ -108,6 +108,34 @@ like `Makefile` or `Dockerfile`. These can be defined with the
 Filenames should be all-lowercase, whether or not the filename
 typically has capital letters included.
 
+A convention that fixes a name's case, such as Bazel's `BUILD`, goes in
+`exact_filenames` instead, which match only in the case given, since the
+lowercase `build` usually names a script:
+
+```json
+"Bazel": {
+    "exact_filenames": ["BUILD", "WORKSPACE"]
+},
+```
+
+An extension that other formats share, such as `.spec` for RPM and
+PostgreSQL's isolation tests, goes in `content_checked_extensions`
+instead of `extensions`: a file with it is the language only when its
+text matches every listed pattern, read as multi-line Rust regular
+expressions, and is otherwise left unrecognized. Ground the patterns in
+the language's own syntax, as GitHub Linguist's `heuristics.yml` does,
+and measure them on files of the formats that share the extension:
+
+```json
+"RPMSpecfile": {
+    "content_checked_extensions": {"spec": [
+        "^[ \\t]*(?i:Name):[ \\t]*[^ \\t\\r\\n]",
+        "^[ \\t]*(?i:Version|Release):[ \\t]*[^ \\t\\r\\n]",
+        "^[ \\t]*%(?:description|prep|build|install|files|changelog)(?:[ \\t]|\\r?$)"
+    ]}
+},
+```
+
 Note that filenames will **override** extensions. With the
 following definition, a file named `CMakeLists.txt` will be
 detected as a `CMake` file, not a `Text` file.

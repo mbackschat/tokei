@@ -883,6 +883,20 @@ impl LanguageType {
     {
         let entry = entry.as_ref();
 
+        // Names a convention fixes in one case, such as Bazel's `BUILD`,
+        // whose lowercase forms name other files, such as `build` scripts.
+        match entry.file_name().and_then(|name| name.to_str()) {
+            {% for key, value in languages -%}
+                {%- if value.exact_filenames -%}
+                    {%- for item in value.exact_filenames -%}
+                        | Some("{{item}}")
+                    {%- endfor -%}
+                        => return Some({{key}}),
+                {% endif -%}
+            {%- endfor %}
+            _ => ()
+        }
+
         if let Some(filename) = fsutils::get_filename(entry) {
             match &*filename {
                 {% for key, value in languages -%}
@@ -908,9 +922,45 @@ impl LanguageType {
         }
 
         match fsutils::get_extension(entry) {
-            Some(extension) => LanguageType::from_file_extension(extension.as_str()),
+            Some(extension) => LanguageType::from_file_extension(extension.as_str())
+                .or_else(|| LanguageType::from_checked_extension(entry, &extension)),
             None => LanguageType::from_shebang(entry),
         }
+    }
+
+    /// The language of a file whose extension other formats share, such as
+    /// `.spec` for RPM and PostgreSQL's isolation tests: the one whose
+    /// patterns for that extension all match the file's text, if any.
+    fn from_checked_extension(entry: &Path, extension: &str) -> Option<Self> {
+        static CHECKS: Lazy<Vec<(&str, LanguageType, Vec<regex::bytes::Regex>)>> = Lazy::new(|| {
+            let patterns = |sources: &[&str]| -> Vec<regex::bytes::Regex> {
+                sources
+                    .iter()
+                    .map(|source| {
+                        regex::bytes::RegexBuilder::new(source)
+                            .multi_line(true)
+                            .build()
+                            .expect("languages.json declares valid patterns")
+                    })
+                    .collect()
+            };
+            vec![
+                {% for key, value in languages -%}
+                    {%- if value.content_checked_extensions -%}
+                        {%- for extension, sources in value.content_checked_extensions %}
+                ("{{extension}}", {{key}}, patterns(&[{% for source in sources %}r#"{{source}}"#, {% endfor %}])),
+                        {%- endfor %}
+                    {%- endif -%}
+                {%- endfor %}
+            ]
+        });
+
+        let mut checks = CHECKS.iter().filter(|(checked, ..)| *checked == extension).peekable();
+        checks.peek()?;
+        let text = std::fs::read(entry).ok()?;
+        checks
+            .find(|(_, _, patterns)| patterns.iter().all(|pattern| pattern.is_match(&text)))
+            .map(|(_, language, _)| *language)
     }
 
     /// Get language from a file extension.

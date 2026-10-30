@@ -574,6 +574,101 @@ mod tests {
         assert_stats(&stats, 115, 528, 333);
     }
 
+    /// The language `from_path` detects for a file `name` holding `text`.
+    fn detect(name: &str, text: &str) -> Option<LanguageType> {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(name);
+        fs::write(&path, text).unwrap();
+        LanguageType::from_path(&path, &Config::default())
+    }
+
+    #[test]
+    fn only_configure_scripts_are_autoconf_not_every_template() {
+        assert_eq!(
+            detect("configure.ac", "AC_INIT([x], [1])\n"),
+            Some(Autoconf)
+        );
+        assert_eq!(detect("configure.in", "AC_INIT(x, 1)\n"), Some(Autoconf));
+        for template in [
+            "Makefile.in",
+            "Config.in",
+            "MANIFEST.in",
+            "foo.cmake.in",
+            "config.h.in",
+        ] {
+            assert_eq!(detect(template, "@VERSION@\n"), None, "{template}");
+        }
+    }
+
+    #[test]
+    fn bazel_file_names_match_in_their_own_case() {
+        assert_eq!(detect("BUILD", "cc_library(name = \"x\")\n"), Some(Bazel));
+        assert_eq!(
+            detect("WORKSPACE", "workspace(name = \"x\")\n"),
+            Some(Bazel)
+        );
+        assert_eq!(
+            detect("MODULE.bazel", "module(name = \"x\")\n"),
+            Some(Bazel)
+        );
+        // A lowercase `build` is usually a script, as in ShellCheck's `builders/`.
+        assert_eq!(detect("build", "#!/bin/sh\nmake\n"), Some(Sh));
+        assert_eq!(detect("module", "x\n"), None);
+    }
+
+    #[test]
+    fn a_spec_file_is_rpm_only_with_an_rpm_preamble_and_section() {
+        let rpm = "Name: x\nVersion: 1\nSummary: s\n\n%description\nText.\n";
+        assert_eq!(detect("x.spec", rpm), Some(RPMSpecfile));
+        // PostgreSQL's isolation tester reads `.spec` files too.
+        let isolation = "setup { CREATE TABLE t (a int); }\nsession s1\nstep s1a { SELECT 1; }\n";
+        assert_eq!(detect("lock.spec", isolation), None);
+    }
+
+    #[test]
+    fn an_inc_file_is_bitbake_only_with_bitbake_syntax() {
+        for (name, text) in [
+            ("a.inc", "SUMMARY = \"x\"\nLICENSE = \"MIT\"\n"),
+            ("b.inc", "inherit autotools pkgconfig\n"),
+            ("c.inc", "require recipes-core/foo.inc\n"),
+            ("d.inc", "do_install:append() {\n}\n"),
+            ("e.inc", "python do_patch() {\n}\n"),
+        ] {
+            assert_eq!(detect(name, text), Some(Bitbake), "{name}");
+        }
+        for (name, text) in [
+            (
+                "mg_names.inc",
+                "/* -*- buffer-read-only: t -*- */\n#define X 1\n",
+            ),
+            ("t.inc", "<?php\nrequire 'x.php';\n$a = \"b\";\n"),
+            ("version.inc", "VERSION=\"1.0\"\n"),
+            ("config.inc", "config.name = \"x\"\n"),
+        ] {
+            assert_eq!(detect(name, text), None, "{name}");
+        }
+    }
+
+    #[test]
+    fn a_rules_file_is_snakemake_only_with_snakemake_directives() {
+        assert_eq!(
+            detect("tex.rules", "rule pdf:\n    input: \"x.tex\"\n"),
+            Some(Snakemake)
+        );
+        assert_eq!(
+            detect("test.rules", "configfile: \"x.json\"\n"),
+            Some(Snakemake)
+        );
+        assert_eq!(
+            detect("90-kvm.rules", "KERNEL==\"kvm\", GROUP=\"kvm\"\n"),
+            None
+        );
+        assert_eq!(
+            detect("p.rules", "polkit.addRule(function(action, subject) {});\n"),
+            None
+        );
+    }
+
     #[test]
     fn lf_embedded_language_is_counted() {
         let file_text =
