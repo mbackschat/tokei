@@ -1558,6 +1558,8 @@
     "Protobuf": {
       "name": "Protocol Buffers",
       "line_comment": ["//"],
+      "multi_line_comments": [["/*", "*/"]],
+      "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["proto"]
     },
     "Pug" : {

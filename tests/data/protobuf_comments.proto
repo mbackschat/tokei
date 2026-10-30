@@ -1,0 +1,12 @@
+// 12 lines 6 code 5 comments 1 blanks
+syntax = "proto3";
+
+/* A block comment
+   over two lines,
+
+   with a blank line. */
+message M {
+  string url = 1; // a field
+  string s = 2 [default = "/* not a comment */"];
+  string t = 3 [json_name = 'it\'s // no comment'];
+}
