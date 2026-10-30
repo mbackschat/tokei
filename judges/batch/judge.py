@@ -19,7 +19,8 @@ reimplementation in `programs/cmd/wcmdmain.c`, citing it by function:
   Remarks and labels take their line whole, so a caret ends neither.
 
 Reads paths on stdin and prints, per file, the comment ranges in byte
-offsets, as judgecmp's stream expects. Batch has no lexical errors.
+offsets after any byte order mark, as judgecmp's stream expects. Batch has
+no lexical errors.
 """
 
 import json
@@ -72,7 +73,7 @@ def is_remark(line):
 
 def judge(path):
     with open(path, "rb") as f:
-        data = f.read()
+        data = f.read().removeprefix(b"\xef\xbb\xbf")
     comments, offset, continued = [], 0, False
     for raw in data.split(b"\n"):
         line = raw[:-1] if raw.endswith(b"\r") else raw

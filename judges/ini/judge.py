@@ -7,8 +7,8 @@ inside a value continued over indented lines (`_Line._strip_full` in
 CPython 3.13's `Lib/configparser.py`); inline comments are off by default, so
 the rest of a line holding a value is code. A file that `RawConfigParser`
 rejects, with duplicates allowed and no interpolation, is invalid. Reads
-paths on stdin and prints, per file, the comment ranges in byte offsets, as
-judgecmp's stream expects.
+paths on stdin and prints, per file, the comment ranges in byte offsets
+after any byte order mark, as judgecmp's stream expects.
 """
 
 import configparser
@@ -25,14 +25,14 @@ def judge(path):
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError:
         return None
-    bom = len(data) - len(text.encode("utf-8"))
+    data = text.encode("utf-8")
     errors = 0
     try:
         configparser.RawConfigParser(strict=False, allow_no_value=True).read_string(text)
     except configparser.Error:
         errors = 1
-    comments, offset = [], bom
-    for raw in data[bom:].split(b"\n"):
+    comments, offset = [], 0
+    for raw in data.split(b"\n"):
         line = raw.decode("utf-8")
         if line.strip().startswith(PREFIXES):
             comments.append([offset, offset + len(raw.rstrip(b"\r"))])
