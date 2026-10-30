@@ -305,9 +305,7 @@ impl SharedMatchers {
         }
         let pair_inert_bytes: [bool; 256] = std::array::from_fn(|i| {
             let b = i as u8;
-            !hole_bytes[i]
-                && b != language.escape_character()
-                && !(language.jsx() && b == b'<')
+            !hole_bytes[i] && b != language.escape_character() && !(language.jsx() && b == b'<')
         });
         let inert_bytes = std::array::from_fn(|i| pair_inert_bytes[i] && !opener_bytes[i]);
         let important_syntax: Vec<String> = language
@@ -1453,12 +1451,15 @@ impl SyntaxCounter {
         if window.starts_with(closer.as_bytes()) {
             return Some(closer.len());
         }
-        self.shared.quote_aliases.iter().find_map(|&(quote, alias)| {
-            let rest = closer.strip_prefix(quote)?;
-            (window.starts_with(alias.as_bytes())
-                && window[alias.len()..].starts_with(rest.as_bytes()))
-            .then_some(alias.len() + rest.len())
-        })
+        self.shared
+            .quote_aliases
+            .iter()
+            .find_map(|&(quote, alias)| {
+                let rest = closer.strip_prefix(quote)?;
+                (window.starts_with(alias.as_bytes())
+                    && window[alias.len()..].starts_with(rest.as_bytes()))
+                .then_some(alias.len() + rest.len())
+            })
     }
 
     fn escapes_here(&self) -> bool {
