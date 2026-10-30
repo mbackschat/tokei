@@ -1704,7 +1704,7 @@ impl SyntaxCounter {
             return None;
         }
         self.shared.heredocs.iter().find_map(|heredoc| {
-            let opening = heredoc.parse_opener(&lines[i..])?;
+            let opening = heredoc.parse_opener(lines, i)?;
             let next_line = i + lines[i..].iter().position(|b| *b == b'\n')? + 1;
             let from = next_line.max(self.literal_end);
             self.literal_end = heredoc.closing_line_end(&opening, lines, from)?;
@@ -1716,7 +1716,9 @@ impl SyntaxCounter {
     /// Whether a word can start at `lines[i]`: at the start of the text, or
     /// after whitespace or one of the language's word delimiters, such as a
     /// shell operator character (POSIX.1-2024, Shell Command Language §2.3,
-    /// rules 6, 8 and 9).
+    /// rules 6, 8 and 9) or a backquote, whose text is read as a script of
+    /// its own (§2.6.3); a `#` right after a closing backquote, which goes on
+    /// with the word, is taken for a comment too.
     fn starts_word(&self, lines: &[u8], i: usize) -> bool {
         match lines[..i].last() {
             None => true,

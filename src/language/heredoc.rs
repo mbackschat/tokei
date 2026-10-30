@@ -53,12 +53,15 @@ pub(crate) struct HeredocOpening<'a> {
 }
 
 impl Heredoc {
-    /// The opener starting `window`, with the word its closing line holds.
-    pub(crate) fn parse_opener<'a>(&self, window: &'a [u8]) -> Option<HeredocOpening<'a>> {
-        let rest = window.strip_prefix(self.start.as_bytes())?;
+    /// The opener at `lines[i]`, with the word its closing line holds.
+    pub(crate) fn parse_opener<'a>(&self, lines: &'a [u8], i: usize) -> Option<HeredocOpening<'a>> {
+        let rest = lines[i..].strip_prefix(self.start.as_bytes())?;
         // A longer run of `<`, such as a shell here-string `<<<`, is another
-        // operator.
-        if rest.first() == self.start.as_bytes().last() {
+        // operator, read from its first `<` (Bash Reference Manual, 3.6.7
+        // "Here Strings").
+        if rest.first() == self.start.as_bytes().last()
+            || lines[..i].last() == self.start.as_bytes().first()
+        {
             return None;
         }
         let indented = rest

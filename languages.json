@@ -157,7 +157,7 @@
       "extensions": ["bal"]
     },
     "Bash": {
-      "word_delimiters": ";&|()<>",
+      "word_delimiters": ";&|()<>`",
       "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
@@ -1051,7 +1051,7 @@
       "extensions": ["kt", "kts"]
     },
     "Ksh": {
-      "word_delimiters": ";&|()<>",
+      "word_delimiters": ";&|()<>`",
       "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
@@ -1788,7 +1788,7 @@
       "filenames": ["sconstruct", "sconscript"]
     },
     "Sh": {
-      "word_delimiters": ";&|()<>",
+      "word_delimiters": ";&|()<>`",
       "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
@@ -2279,7 +2279,7 @@
       "extensions": ["zok"]
     },
     "Zsh": {
-      "word_delimiters": ";&|()<>",
+      "word_delimiters": ";&|()<>`",
       "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "any", "word": "shell", "closer": "line"}],
       "line_comment_starts_word": true,
       "interpolations": [{"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}],
