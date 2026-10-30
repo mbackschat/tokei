@@ -19,6 +19,7 @@ Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbacksch
 | R | R's own parser, through the parse data of `parse(keep.source = TRUE)` (measured with R 4.6.1) | `… \| Rscript r/judge.R \| judgecmp stream R`, as in the `r-base` image with `jsonlite` installed |
 | Elixir | Elixir's own tokenizer, `:elixir_tokenizer`, the one `Code.string_to_quoted_with_comments/2` runs (measured with Elixir 1.20.4 on OTP 29); a literal ends where the next token or comment starts, less the whitespace before it | `… \| elixir elixir/judge.exs \| judgecmp stream Elixir`, as in the `elixir` image |
 | PowerShell | PowerShell's own parser, `Parser.ParseFile` (measured with PowerShell 7.5.0); bare words, which it also types as strings, are code | `… \| pwsh -NoProfile -File powershell/judge.ps1 \| judgecmp stream PowerShell`, as in the `mcr.microsoft.com/powershell:azurelinux-3.0-arm64` image |
+| Haskell | GHC's own lexer, `lexTokenStream` from the `ghc` library (measured with GHC 9.14.1), with GHC2021 and each file's LANGUAGE pragmas; files that use the C preprocessor are lexed unprocessed and mostly fail | build with `ghc -O1 -package ghc Judge.hs -o judge` in `haskell/`, as in the `haskell` image, then `… \| haskell/judge \| judgecmp stream Haskell` |
 | Python | CPython's `tokenize` (measured with 3.14) | `… \| python3 python/judge.py \| judgecmp stream Python` |
 | Lean | Lean 4.31.0's own lexer functions | see below |
 
