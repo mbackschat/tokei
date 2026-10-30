@@ -41,7 +41,12 @@ pub(crate) fn block_scalar_end(lines: &[u8], i: usize) -> Option<usize> {
             if content_indent.is_none() {
                 leading_empty_indent = leading_empty_indent.max(indent);
             }
-            if keeps_trailing_lines {
+            // Whitespace past the content's indentation is text, so the line
+            // is content, not empty (YAML 1.2.2 §8.1.2, `l-nb-literal-text`).
+            let past_indent = content_indent.is_some_and(|content_indent| {
+                line.strip_suffix(b"\r").unwrap_or(line).len() > content_indent
+            });
+            if keeps_trailing_lines || past_indent {
                 content_end = Some((end + 1).min(lines.len()));
             }
         } else {
