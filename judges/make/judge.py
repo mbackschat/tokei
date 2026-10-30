@@ -27,7 +27,12 @@ each line, citing it by function, and reads recipes as the shell does
   where both would read it as one: when it starts with `#`, after blanks and,
   on a line starting with the recipe prefix, recipe flags.
 
-Conditional directives are not evaluated: every branch is read. Reads paths
+Conditional directives are not evaluated: every branch is read. In an
+Automake `.am` file, `if COND` at the start of a line opens Automake's own
+conditional, which `automake` turns into make text (`$IF_PATTERN` in
+automake 1.18's `bin/automake.in`), and a line holding only an `@NAME@`
+substitution is text `configure` replaces before make reads it; the rest
+reads as make reads it. Reads paths
 on stdin and prints, per file, the comment and literal ranges in byte offsets
 and the number of errors, as judgecmp's stream expects: the fatal errors
 `eval` reports for an unterminated `define`, a recipe line before the first
@@ -37,10 +42,12 @@ and an unterminated shell quote.
 """
 
 import json
+import re
 import sys
 
 ASSIGNMENT_WORDS = {b"export", b"unexport", b"override", b"private", b"define", b"undefine"}
 RULE_ENDING_WORDS = {b"export", b"unexport", b"vpath", b"include", b"-include", b"sinclude", b"load", b"-load"}
+SUBSTITUTION = re.compile(rb"@[A-Za-z_][A-Za-z0-9_]*@")
 CONDITIONAL_WORDS = {b"ifeq", b"ifneq", b"ifdef", b"ifndef", b"else", b"endif"}
 SHELL_OPERATORS = b";&|()<>"
 
@@ -149,8 +156,9 @@ def is_assignment(code):
 
 
 class Judge:
-    def __init__(self, text):
+    def __init__(self, text, automake=False):
         self.text = text
+        self.automake = automake
         self.comments = []
         self.literals = []
         self.errors = 0
@@ -261,7 +269,7 @@ class Judge:
                 value = name_and_value[1].lstrip()
                 self.prefix = value[0] if value else 0x09
             return b"define" in modifiers
-        if words[0] in CONDITIONAL_WORDS:
+        if words[0] in CONDITIONAL_WORDS or self.automake and words[0] == b"if" and self.text[start:start + 2] == b"if":
             self.comment_from(cut, end)
             return False
         if words[0] in RULE_ENDING_WORDS:
@@ -269,6 +277,8 @@ class Judge:
             self.comment_from(cut, end)
             return False
         colon = find_unquoted(self.text, start, end, b":") is not None
+        if self.automake and len(words) == 1 and SUBSTITUTION.fullmatch(words[0]):
+            return False
         if self.text[start] == self.prefix:
             self.errors += 1
         elif not colon and b"$" not in code:
@@ -343,7 +353,7 @@ def judge(path):
         data.decode("utf-8")
     except UnicodeDecodeError:
         return None
-    judged = Judge(data)
+    judged = Judge(data, automake=path.endswith(".am"))
     judged.run()
     return {"path": path, "units": "bytes", "errors": judged.errors, "comments": judged.comments, "literals": judged.literals}
 
