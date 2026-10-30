@@ -165,6 +165,30 @@ impl LanguageType {
         }
     }
 
+    /// Returns the line comments a markup language reads between the
+    /// attributes of a tag, such as Svelte's `//`.
+    pub(crate) fn tag_line_comments(self) -> &'static [&'static str] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[{% for item in value.tag_line_comments | default(value=[]) %}"{{item}}",{% endfor %}],
+            {% endfor %}
+        }
+    }
+
+    /// Returns the block comments a markup language reads between the
+    /// attributes of a tag, such as Svelte's `/* … */`.
+    pub(crate) fn tag_multi_line_comments(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => &[
+                    {%- for items in value.tag_multi_line_comments | default(value=[]) -%}
+                        ({% for item in items %}"{{item}}",{% endfor %}),
+                    {%- endfor -%}
+                ],
+            {% endfor %}
+        }
+    }
+
     /// Returns the sections of character data in a markup language, whose
     /// text holds no markup up to the closer, such as XML's
     /// `<![CDATA[`…`]]>`; their lines are code, or blank when only whitespace.
@@ -262,9 +286,31 @@ impl LanguageType {
                             nest: b'{{ hole.nest }}',
                             literal: &[{% for text in hole.literal | default(value=[]) %}"{{ text }}",{% endfor %}],
                             run_opens: {{ hole.run_opens | default(value=false) }},
+                            language: {% if hole.language %}Some(crate::LanguageType::{{ hole.language }}){% else %}None{% endif %},
                         },
                     {%- endfor -%}
                 ],
+            {% endfor %}
+        }
+    }
+
+    /// Returns the expressions in a markup language's text and tags whose
+    /// contents another language reads, such as Svelte's `{…}`.
+    pub(crate) fn markup_expressions(self) -> Option<crate::language::interpolation::MarkupExpressions> {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {% if value.markup_expressions is defined -%}
+                    {%- set e = value.markup_expressions -%}
+                    Some(crate::language::interpolation::MarkupExpressions {
+                        open: "{{ e.open }}",
+                        close: "{{ e.close }}",
+                        nest: b'{{ e.nest }}',
+                        language: crate::LanguageType::{{ e.language }},
+                        block_closer: {% if e.block_closer %}Some(b'{{ e.block_closer }}'){% else %}None{% endif %},
+                    })
+                {%- else -%}
+                    None
+                {%- endif %},
             {% endfor %}
         }
     }

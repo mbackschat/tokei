@@ -14,7 +14,7 @@ use super::embedding::{
 };
 use super::frontmatter::frontmatter_end;
 use super::heredoc::Heredoc;
-use super::interpolation::{Interpolation, OpenHole};
+use super::interpolation::{Interpolation, MarkupExpressions, OpenHole};
 use super::jsx::{element_starts, is_name_byte, JsxFrame};
 use super::plain_scalar::plain_scalar_end;
 use super::pod::{pod_block_end, PodSyntax};
@@ -148,6 +148,9 @@ pub(crate) struct SharedMatchers {
     pub multi_line_comments: &'static [(&'static str, &'static str)],
     pub nested_comments: &'static [(&'static str, &'static str)],
     pub text_sections: &'static [(&'static str, &'static str)],
+    pub markup_expressions: Option<MarkupExpressions>,
+    pub tag_line_comments: &'static [&'static str],
+    pub tag_multi_line_comments: &'static [(&'static str, &'static str)],
     pub string_literals: &'static [(&'static str, &'static str)],
     pub character_literals: &'static [(&'static str, &'static str)],
     pub code_tokens: &'static [&'static str],
@@ -311,6 +314,17 @@ impl SharedMatchers {
         for (open, _) in language.template_expressions() {
             opener_pairs.allow_any(open.as_bytes()[0]);
         }
+        if let Some(expressions) = language.markup_expressions() {
+            opener_pairs.allow_any(expressions.open.as_bytes()[0]);
+        }
+        for open in language
+            .tag_line_comments()
+            .iter()
+            .copied()
+            .chain(starts(language.tag_multi_line_comments()))
+        {
+            opener_pairs.allow_any(open.as_bytes()[0]);
+        }
         let opener_bytes = std::array::from_fn(|b| opener_pairs.may_start(b as u8));
         let mut hole_bytes = [false; 256];
         let mut interpolating_quote_bytes = [false; 256];
@@ -368,6 +382,7 @@ impl SharedMatchers {
             )
             .chain(language.end_markers().iter().map(|m| (*m).to_owned()))
             .chain(starts(language.text_sections()).map(str::to_owned))
+            .chain(language.markup_expressions().map(|e| e.open.to_owned()))
             .collect();
         let important_syntax = without_superstrings(important_syntax);
 
@@ -399,6 +414,9 @@ impl SharedMatchers {
             any_multi_line_comments: language.any_multi_line_comments(),
             nested_comments: language.nested_comments(),
             text_sections: language.text_sections(),
+            markup_expressions: language.markup_expressions(),
+            tag_line_comments: language.tag_line_comments(),
+            tag_multi_line_comments: language.tag_multi_line_comments(),
             string_literals: language.quotes(),
             character_literals: language.character_literals(),
             code_tokens: language.code_tokens(),
@@ -721,9 +739,35 @@ impl SyntaxCounter {
         {
             trace!("Start {:?} at the start of a line", comment);
             true
+        } else if self.in_tag
+            && self
+                .shared
+                .tag_line_comments
+                .iter()
+                .any(|c| window.starts_with(c.as_bytes()))
+            && may_start_tag_comment(&lines[..i])
+        {
+            trace!("Start line comment in a tag");
+            true
         } else {
             false
         }
+    }
+
+    /// Opens the block comment at `lines[i..]` that a tag holds between its
+    /// attributes.
+    fn parse_tag_block_comment(&mut self, lines: &[u8], i: usize) -> Option<usize> {
+        let &(open, close) = self
+            .shared
+            .tag_multi_line_comments
+            .iter()
+            .find(|(open, _)| lines[i..].starts_with(open.as_bytes()))?;
+        if !may_start_tag_comment(&lines[..i]) {
+            return None;
+        }
+        trace!("Start {:?} in a tag", open);
+        self.stack.push(Cow::Borrowed(close));
+        Some(open.len())
     }
 
     /// Try to see if we can determine what a line is from examining the whole
@@ -894,6 +938,11 @@ impl SyntaxCounter {
                     self.shared.opener_pairs.allows(window[0], next)
                 });
             if may_open {
+                if let Some(len) = self.parse_markup_expression(window) {
+                    skip!(len);
+                    continue;
+                }
+
                 if let Some(len) = self.code_token(window) {
                     skip!(len);
                     continue;
@@ -984,6 +1033,10 @@ impl SyntaxCounter {
                 }
                 if window[0] == b'>' {
                     self.in_tag = false;
+                    continue;
+                }
+                if let Some(len) = self.parse_tag_block_comment(lines, i) {
+                    skip!(len);
                     continue;
                 }
             }
@@ -1619,17 +1672,50 @@ impl SyntaxCounter {
             }
         }
         trace!("Start hole {:?}", kind.open);
+        self.open_hole(kind.close, kind.nest, kind.language);
+        Some(kind.open.len())
+    }
+
+    /// Suspends the string being read, if any, for a hole up to `close`,
+    /// whose contents `language` reads, if given, instead of the host's.
+    fn open_hole(&mut self, close: &'static str, nest: u8, language: Option<LanguageType>) {
         self.holes.push(OpenHole {
             quote: self.quote.take(),
             quote_opener: std::mem::take(&mut self.quote_opener),
             quote_escape: self.quote_escape.take(),
             quote_is_verbatim: self.quote_is_verbatim,
-            close: kind.close,
-            nest: kind.nest,
+            close,
+            nest,
             depth: 0,
+            host: language.map(|_| self.shared.clone()),
+            in_tag: self.in_tag,
         });
         self.quote_is_verbatim = false;
-        Some(kind.open.len())
+        if let Some(language) = language {
+            self.in_tag = false;
+            self.shared = SharedMatchers::new(language);
+        }
+    }
+
+    /// Opens the markup expression at `window`, outside literals and
+    /// comments, whose contents the expression's language reads up to its
+    /// closer (Svelte, "Basic markup", text expressions and attributes).
+    fn parse_markup_expression(&mut self, window: &[u8]) -> Option<usize> {
+        let expressions = self.shared.markup_expressions?;
+        if !self.is_plain_mode()
+            || !window.starts_with(expressions.open.as_bytes())
+            || expressions.block_closer.is_some()
+                && window.get(expressions.open.len()).copied() == expressions.block_closer
+        {
+            return None;
+        }
+        trace!("Start markup expression {:?}", expressions.open);
+        self.open_hole(
+            expressions.close,
+            expressions.nest,
+            Some(expressions.language),
+        );
+        Some(expressions.open.len())
     }
 
     /// Inside a hole, outside its strings and comments, tracks nested brackets
@@ -1646,6 +1732,10 @@ impl SyntaxCounter {
             self.quote_opener = hole.quote_opener;
             self.quote_escape = hole.quote_escape;
             self.quote_is_verbatim = hole.quote_is_verbatim;
+            if let Some(host) = hole.host {
+                self.shared = host;
+                self.in_tag = hole.in_tag;
+            }
             return Some(hole.close.len());
         }
         if window[0] == hole.nest {
@@ -2074,6 +2164,17 @@ fn starts_tag(window: &[u8]) -> bool {
         && window
             .get(1)
             .is_some_and(|b| b.is_ascii_alphabetic() || b"/!?".contains(b))
+}
+
+/// Whether a comment may start after `before` in a tag: where an attribute
+/// may, after whitespace or another attribute's quoted value or expression,
+/// and not as an unquoted value after `=` (Svelte 5.53.0, `read_attribute`
+/// in `src/compiler/phases/1-parse/state/element.js`).
+fn may_start_tag_comment(before: &[u8]) -> bool {
+    before
+        .last()
+        .is_some_and(|b| b.is_ascii_whitespace() || b"\"'}".contains(b))
+        && before.iter().rev().find(|b| !b.is_ascii_whitespace()) != Some(&b'=')
 }
 
 /// The length of the template expression that starts `window`, such as

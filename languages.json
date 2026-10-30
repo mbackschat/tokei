@@ -1900,7 +1900,14 @@
       "extensions": ["styl"]
     },
     "Svelte": {
+      "markup_expressions": {"open": "{", "close": "}", "nest": "{", "language": "TypeScript", "block_closer": "/"},
+      "interpolations": [
+        {"quote": "\\\"", "open": "{", "close": "}", "nest": "{", "language": "TypeScript"},
+        {"quote": "'", "open": "{", "close": "}", "nest": "{", "language": "TypeScript"}
+      ],
       "quotes_in_tags": true,
+      "tag_line_comments": ["//"],
+      "tag_multi_line_comments": [["/*", "*/"]],
       "multi_line_comments": [["<!--", "-->"]],
       "important_syntax": ["<script", "<style"],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
