@@ -29,6 +29,7 @@ Dev tools for step 6 of Locmetry's [Tokei fork plan](https://github.com/mbacksch
 | Groovy | Groovy's own lexer, `GroovyLangLexer` from the Parrot parser (measured with Groovy 5.1.3); it turns comments into newline tokens or drops them, so they are read from those tokens and the text between tokens; `$name` and `${…}` interpolations are code | `… \| JUDGE_ROOT=DIR groovy/run.sh \| judgecmp stream Groovy`, which compiles and runs the judge in the `groovy` image with `DIR`, holding the paths, mounted |
 | JSON | `jsonc-parser` 3.3.1's scanner, the one VS Code reads JSON and JSON with Comments with; strict JSON is the subset without comments | `pnpm install` in `json/`, then `… \| node json/judge.mjs \| judgecmp stream JSON` |
 | TOML | `toml_parser` 1.1.5's lexer, under the `toml` crate (0.9.12) that Cargo reads manifests with; a file `toml` does not parse is invalid | `cargo build --release` in `toml/`, then `… \| toml/target/release/toml-judge \| judgecmp stream TOML` |
+| Dockerfile | BuildKit's Dockerfile parser, `github.com/moby/buildkit/frontend/dockerfile/parser` v0.34.1, for instructions, heredoc bodies and validity; a line starting with `#` is a comment, as the Dockerfile reference defines | build with `go build -o judge-linux .` in `dockerfile/`, as in the `golang:1.26` image, then `… \| dockerfile/judge-linux \| judgecmp stream Dockerfile` |
 | Python | CPython's `tokenize` (measured with 3.14) | `… \| python3 python/judge.py \| judgecmp stream Python` |
 | Lean | Lean 4.31.0's own lexer functions | see below |
 

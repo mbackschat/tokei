@@ -17,3 +17,4 @@ lua/judge-linux
 shell/judge-linux
 groovy/out/
 toml/target/
+dockerfile/judge-linux
