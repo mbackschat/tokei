@@ -30,3 +30,5 @@ The Lean judge checks Locmetry's own Lean counter, which counts Lean in place of
 ## Speed
 
 Every release must parse within 10% of upstream Tokei's time on each measured repository, as Locmetry's owner decided on 2026-10-30. `python3 speed/check.py ROOT...` builds the same in-memory benchmark against this working tree and against upstream's `v15.0.0` tag, runs both 15 times interleaved on each root, compares their minimum user CPU time, and exits with an error when any root exceeds the threshold. `--threshold`, `--runs` and `--base` change those defaults; builds are cached in `speed/target`.
+
+Upstream is given the string quotes listed in [baseline-quotes.json](speed/baseline-quotes.json) for languages whose upstream definition has none, so the check measures the fork's own overhead rather than the cost of reading strings at all; Locmetry's owner decided this on 2026-10-30, after upstream's quote-less Haskell made pandoc and cabal unreachable. Without the quotes, upstream analyses none of the lines holding strings, a quarter of cabal's Haskell lines and a third of pandoc's; with them, its own engine took 3.4 times as long on cabal's Haskell files.
