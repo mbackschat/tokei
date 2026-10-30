@@ -642,6 +642,18 @@ mod tests {
     }
 
     #[test]
+    fn an_m4_file_is_autoconf_when_it_uses_autoconf_or_m4sugar_macros() {
+        for (name, text) in [
+            ("ax_check.m4", "AC_DEFUN([AX_CHECK], [true])\n"),
+            ("version.m4", "m4_define([VERSION], [1.0])\n"),
+            ("prereq.m4", "AC_PREREQ([2.69])\n"),
+        ] {
+            assert_eq!(detect(name, text), Some(Autoconf), "{name}");
+        }
+        assert_eq!(detect("plain.m4", "define(`greet', `Hello')\n"), Some(M4));
+    }
+
+    #[test]
     fn an_inc_file_is_bitbake_only_with_bitbake_syntax() {
         for (name, text) in [
             ("a.inc", "SUMMARY = \"x\"\nLICENSE = \"MIT\"\n"),

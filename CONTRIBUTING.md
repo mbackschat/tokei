@@ -122,7 +122,9 @@ An extension that other formats share, such as `.spec` for RPM and
 PostgreSQL's isolation tests, goes in `content_checked_extensions`
 instead of `extensions`: a file with it is the language only when its
 text matches every listed pattern, read as multi-line Rust regular
-expressions, and is otherwise left unrecognized. Ground the patterns in
+expressions, and is otherwise left unrecognized, or given to a language
+that lists the extension in `extensions`, as `.m4` files without
+Autoconf's macros are M4. Ground the patterns in
 the language's own syntax, as GitHub Linguist's `heuristics.yml` does,
 and measure them on files of the formats that share the extension:
 

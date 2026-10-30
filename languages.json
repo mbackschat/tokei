@@ -121,7 +121,9 @@
     },
     "Autoconf": {
       "line_comment": ["#", "dnl"],
-      "filenames": ["configure.ac", "configure.in"]
+      "quote_like": "m4_brackets",
+      "filenames": ["configure.ac", "configure.in"],
+      "content_checked_extensions": {"m4": ["AC_DEFUN|AC_PREREQ|AC_INIT|^_?m4_"]}
     },
     "Autoit": {
       "line_comment": [";"],
@@ -1194,7 +1196,7 @@
     "M4": {
       "extensions": ["m4"],
       "line_comment": ["#", "dnl"],
-      "quotes": [["`", "'"]]
+      "quote_like": "m4"
     },
     "Madlang": {
       "extensions": ["mad"],

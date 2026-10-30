@@ -15,7 +15,7 @@ use super::dialects::rust::frontmatter_end;
 use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
-use super::dialects::{batch, elixir, haskell, make, perl, ruby};
+use super::dialects::{batch, elixir, haskell, m4, make, perl, ruby};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
@@ -352,6 +352,9 @@ impl SharedMatchers {
             Some(QuoteLikeSyntax::MakeReference) => {
                 opener_pairs.allow_any(b'$');
             }
+            Some(QuoteLikeSyntax::M4 { open, .. }) => {
+                opener_pairs.allow_any(open.as_bytes()[0]);
+            }
             Some(QuoteLikeSyntax::HaskellQuasiQuote) => {
                 for b in (b'a'..=b'z').chain(b'A'..=b'Z').chain(*b"_") {
                     opener_pairs.allow(b'[', b);
@@ -438,6 +441,7 @@ impl SharedMatchers {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
                     Some(QuoteLikeSyntax::RubyPercent) => vec!["%"],
                     Some(QuoteLikeSyntax::ElixirSigil) => vec!["~"],
+                    Some(QuoteLikeSyntax::M4 { open, .. }) => vec![open],
                     // Only files that turn quasi-quotes on search for their
                     // `|`, which `may_open_quasi_quote` does.
                     Some(QuoteLikeSyntax::HaskellQuasiQuote) | None => vec![],
@@ -1803,6 +1807,7 @@ impl SyntaxCounter {
                 haskell::quasi_quote_len(lines, i, || self.quasi_quoting(lines))
             }
             QuoteLikeSyntax::MakeReference => make::reference_len(lines, i),
+            QuoteLikeSyntax::M4 { open, close } => m4::quote_len(lines, i, open, close),
         }
     }
 

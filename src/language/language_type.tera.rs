@@ -353,7 +353,7 @@ impl LanguageType {
     pub(crate) fn quote_like(self) -> Option<crate::language::quote_like::QuoteLikeSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% elif value.quote_like is defined and value.quote_like == "elixir_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ElixirSigil){% elif value.quote_like is defined and value.quote_like == "haskell_quasi_quote" %}Some(crate::language::quote_like::QuoteLikeSyntax::HaskellQuasiQuote){% elif value.quote_like is defined and value.quote_like == "make_reference" %}Some(crate::language::quote_like::QuoteLikeSyntax::MakeReference){% else %}None{% endif %},
+                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% elif value.quote_like is defined and value.quote_like == "elixir_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ElixirSigil){% elif value.quote_like is defined and value.quote_like == "haskell_quasi_quote" %}Some(crate::language::quote_like::QuoteLikeSyntax::HaskellQuasiQuote){% elif value.quote_like is defined and value.quote_like == "make_reference" %}Some(crate::language::quote_like::QuoteLikeSyntax::MakeReference){% elif value.quote_like is defined and value.quote_like == "m4" %}Some(crate::language::quote_like::QuoteLikeSyntax::M4 { open: "`", close: "'" }){% elif value.quote_like is defined and value.quote_like == "m4_brackets" %}Some(crate::language::quote_like::QuoteLikeSyntax::M4 { open: "[", close: "]" }){% else %}None{% endif %},
             {% endfor %}
         }
     }
@@ -922,8 +922,10 @@ impl LanguageType {
         }
 
         match fsutils::get_extension(entry) {
-            Some(extension) => LanguageType::from_file_extension(extension.as_str())
-                .or_else(|| LanguageType::from_checked_extension(entry, &extension)),
+            // A checked extension's patterns decide before a language that
+            // claims the extension plainly, as Autoconf's macros do for `.m4`.
+            Some(extension) => LanguageType::from_checked_extension(entry, &extension)
+                .or_else(|| LanguageType::from_file_extension(extension.as_str())),
             None => LanguageType::from_shebang(entry),
         }
     }
