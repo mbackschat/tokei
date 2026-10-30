@@ -1,6 +1,7 @@
 //! The lexical rules that only one language, or one family of languages,
 //! has, kept apart from the engine's shared mechanisms in `syntax.rs`.
 
+pub(crate) mod commonmark;
 pub(crate) mod elixir;
 pub(crate) mod haskell;
 pub(crate) mod jsx;
