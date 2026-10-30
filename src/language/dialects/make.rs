@@ -1,13 +1,15 @@
 //! GNU make's references, line splices and `define` bodies, as GNU make
 //! 4.4.1's `src/read.c` reads them.
 
+use crate::language::syntax::{line_end, line_start};
+
 /// The length of the reference at `lines[i]`, whose `#` starts no comment
 /// (`find_map_unquote` with `MAP_VARIABLE`): `$(...)` or `${...}` up to the
 /// closer that balances its opener, counting that opener alone, or `$` and
-/// the byte after it, as in `$$` or `$@`. None where the logical line ends
-/// first.
+/// the byte after it, as in `$$` or `$@`. None where no `$` is at `lines[i]`
+/// or the logical line ends first.
 pub(crate) fn reference_len(lines: &[u8], i: usize) -> Option<usize> {
-    let open = *lines.get(i + 1)?;
+    let open = *lines[i..].strip_prefix(b"$")?.first()?;
     let close = match open {
         b'(' => b')',
         b'{' => b'}',
@@ -62,6 +64,13 @@ pub(crate) fn ends_in_splice(line: &[u8]) -> bool {
     line.iter().rev().take_while(|b| **b == b'\\').count() % 2 == 1
 }
 
+/// Whether the shell may read the logical line at `lines[start]`: a recipe
+/// line, which starts with a tab, or a line of a `define` body, which may
+/// become a recipe.
+pub(crate) fn shell_may_read(lines: &[u8], start: usize, defines: &mut Defines) -> bool {
+    lines.get(start) == Some(&b'\t') || defines.contain(lines, start)
+}
+
 /// How far a file's `define` bodies have been read, so that asking whether
 /// a line lies in one reads the file once. Scanning back to the start of the
 /// file for each continued comment instead took Linux's makefiles,
@@ -86,16 +95,18 @@ impl Defines {
         }
         // Only a line holding `def`, as `define` and `endef` do, can change
         // the depth, so the scan jumps from one to the next.
-        while let Some(at) =
-            memchr::memmem::find(&lines[self.read..start], b"def").map(|n| self.read + n)
-        {
-            let line_start = memchr::memrchr(b'\n', &lines[..at]).map_or(0, |n| n + 1);
-            let end = memchr::memchr(b'\n', &lines[at..]).map_or(lines.len(), |n| at + n);
-            self.depth = self.depth_after(&lines[line_start..end]);
-            self.read = (end + 1).min(start);
+        let from = self.read;
+        for at in memchr::memmem::find_iter(&lines[from..start], b"def").map(|n| from + n) {
+            // A second `def` on a line already read.
+            if at < self.read {
+                continue;
+            }
+            let end = line_end(lines, at);
+            self.depth = self.depth_after(&lines[line_start(lines, at)..end]);
+            self.read = end + 1;
         }
         self.read = start;
-        self.depth > 0 && self.depth_after(line_at(lines, start)) > 0
+        self.depth > 0 && self.depth_after(&lines[start..line_end(lines, start)]) > 0
     }
 
     fn depth_after(&self, line: &[u8]) -> usize {
@@ -117,9 +128,4 @@ impl Defines {
             _ => self.depth,
         }
     }
-}
-
-fn line_at(lines: &[u8], start: usize) -> &[u8] {
-    let end = memchr::memchr(b'\n', &lines[start..]).map_or(lines.len(), |n| start + n);
-    &lines[start..end]
 }

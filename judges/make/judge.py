@@ -45,6 +45,15 @@ CONDITIONAL_WORDS = {b"ifeq", b"ifneq", b"ifdef", b"ifndef", b"else", b"endif"}
 SHELL_OPERATORS = b";&|()<>"
 
 
+def backslashes_before(text, i, start):
+    """The length of the run of backslashes that ends before `text[i]` and
+    begins at `start` or later."""
+    run = 0
+    while i - run - 1 >= start and text[i - run - 1] == 0x5C:
+        run += 1
+    return run
+
+
 def logical_lines(text):
     """`readline`: the logical lines as (start, end) byte ranges, each end
     before its final newline."""
@@ -57,10 +66,7 @@ def logical_lines(text):
                 end = size
                 break
             body_end = newline - 1 if newline > start and text[newline - 1] == 0x0D else newline
-            backslashes = 0
-            while body_end - backslashes - 1 >= start and text[body_end - backslashes - 1] == 0x5C:
-                backslashes += 1
-            if backslashes % 2 == 0:
+            if backslashes_before(text, body_end, start) % 2 == 0:
                 end = newline
                 break
             end = newline + 1
@@ -98,12 +104,8 @@ def find_unquoted(text, start, end, stops):
         if byte == 0x24:
             i = skip_reference(text, i, end)
             continue
-        if byte in stops:
-            run = 0
-            while i - run - 1 >= start and text[i - run - 1] == 0x5C:
-                run += 1
-            if run % 2 == 0:
-                return i
+        if byte in stops and backslashes_before(text, i, start) % 2 == 0:
+            return i
         i += 1
     return None
 
@@ -154,6 +156,11 @@ class Judge:
         self.errors = 0
         self.prefix = 0x09
         self.in_rule = False
+
+    def comment_from(self, cut, end):
+        """The comment from `cut` to `end`, if a comment was cut."""
+        if cut is not None:
+            self.comments.append([cut, end])
 
     def shell(self, start, end):
         """A recipe from `start` to `end` read by the shell, with make's
@@ -243,27 +250,23 @@ class Judge:
         code, cut = collapsed_code(self.text, start, end)
         words = code.split()
         if not words:
-            if cut is not None:
-                self.comments.append([cut, end])
+            self.comment_from(cut, end)
             return False
         assignment, modifiers = is_assignment(code)
         if assignment:
             self.in_rule = False
-            if cut is not None:
-                self.comments.append([cut, end])
+            self.comment_from(cut, end)
             name_and_value = code.split(b"=", 1)
             if name_and_value[0].strip().rstrip(b":+?!").strip() == b".RECIPEPREFIX" and len(name_and_value) > 1:
                 value = name_and_value[1].lstrip()
                 self.prefix = value[0] if value else 0x09
             return b"define" in modifiers
         if words[0] in CONDITIONAL_WORDS:
-            if cut is not None:
-                self.comments.append([cut, end])
+            self.comment_from(cut, end)
             return False
         if words[0] in RULE_ENDING_WORDS:
             self.in_rule = False
-            if cut is not None:
-                self.comments.append([cut, end])
+            self.comment_from(cut, end)
             return False
         colon = find_unquoted(self.text, start, end, b":") is not None
         if self.text[start] == self.prefix:
@@ -274,8 +277,8 @@ class Judge:
         semicolon = find_unquoted(self.text, start, end, b";#")
         if semicolon is not None and self.text[semicolon] == ord(";"):
             self.shell(semicolon + 1, end)
-        elif cut is not None:
-            self.comments.append([cut, end])
+        else:
+            self.comment_from(cut, end)
         # A line whose references may expand to a rule, or that sits in a
         # branch make ignores, such as `$(error ...)` under `ifndef`, leaves
         # the rule context as it was: no valid makefile tells the two apart.
@@ -318,8 +321,7 @@ class Judge:
                         depth -= 1
                         if depth == 0:
                             cut = find_unquoted(text, start, end, b"#")
-                            if cut is not None:
-                                self.comments.append([cut, end])
+                            self.comment_from(cut, end)
                             continue
                 self.body_comments(start, end)
                 continue

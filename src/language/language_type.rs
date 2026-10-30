@@ -11,7 +11,7 @@ use crate::{
     config::Config,
     language::{
         dialects::markdown,
-        syntax::{FileContext, LanguageContext, LineClass, SyntaxCounter},
+        syntax::{line_end, FileContext, LanguageContext, LineClass, SyntaxCounter},
     },
     stats::{CodeStats, Report},
     utils::{ext::SliceExt, fs as fsutils},
@@ -539,15 +539,6 @@ impl LanguageType {
             }
         })
     }
-}
-
-/// The position of the line break that ends the line holding `lines[at]`,
-/// or the end of `lines`.
-fn line_end(lines: &[u8], at: usize) -> usize {
-    lines[at..]
-        .iter()
-        .position(|b| *b == b'\n')
-        .map_or(lines.len(), |n| at + n)
 }
 
 #[cfg(test)]

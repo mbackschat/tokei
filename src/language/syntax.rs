@@ -416,8 +416,8 @@ impl SharedMatchers {
                     // `|`, which `may_open_quasi_quote` does.
                     Some(QuoteLikeSyntax::HaskellQuasiQuote) | None => vec![],
                     // A make reference changes the class of no line but one
-                    // that a splice continues, which the splice's backslash
-                    // already sends to the full parse.
+                    // that a splice continues, which `make::needs_full_parse`
+                    // sends to the full parse.
                     Some(QuoteLikeSyntax::MakeReference) => vec![],
                 }
                 .into_iter()
@@ -1780,8 +1780,7 @@ impl SyntaxCounter {
             QuoteLikeSyntax::HaskellQuasiQuote => {
                 haskell::quasi_quote_len(lines, i, || self.quasi_quoting(lines))
             }
-            QuoteLikeSyntax::MakeReference if lines[i] == b'$' => make::reference_len(lines, i),
-            QuoteLikeSyntax::MakeReference => None,
+            QuoteLikeSyntax::MakeReference => make::reference_len(lines, i),
         }
     }
 
@@ -1901,6 +1900,18 @@ fn lang_language(lang: &[u8]) -> Option<LanguageType> {
     LanguageType::from_str(&lang)
         .ok()
         .or_else(|| LanguageType::from_file_extension(&lang))
+}
+
+/// The position of the newline that ends the line holding `lines[at]`, or
+/// the end of `lines`; `at` may lie past it.
+pub(crate) fn line_end(lines: &[u8], at: usize) -> usize {
+    let at = at.min(lines.len());
+    memchr::memchr(b'\n', &lines[at..]).map_or(lines.len(), |n| at + n)
+}
+
+/// The start of the line holding `lines[at]`.
+pub(crate) fn line_start(lines: &[u8], at: usize) -> usize {
+    memchr::memrchr(b'\n', &lines[..at]).map_or(0, |n| n + 1)
 }
 
 /// Whether nothing but spaces and tabs precede `lines[i]` on its line.

@@ -5,7 +5,7 @@
 //! the empty lines between them (§7.3.3). Their text is not syntax, so a `#`,
 //! a quote or a blank line in it is text.
 
-use crate::language::syntax::SyntaxCounter;
+use crate::language::syntax::{line_end, line_start, SyntaxCounter};
 use crate::utils::ext::SliceExt;
 
 /// The end of the content of the block scalar whose `|` or `>` indicator is
@@ -273,12 +273,6 @@ fn enclosing_indent(lines: &[u8], start: usize, indent: usize) -> Option<usize> 
         .find(|&i| i < indent)
 }
 
-/// The position of the newline that ends the line at `lines[start]`, or the
-/// end of `lines`.
-fn line_end(lines: &[u8], start: usize) -> usize {
-    memchr::memchr(b'\n', &lines[start..]).map_or(lines.len(), |n| start + n)
-}
-
 fn indent_of(line: &[u8]) -> usize {
     line.iter().take_while(|b| **b == b' ').count()
 }
@@ -303,7 +297,7 @@ impl SyntaxCounter {
         let Some(after) = self.shared.quotes_after else {
             return true;
         };
-        let line_start = memchr::memrchr(b'\n', &lines[..i]).map_or(0, |n| n + 1);
+        let line_start = line_start(lines, i);
         let before = &lines[line_start..i];
         let spaces = before
             .iter()

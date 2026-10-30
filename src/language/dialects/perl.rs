@@ -5,6 +5,7 @@
 //! (src/NQP/Grammar.nqp at Raku/nqp `e5e5a90`).
 
 use crate::language::quote_like::is_word_byte;
+use crate::language::syntax::line_end;
 use crate::utils::ext::SliceExt;
 
 /// Which language's POD rules apply.
@@ -97,14 +98,6 @@ fn end_after_line(lines: &[u8], from: usize, last: impl Fn(&[u8]) -> bool) -> us
         line_start = end + 1;
     }
     lines.len()
-}
-
-fn line_end(lines: &[u8], start: usize) -> usize {
-    let start = start.min(lines.len());
-    lines[start..]
-        .iter()
-        .position(|b| *b == b'\n')
-        .map_or(lines.len(), |n| start + n)
 }
 
 /// NQP's identifier characters, `\w` with the `-` and `'` that join words.

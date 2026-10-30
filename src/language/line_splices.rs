@@ -1,4 +1,5 @@
 use super::dialects::make;
+use super::syntax::{line_end, line_start};
 use crate::utils::ext::SliceExt;
 
 /// How a backslash before a newline splices two lines into one, so that a
@@ -15,8 +16,9 @@ pub(crate) enum LineSplices {
     /// with a tab or continue one that does, is the shell's, which ends at the
     /// newline (POSIX.1-2024, Shell Command Language, 2.3 Token Recognition);
     /// so is a comment in a `define` body, which may become a recipe; only
-    /// lines starting with `#` are comments in both readings. Unlike C's, its backslash is no blank symbol: elsewhere on a line it
-    /// quotes the next character, as in `\#`.
+    /// lines starting with `#` are comments in both readings. Unlike C's, its
+    /// backslash is no blank symbol: elsewhere on a line it quotes the next
+    /// character, as in `\#`.
     Make,
 }
 
@@ -36,38 +38,39 @@ impl LineSplices {
     pub(crate) fn comment_end(
         self,
         text: &[u8],
-        mut from: usize,
+        from: usize,
         defines: &mut make::Defines,
     ) -> usize {
-        if self == LineSplices::Make {
-            let line_end = memchr::memchr(b'\n', &text[from..]).map_or(text.len(), |n| from + n);
-            if !self.splices(&text[from..line_end]) {
-                return line_end;
-            }
-            // A `define` body may be read as a recipe; the scan for its
-            // `define` runs only for the rare comment that a splice continues.
-            let start = self.logical_line_start(text, from);
-            if text.get(start) == Some(&b'\t') || defines.contain(text, start) {
-                return line_end;
+        let mut end = line_end(text, from);
+        if !self.splices(&text[from..end]) {
+            return end;
+        }
+        match self {
+            LineSplices::C => {}
+            // The scan for a `define` runs only for the rare comment that a
+            // splice continues.
+            LineSplices::Make => {
+                if make::shell_may_read(text, self.logical_line_start(text, from), defines) {
+                    return end;
+                }
             }
         }
-        loop {
-            let Some(newline) = memchr::memchr(b'\n', &text[from..]).map(|n| from + n) else {
-                return text.len();
-            };
-            if !self.splices(&text[from..newline]) {
-                return newline;
+        while end < text.len() {
+            let next = end + 1;
+            end = line_end(text, next);
+            if !self.splices(&text[next..end]) {
+                break;
             }
-            from = newline + 1;
         }
+        end
     }
 
     /// The start of the first line of those that splices join into the one
     /// holding `text[at]`.
     fn logical_line_start(self, text: &[u8], at: usize) -> usize {
-        let mut start = memchr::memrchr(b'\n', &text[..at]).map_or(0, |n| n + 1);
+        let mut start = line_start(text, at);
         while start > 0 {
-            let previous = memchr::memrchr(b'\n', &text[..start - 1]).map_or(0, |n| n + 1);
+            let previous = line_start(text, start - 1);
             if !self.splices(&text[previous..start - 1]) {
                 break;
             }
