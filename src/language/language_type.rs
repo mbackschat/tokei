@@ -9,7 +9,10 @@ use std::{
 
 use crate::{
     config::Config,
-    language::syntax::{FileContext, LanguageContext, LineClass, SyntaxCounter},
+    language::{
+        dialects::markdown,
+        syntax::{FileContext, LanguageContext, LineClass, SyntaxCounter},
+    },
     stats::{CodeStats, Report},
     utils::{ext::SliceExt, fs as fsutils},
 };
@@ -299,6 +302,9 @@ impl LanguageType {
         mut counted: Range<usize>,
         on_line: &mut impl FnMut(LineReport<'_>),
     ) -> CodeStats {
+        if matches!(self, Markdown | UnrealDeveloperMarkdown) {
+            return markdown::parse(config, lines, stats, counted, on_line);
+        }
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
 
         while let Some((start, end)) = stepper.next(lines) {
@@ -355,12 +361,6 @@ impl LanguageType {
                             stats: blob,
                         }) => {
                             match language {
-                                LanguageContext::Markdown { balanced, language } => {
-                                    // Add the lines for the code fences.
-                                    stats.comments += if balanced { 2 } else { 1 };
-                                    // Add the code inside the fence to the stats.
-                                    *stats.blobs.entry(language).or_default() += blob;
-                                }
                                 LanguageContext::LinguaFranca => {
                                     let child_lang = syntax.get_lf_target_language();
                                     *stats.blobs.entry(child_lang).or_default() += blob;

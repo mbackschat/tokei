@@ -9,7 +9,6 @@ use super::blank_symbols::BlankSymbols;
 use super::dialects::haskell::CodePragmas;
 use super::dialects::haskell::QuasiQuoting;
 use super::dialects::jsx::JsxFrame;
-use super::dialects::markdown::FencedBlock;
 use super::dialects::perl::{pod_block_end, PodSyntax};
 use super::dialects::php::CodeTags;
 use super::dialects::rust::frontmatter_end;
@@ -79,9 +78,6 @@ pub(crate) struct SyntaxCounter {
     /// The delimiters of the dollar-quoted bodies read as SQL at this point,
     /// innermost last.
     pub(crate) dollar_bodies: Vec<Vec<u8>>,
-    /// Markdown's fenced code blocks, found at the first line that may open
-    /// one.
-    pub(crate) fenced_blocks: Option<Vec<FencedBlock>>,
     /// The JSX elements and expressions open at this point, innermost last.
     pub(crate) jsx: Vec<JsxFrame>,
     pub(crate) quote_is_doc_quote: bool,
@@ -120,10 +116,6 @@ pub(crate) enum LanguageContext {
         start: usize,
     },
     LinguaFranca,
-    Markdown {
-        balanced: bool,
-        language: LanguageType,
-    },
 }
 
 #[derive(Clone, Debug)]
@@ -551,7 +543,6 @@ impl SyntaxCounter {
             flow_depth: 0,
             in_tag: false,
             dollar_bodies: Vec::new(),
-            fenced_blocks: None,
             jsx: Vec::new(),
             line_has_code: false,
         }
@@ -839,9 +830,6 @@ impl SyntaxCounter {
         end: usize,
         config: &Config,
     ) -> AnalysisReport {
-        if let Some(child) = self.parse_fenced_block(lines, start, config) {
-            return AnalysisReport::ChildLanguage(child);
-        }
         let mut ended_with_comments = false;
         let regex_cache = RegexCache::build(self.shared.language, lines, start, end);
         let embeds = regex_cache.family().is_some();
