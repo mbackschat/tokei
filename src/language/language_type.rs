@@ -321,6 +321,9 @@ impl LanguageType {
             syntax.continues_line = splices_continue_lines
                 && previous.is_some_and(|previous| LineSplices::C.splices(&lines[previous..start]));
             previous = Some(start);
+            if syntax.shared.quotes_close_at_line_end && syntax.quote.is_some() {
+                syntax.end_quote();
+            }
             let before = (stats.code, stats.comments, stats.blanks);
             let mut embedded = false;
             let mut element = None;

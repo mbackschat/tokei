@@ -17,7 +17,7 @@ use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
 use super::dialects::CommentLiterals;
 use super::dialects::{
-    batch, elixir, erlang, fortran, haskell, julia, m4, make, perl, ruby, visual_basic,
+    batch, elixir, erlang, fortran, haskell, julia, m4, make, masm, perl, ruby, visual_basic,
 };
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
@@ -151,6 +151,8 @@ pub(crate) struct SharedMatchers {
     pub preprocessor_directives: &'static [&'static str],
     pub line_comment_flags: &'static [u8],
     pub batch_remarks: bool,
+    pub masm_comments: bool,
+    pub quotes_close_at_line_end: bool,
     pub rem_comments: bool,
     pub comment_literals: Option<CommentLiterals>,
     pub postfix_primes: bool,
@@ -533,6 +535,8 @@ impl SharedMatchers {
             preprocessor_directives: language.preprocessor_directives(),
             line_comment_flags: language.line_comment_flags(),
             batch_remarks: language.batch_remarks(),
+            masm_comments: language.masm_comments(),
+            quotes_close_at_line_end: language.quotes_close_at_line_end(),
             rem_comments: language.rem_comments(),
             comment_literals: language.comment_literals(),
             postfix_primes: language.postfix_primes(),
@@ -734,6 +738,13 @@ impl SyntaxCounter {
                 trace!("Start frontmatter, ends at {}", frontmatter_end);
                 self.literal_end = frontmatter_end;
                 return Some(LineClass::Code);
+            }
+        }
+        if self.shared.masm_comments {
+            if let Some(end) = masm::comment_block_end(lines, start) {
+                trace!("Start a COMMENT block, ends at {}", end);
+                self.comment_end = end;
+                return Some(LineClass::Comment);
             }
         }
         if let Some(syntax) = self.shared.pod {
@@ -1666,11 +1677,7 @@ impl SyntaxCounter {
                 return Some(len * 2);
             }
             trace!("End {:?}", quote);
-            self.quote = None;
-            self.quote_escape = None;
-            self.quote_closes_at_line_start = false;
-            self.quote_opener = "";
-            self.quote_is_verbatim = false;
+            self.end_quote();
             Some(len)
         } else if let Some(len) = self.string_gap_len(lines, i) {
             Some(len)
@@ -1714,6 +1721,15 @@ impl SyntaxCounter {
         } else {
             None
         }
+    }
+
+    /// Leaves the literal being read.
+    pub(crate) fn end_quote(&mut self) {
+        self.quote = None;
+        self.quote_escape = None;
+        self.quote_closes_at_line_start = false;
+        self.quote_opener = "";
+        self.quote_is_verbatim = false;
     }
 
     /// Length of the `closer` that `window` starts with, its leading quote

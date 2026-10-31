@@ -92,7 +92,10 @@
     },
     "Assembly": {
       "line_comment": [";"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "verbatim_quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes": [["`", "`"]],
+      "quotes_close_at_line_end": true,
+      "masm_comments": true,
       "extensions": ["asm"]
     },
     "AssemblyGAS": {

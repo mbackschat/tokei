@@ -489,6 +489,26 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether MASM's `COMMENT` directive opens a block comment, as
+    /// `masm::comment_block_end` reads it.
+    pub(crate) fn masm_comments(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.masm_comments | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
+    /// Returns whether a string that does not close on its line ends with
+    /// the line, as NASM reads one.
+    pub(crate) fn quotes_close_at_line_end(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.quotes_close_at_line_end | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether a line whose first command is cmd.exe's `rem` is a
     /// comment, as `batch::starts_remark` reads it.
     pub(crate) fn batch_remarks(self) -> bool {
