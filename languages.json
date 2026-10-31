@@ -2341,6 +2341,8 @@
     "Zig": {
       "line_comment": ["//"],
       "quotes": [["\\\"", "\\\""]],
+      "character_literals": [["'", "'"]],
+      "quotes_close_at_line_end": true,
       "extensions": ["zig"]
     },
     "Zokrates": {
