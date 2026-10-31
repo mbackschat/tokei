@@ -104,7 +104,9 @@ fn whitespace(language: LanguageType) -> fn(char) -> bool {
         // Translation phase 2 deletes each backslash before a newline (C23
         // §5.1.1.2), and the clang judge leaves these splices outside its
         // tokens; elsewhere in valid code a backslash occurs only in literals.
-        C | CHeader | Cpp | CppHeader | ObjectiveC | ObjectiveCpp => {
+        // The preprocessor reads GNU-style assembly first, and a macro
+        // argument's backslash, as in `\reg`, is never alone on its line.
+        C | CHeader | Cpp | CppHeader | ObjectiveC | ObjectiveCpp | AssemblyGAS => {
             |c: char| c.is_ascii_whitespace() || c == '\u{000B}' || c == '\\'
         }
         _ => |c: char| c.is_ascii_whitespace() || c == '\u{000B}',
