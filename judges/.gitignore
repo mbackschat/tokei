@@ -31,3 +31,5 @@ cue/judge-linux
 bicep/out/
 bicep/obj/
 bicep/bin/
+freemarker/lib/
+freemarker/out/
