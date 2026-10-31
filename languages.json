@@ -814,8 +814,8 @@
       "extensions": ["haml"]
     },
     "Hamlet": {
+      "line_start_comments": ["$#"],
       "multi_line_comments": [["<!--", "-->"]],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["hamlet"]
     },
     "Happy": {

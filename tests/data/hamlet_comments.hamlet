@@ -1,0 +1,9 @@
+$# 9 lines 3 code 5 comments 1 blanks
+<p>Don't panic
+
+<!-- an HTML comment
+     spanning lines -->
+<p>after <!-- a comment --> text
+  $# an indented comment
+<a href="x">$#{n}
+<!-- one --> <!-- two -->
