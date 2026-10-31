@@ -1011,7 +1011,11 @@
     "Julia": {
       "line_comment": ["#"],
       "multi_line_comments": [["#=", "=#"]],
-      "quotes": [["\\\"", "\\\""], ["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
+      "quotes": [["r\\\"\\\"\\\"", "\\\"\\\"\\\""], ["r\\\"", "\\\""], ["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["\\\"", "\\\""], ["```", "```"], ["`", "`"]],
+      "interpolations": [{"quote": "\\\"\\\"\\\"", "open": "$(", "close": ")", "nest": "("}, {"quote": "\\\"", "open": "$(", "close": ")", "nest": "("}, {"quote": "```", "open": "$(", "close": ")", "nest": "("}, {"quote": "`", "open": "$(", "close": ")", "nest": "("}],
+      "identifier_quote_prefix": "r",
+      "character_literals": [["'", "'"]],
+      "postfix_primes": true,
       "nested": true,
       "extensions": ["jl"]
     },

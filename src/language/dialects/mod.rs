@@ -7,6 +7,7 @@ pub(crate) mod elixir;
 pub(crate) mod fsharp;
 pub(crate) mod haskell;
 pub(crate) mod jsx;
+pub(crate) mod julia;
 pub(crate) mod m4;
 pub(crate) mod make;
 pub(crate) mod markdown;

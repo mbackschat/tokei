@@ -513,6 +513,17 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether a character literal's opener directly after an
+    /// operand is a postfix operator instead, as `julia::follows_operand`
+    /// reads it.
+    pub(crate) fn postfix_primes(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.postfix_primes | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether a block comment reads strings and character literals
     /// as text, as `fsharp::comment_literal_len` reads them.
     pub(crate) fn comment_literals(self) -> bool {

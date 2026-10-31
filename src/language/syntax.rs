@@ -15,7 +15,7 @@ use super::dialects::rust::frontmatter_end;
 use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
-use super::dialects::{batch, elixir, fsharp, haskell, m4, make, perl, ruby, visual_basic};
+use super::dialects::{batch, elixir, fsharp, haskell, julia, m4, make, perl, ruby, visual_basic};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
@@ -139,6 +139,7 @@ pub(crate) struct SharedMatchers {
     pub batch_remarks: bool,
     pub rem_comments: bool,
     pub comment_literals: bool,
+    pub postfix_primes: bool,
     pub xml_literals: bool,
     pub line_start_closers: &'static [&'static str],
     pub pod: Option<PodSyntax>,
@@ -489,6 +490,7 @@ impl SharedMatchers {
             batch_remarks: language.batch_remarks(),
             rem_comments: language.rem_comments(),
             comment_literals: language.comment_literals(),
+            postfix_primes: language.postfix_primes(),
             xml_literals: language.xml_literals(),
             line_start_closers: language.line_start_closers(),
             pod: language.pod(),
@@ -1038,7 +1040,7 @@ impl SyntaxCounter {
                     continue;
                 }
 
-                if let Some(skip_amount) = self.parse_character_literal(window) {
+                if let Some(skip_amount) = self.parse_character_literal(lines, i) {
                     skip!(skip_amount);
                     continue;
                 }
@@ -1537,10 +1539,12 @@ impl SyntaxCounter {
     /// the closing delimiter on the same line, or exactly one character. Any
     /// other opener, such as a Rust lifetime `'a`, is not a literal and stays
     /// code, so a literal can never carry string state to the next line.
-    pub(crate) fn parse_character_literal(&self, window: &[u8]) -> Option<usize> {
-        if !self.is_plain_mode() {
+    pub(crate) fn parse_character_literal(&self, lines: &[u8], i: usize) -> Option<usize> {
+        if !self.is_plain_mode() || (self.shared.postfix_primes && julia::follows_operand(lines, i))
+        {
             return None;
         }
+        let window = &lines[i..];
         let (start, end) = self
             .shared
             .character_literals
