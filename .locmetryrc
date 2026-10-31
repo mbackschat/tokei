@@ -1,0 +1,60 @@
+version = 1
+
+# LOCmetry's policy for measuring this fork (https://github.com/mbackschat/locmetry).
+# Category names come from the category reference (locmetry --guide categories).
+#
+# Cargo inference makes src/ production and the test-directory convention
+# makes tests/ tests. Tokei's own .tokeignore keeps tests/data out: its
+# fixtures are counting input in over a hundred languages, not test code, and
+# the tests that read them are generated at build time, so Test/prod stays
+# near zero by design. Rules decide what no convention can, and come before
+# the module inference that would make each judge's own go.mod, Cargo.toml or
+# project file product code. Every entry records its evidence as `reason`.
+
+[[rules]]
+id = "build-script"
+match = ["build.rs"]
+kind = ["source"]
+purpose = "production"
+category = "build-tooling"
+reason = "Generates the language tables from languages.json at every build"
+
+[[rules]]
+id = "judges"
+match = ["judges/**"]
+kind = ["source"]
+purpose = "production"
+category = "verification-tooling"
+reason = "Each judge reads files with a language's own lexer or parser and scores the fork's counts against it; the speed gate times both counters. See judges/README.md"
+
+[[rules]]
+id = "upstream-ci"
+match = ["ci/**"]
+kind = ["source"]
+purpose = "production"
+category = "verification-tooling"
+reason = "Upstream's CI scripts, which build and test each target"
+
+[[rules]]
+id = "fuzz-targets"
+match = ["fuzz/fuzz_targets/**"]
+kind = ["source"]
+purpose = "test"
+category = "fuzz"
+reason = "cargo-fuzz targets, declared as binaries in fuzz/Cargo.toml"
+
+[[rules]]
+id = "benchmark"
+match = ["benchmark.sh"]
+kind = ["source"]
+purpose = "test"
+category = "performance"
+reason = "Upstream's benchmark of Tokei against other counters"
+
+[[rules]]
+id = "spike"
+match = ["locmetry-spike/**"]
+kind = ["source"]
+purpose = "other"
+category = "archived"
+reason = "The 2026-10-28/29 spike material, preserved unchanged; see locmetry-spike/README.md"
