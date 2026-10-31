@@ -93,6 +93,9 @@ pub(crate) struct SyntaxCounter {
     pub(crate) lf_embedded_language: Option<LanguageType>,
     /// Whether the file is read in Fortran's fixed source form.
     pub(crate) fixed_form: bool,
+    /// Whether the file's `nested_comments` nest, which only a Pascal file
+    /// may not.
+    pub(crate) comments_nest: bool,
     /// Whether a non-blank byte of the line being read lies outside every
     /// comment, which makes the line code.
     pub(crate) line_has_code: bool,
@@ -627,6 +630,7 @@ impl SyntaxCounter {
             stack: Vec::with_capacity(1),
             lf_embedded_language: None,
             fixed_form: language.fixed_form(),
+            comments_nest: true,
             quote: None,
             quote_escape: None,
             quote_closes_at_line_start: false,
@@ -1203,8 +1207,8 @@ impl SyntaxCounter {
             else {
                 return false;
             };
-            let nests =
-                self.shared.allows_nested || self.shared.nested_comments.contains(&(start, end));
+            let nests = self.shared.allows_nested
+                || (self.comments_nest && self.shared.nested_comments.contains(&(start, end)));
             match block_comment_len(text, start, end, nests) {
                 Some(len) => text = &text[len..],
                 None => return true,
@@ -1956,11 +1960,15 @@ impl SyntaxCounter {
         for &(start, end) in iter {
             // Inside a comment that does not nest, an opener means nothing,
             // so it must not hide a closer it overlaps, as `<!-->` closes an
-            // HTML comment and `/*/` a C one.
+            // HTML comment and `/*/` a C one. A comment that nests nests only
+            // in its own kind, as D's `/+` is text in a `/* */` comment
+            // (D spec, Lexical, Comments) and Pascal's `(*` in a `{ }` one.
             if window.starts_with(start.as_bytes())
                 && (self.stack.is_empty()
                     || self.shared.allows_nested
-                    || self.shared.nested_comments.contains(&(start, end)))
+                    || (self.comments_nest
+                        && self.shared.nested_comments.contains(&(start, end))
+                        && self.stack.last().is_some_and(|closer| closer == end)))
             {
                 self.stack.push(Cow::Borrowed(end));
 

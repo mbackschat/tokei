@@ -10,7 +10,7 @@ use std::{
 use crate::{
     config::Config,
     language::{
-        dialects::{fortran, markdown, rpm},
+        dialects::{fortran, markdown, pascal, rpm},
         syntax::{line_end, FileContext, LanguageContext, LineClass, SyntaxCounter},
     },
     stats::{CodeStats, Report},
@@ -507,7 +507,8 @@ impl LanguageType {
 
     /// The syntax counter for reading `text` as this language, with the
     /// settings its content decides: the target language of a LinguaFranca
-    /// file, and the source form of a fixed-form Fortran one.
+    /// file, the source form of a fixed-form Fortran one, and whether the
+    /// comments of a Pascal one nest.
     fn syntax_counter_for(self, text: &[u8]) -> SyntaxCounter {
         let mut syntax = SyntaxCounter::new(self);
         if self == LinguaFranca {
@@ -515,6 +516,9 @@ impl LanguageType {
         }
         if syntax.fixed_form {
             syntax.fixed_form = !fortran::is_free_form(text);
+        }
+        if self == Pascal {
+            syntax.comments_nest = pascal::nested_comments_close(text);
         }
         syntax
     }

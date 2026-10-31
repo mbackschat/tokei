@@ -1440,10 +1440,10 @@
       "extensions": ["pan", "tpl"]
     },
     "Pascal": {
-      "nested": true,
       "line_comment": ["//"],
-      "multi_line_comments": [["{", "}"], ["(*", "*)"]],
-      "quotes": [["'", "'"]],
+      "nested_comments": [["{", "}"], ["(*", "*)"]],
+      "verbatim_quotes": [["'", "'"]],
+      "doubled_quote_escapes": ["'"],
       "extensions": ["pas"]
     },
     "Perl": {

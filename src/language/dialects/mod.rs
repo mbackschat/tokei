@@ -14,6 +14,7 @@ pub(crate) mod m4;
 pub(crate) mod make;
 pub(crate) mod markdown;
 pub(crate) mod ocaml;
+pub(crate) mod pascal;
 pub(crate) mod perl;
 pub(crate) mod php;
 pub(crate) mod rpm;
