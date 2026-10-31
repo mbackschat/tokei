@@ -2185,8 +2185,12 @@
     },
     "VisualBasic": {
       "name": "Visual Basic",
-      "quotes": [["\\\"", "\\\""]],
+      "backslash_operator": true,
+      "verbatim_quotes": [["\\\"", "\\\""]],
+      "doubled_quote_escapes": ["\\\""],
       "line_comment": ["'"],
+      "rem_comments": true,
+      "xml_literals": true,
       "extensions": ["vb"]
     },
     "VisualStudioProject": {

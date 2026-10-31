@@ -16,4 +16,5 @@ pub(crate) mod ruby;
 pub(crate) mod rust;
 pub(crate) mod sql;
 pub(crate) mod svelte;
+pub(crate) mod visual_basic;
 pub(crate) mod yaml;

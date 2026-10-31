@@ -15,7 +15,7 @@ use super::dialects::rust::frontmatter_end;
 use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
-use super::dialects::{batch, elixir, haskell, m4, make, perl, ruby};
+use super::dialects::{batch, elixir, haskell, m4, make, perl, ruby, visual_basic};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
@@ -137,6 +137,8 @@ pub(crate) struct SharedMatchers {
     pub line_start_comments: &'static [&'static str],
     pub line_comment_flags: &'static [u8],
     pub batch_remarks: bool,
+    pub rem_comments: bool,
+    pub xml_literals: bool,
     pub line_start_closers: &'static [&'static str],
     pub pod: Option<PodSyntax>,
     pub code_tags: Option<CodeTags>,
@@ -227,6 +229,7 @@ impl SharedMatchers {
                 .line_comments
                 .iter()
                 .any(|c| line.starts_with(c.as_bytes()))
+            || (self.rem_comments && visual_basic::starts_rem(line, 0))
             || self.starts_with_line_start_comment(line)
         {
             LineClass::Comment
@@ -327,6 +330,14 @@ impl SharedMatchers {
         if language.question_mark_characters().is_some() {
             opener_pairs.allow_any(b'?');
         }
+        if language.xml_literals() {
+            opener_pairs.allow_any(b'<');
+        }
+        if language.rem_comments() {
+            for (first, second) in [(b'R', b'E'), (b'R', b'e'), (b'r', b'E'), (b'r', b'e')] {
+                opener_pairs.allow(first, second);
+            }
+        }
         if language.regex_keywords().is_some() {
             opener_pairs.allow_any(b'/');
         }
@@ -421,6 +432,8 @@ impl SharedMatchers {
             .chain(language.heredocs().iter().map(|h| h.start.to_owned()))
             .chain((language.jsx() || language.quotes_in_tags()).then(|| "<".to_owned()))
             .chain(language.pod().is_some().then(|| "=".to_owned()))
+            // An XML literal decides the lines it spans.
+            .chain(language.xml_literals().then(|| "<".to_owned()))
             .chain(
                 language
                     .code_tags()
@@ -473,6 +486,8 @@ impl SharedMatchers {
             line_start_comments: language.line_start_comments(),
             line_comment_flags: language.line_comment_flags(),
             batch_remarks: language.batch_remarks(),
+            rem_comments: language.rem_comments(),
+            xml_literals: language.xml_literals(),
             line_start_closers: language.line_start_closers(),
             pod: language.pod(),
             code_tags: language.code_tags(),
@@ -809,6 +824,9 @@ impl SyntaxCounter {
         {
             trace!("Start {:?}", comment);
             true
+        } else if self.shared.rem_comments && visual_basic::starts_rem(lines, i) {
+            trace!("Start a REM comment");
+            true
         // Only comments may come before it on the line, as before an HTML-like
         // `-->` (ECMA-262 Annex B.1.1, HTMLCloseComment).
         } else if !self.line_has_code && self.shared.starts_with_line_start_comment(window) {
@@ -1061,6 +1079,10 @@ impl SyntaxCounter {
 
             if let Some(len) = self.text_section_len(lines, i) {
                 literal!(len, "text section", true);
+            }
+
+            if let Some(len) = self.xml_literal_len(lines, i) {
+                literal!(len, "XML literal", true);
             }
 
             match self.dollar_quote(lines, i) {
@@ -1830,6 +1852,17 @@ impl SyntaxCounter {
                 + memchr::memmem::find(text, close.as_bytes())
                     .map_or(text.len(), |at| at + close.len()),
         )
+    }
+
+    /// Length of the XML literal at `lines[i]`, outside comments, whose text
+    /// counts as text literals' does.
+    fn xml_literal_len(&self, lines: &[u8], i: usize) -> Option<usize> {
+        (self.shared.xml_literals
+            && lines[i] == b'<'
+            && self.stack.is_empty()
+            && visual_basic::expression_may_start(lines, i))
+        .then(|| visual_basic::xml_literal_len(lines, i))
+        .flatten()
     }
 
     /// The syntax that tells where an expression may start, for languages

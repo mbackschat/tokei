@@ -503,6 +503,26 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether `REM` opens a line comment wherever a token starts, as
+    /// `visual_basic::starts_rem` reads it.
+    pub(crate) fn rem_comments(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.rem_comments | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
+    /// Returns whether a `<` where an expression may start opens an XML
+    /// literal, as `visual_basic::xml_literal_len` reads it.
+    pub(crate) fn xml_literals(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.xml_literals | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns the bytes that, with blanks among them, may come before a line
     /// comment at the start of a line and belong to it, as make's recipe
     /// flags `@`, `-` and `+` do (`start_job_command` in GNU make 4.4.1's
