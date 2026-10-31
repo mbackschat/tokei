@@ -98,6 +98,9 @@
     "AssemblyGAS": {
       "name": "GNU Style Assembly",
       "line_comment": ["//"],
+      "line_start_comments": ["#", "@", "!"],
+      "line_splices": "c",
+      "preprocessor_directives": ["define", "undef", "include", "include_next", "import", "if", "ifdef", "ifndef", "elif", "elifdef", "elifndef", "else", "endif", "error", "warning", "pragma", "line", "ident", "sccs", "assert", "unassert"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""]],
       "extensions": ["s"]

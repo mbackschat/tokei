@@ -11,6 +11,7 @@ use crate::{
     config::Config,
     language::{
         dialects::{cobol, fortran, markdown, pascal, rpm},
+        line_splices::LineSplices,
         syntax::{line_end, FileContext, LanguageContext, LineClass, SyntaxCounter},
     },
     stats::{CodeStats, Report},
@@ -312,8 +313,14 @@ impl LanguageType {
             return cobol::parse(config, lines, stats, counted, on_line);
         }
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
+        let splices_continue_lines = syntax.shared.line_splices == Some(LineSplices::C)
+            && !syntax.shared.line_start_comments.is_empty();
+        let mut previous = None;
 
         while let Some((start, end)) = stepper.next(lines) {
+            syntax.continues_line = splices_continue_lines
+                && previous.is_some_and(|previous| LineSplices::C.splices(&lines[previous..start]));
+            previous = Some(start);
             let before = (stats.code, stats.comments, stats.blanks);
             let mut embedded = false;
             let mut element = None;

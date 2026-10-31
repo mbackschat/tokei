@@ -99,6 +99,10 @@ pub(crate) struct SyntaxCounter {
     /// Whether a non-blank byte of the line being read lies outside every
     /// comment, which makes the line code.
     pub(crate) line_has_code: bool,
+    /// Whether a line splice joins the line being read to the one before, so
+    /// that it starts no line-start comment: the preprocessor reads the two
+    /// as one line.
+    pub(crate) continues_line: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -144,6 +148,7 @@ pub(crate) struct SharedMatchers {
     pub is_literate: bool,
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
+    pub preprocessor_directives: &'static [&'static str],
     pub line_comment_flags: &'static [u8],
     pub batch_remarks: bool,
     pub rem_comments: bool,
@@ -262,15 +267,44 @@ impl SharedMatchers {
                 .count(),
         };
         let flagless = &text[flags..];
-        self.line_start_comments
+        (self
+            .line_start_comments
             .iter()
             .any(|c| flagless.starts_with(c.as_bytes()))
+            && !self.starts_with_directive(flagless))
             || (self.batch_remarks && batch::starts_remark(flagless))
             || (flags > 0
                 && self
                     .line_comments
                     .iter()
                     .any(|c| flagless.starts_with(c.as_bytes())))
+    }
+
+    /// Whether `text` starts a C preprocessor directive: a `#` and, after
+    /// any spaces and tabs, the end of the line, as the null directive does,
+    /// or a directive's name. Its name is matched in its own case, so that
+    /// `# If nonzero` stays a comment, and `# 4` is no line marker in an
+    /// assembly file (clang `Preprocessor::HandleDirective`).
+    fn starts_with_directive(&self, text: &[u8]) -> bool {
+        if self.preprocessor_directives.is_empty() {
+            return false;
+        }
+        let Some(rest) = text.strip_prefix(b"#") else {
+            return false;
+        };
+        let rest = &rest[rest
+            .iter()
+            .take_while(|b| matches!(b, b' ' | b'\t'))
+            .count()..];
+        let len = rest
+            .iter()
+            .take_while(|b| b.is_ascii_alphanumeric() || **b == b'_')
+            .count();
+        matches!(rest.first(), None | Some(b'\n' | b'\r'))
+            || self
+                .preprocessor_directives
+                .iter()
+                .any(|d| d.as_bytes() == &rest[..len])
     }
 
     pub fn new(language: LanguageType) -> Arc<Self> {
@@ -496,6 +530,7 @@ impl SharedMatchers {
             any_comments: language.any_comments(),
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
+            preprocessor_directives: language.preprocessor_directives(),
             line_comment_flags: language.line_comment_flags(),
             batch_remarks: language.batch_remarks(),
             rem_comments: language.rem_comments(),
@@ -648,6 +683,7 @@ impl SyntaxCounter {
             jsx: Vec::new(),
             make_defines: make::Defines::default(),
             line_has_code: false,
+            continues_line: false,
         }
     }
 
@@ -853,7 +889,10 @@ impl SyntaxCounter {
             true
         // Only comments may come before it on the line, as before an HTML-like
         // `-->` (ECMA-262 Annex B.1.1, HTMLCloseComment).
-        } else if !self.line_has_code && self.shared.starts_with_line_start_comment(window) {
+        } else if !self.line_has_code
+            && !self.continues_line
+            && self.shared.starts_with_line_start_comment(window)
+        {
             trace!("Start a comment at the start of a line");
             true
         } else if self.in_tag
@@ -908,6 +947,7 @@ impl SyntaxCounter {
                 .as_ref()
                 .is_some_and(|syntax| syntax.is_match(line))
             || (self.shared.line_splices == Some(LineSplices::Make) && make::needs_full_parse(line))
+            || self.continues_line
             || self.may_open_quasi_quote(lines, line)
             || self.opens_flow_collection(line)
             || (self.shared.block_scalars && may_start_block_scalar(line))

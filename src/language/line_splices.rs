@@ -80,7 +80,7 @@ impl LineSplices {
     }
 
     /// Whether `line`, without its newline, ends in a splice.
-    fn splices(self, line: &[u8]) -> bool {
+    pub(crate) fn splices(self, line: &[u8]) -> bool {
         match self {
             LineSplices::C => line.trim_end().ends_with(b"\\"),
             LineSplices::Make => make::ends_in_splice(line),
