@@ -10,7 +10,7 @@ use std::{
 use crate::{
     config::Config,
     language::{
-        dialects::{bitbake, cobol, fortran, markdown, pascal, rpm},
+        dialects::{bitbake, cobol, fortran, just, markdown, pascal, rpm},
         line_splices::LineSplices,
         syntax::{line_end, FileContext, LanguageContext, LineClass, SyntaxCounter},
     },
@@ -314,6 +314,9 @@ impl LanguageType {
         }
         if self == Bitbake {
             return bitbake::parse(config, lines, stats, counted, on_line);
+        }
+        if self == Just {
+            return just::parse(config, lines, stats, counted, on_line);
         }
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
         let splices_continue_lines = syntax.shared.line_splices == Some(LineSplices::C)

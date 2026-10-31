@@ -1140,8 +1140,11 @@ impl LanguageType {
         let buf = &buf[..len];
 
         let first_line = buf.split(|b| *b == b'\n').next()?;
-        let first_line = std::str::from_utf8(first_line).ok()?;
+        Self::from_shebang_line(std::str::from_utf8(first_line).ok()?)
+    }
 
+    /// The language a `#!` line names.
+    pub(crate) fn from_shebang_line(first_line: &str) -> Option<Self> {
         let mut words = first_line.split_whitespace();
         match words.next() {
             {# First match against any shebang paths, and then check if the
