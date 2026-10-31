@@ -1,0 +1,20 @@
+{% comment %} 20 lines 6 code 12 comments 2 blanks {% endcomment %}
+<p>Don't panic</p>
+
+{%- comment -%}
+  {% comment %} nested {% endcomment %}
+  {% raw %}{% endcomment %}{% endraw %}
+
+{%- endcomment -%}
+{% doc %}
+  @param {string} title
+{% enddoc %}
+{% # an inline comment %}
+{% liquid
+  # a comment line
+  assign x = 'a # b'
+%}
+{% raw %}{% comment %}{% endraw %}
+<!-- an HTML comment -->
+
+{{ "it's" }}

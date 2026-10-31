@@ -13,6 +13,7 @@ pub(crate) mod haskell;
 pub(crate) mod jsx;
 pub(crate) mod julia;
 pub(crate) mod just;
+pub(crate) mod liquid;
 pub(crate) mod m4;
 pub(crate) mod make;
 pub(crate) mod markdown;
