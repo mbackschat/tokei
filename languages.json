@@ -390,7 +390,13 @@
     "Crystal": {
       "line_comment": ["#"],
       "shebangs": ["#!/usr/bin/crystal"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "quotes": [["\\\"", "\\\""], ["`", "`"]],
+      "code_tokens": ["def `"],
+      "interpolations": [{"quote": "\\\"", "open": "#{", "close": "}", "nest": "{"}, {"quote": "`", "open": "#{", "close": "}", "nest": "{"}],
+      "character_literals": [["'", "'"]],
+      "heredocs": [{"start": "<<-", "spacing": "adjacent", "word": "identifier", "closer": "indented_line"}],
+      "quote_like": "ruby_percent",
+      "regex_literals": {"after_line_break": true, "spans_lines": true, "operator_symbols": true, "command_arguments": true, "after_keywords": ["begin", "case", "do", "else", "elsif", "ensure", "if", "in", "rescue", "return", "then", "unless", "until", "when", "while", "yield"]},
       "env": ["crystal"],
       "extensions": ["cr"]
     },

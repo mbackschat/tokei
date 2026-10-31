@@ -26,7 +26,7 @@
             word: crate::language::heredoc::HeredocWord::
                 {%- if heredoc.word == "shell" %}Shell{% else %}Identifier{% endif %},
             closer: crate::language::heredoc::HeredocCloser::
-                {%- if heredoc.closer == "flexible" %}Flexible{% else %}Line{% endif %},
+                {%- if heredoc.closer == "flexible" %}Flexible{% elif heredoc.closer == "indented_line" %}IndentedLine{% else %}Line{% endif %},
         },
     {%- endfor -%}
 {%- endmacro heredocs %}

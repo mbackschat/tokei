@@ -28,6 +28,10 @@ pub(crate) enum HeredocWord {
 pub(crate) enum HeredocCloser {
     /// The line holds only the word, indented only after an indent flag.
     Line,
+    /// The line holds only the word, indented or not, as Crystal's lexer
+    /// reads a `<<-` heredoc (`check_heredoc_end` in
+    /// `src/compiler/crystal/syntax/lexer.cr`, Crystal 1.22.2).
+    IndentedLine,
     /// The word, optionally indented and followed by anything but an
     /// identifier character, as PHP 7.3 allows.
     Flexible,
@@ -138,7 +142,12 @@ impl Heredoc {
                 .map_or(lines.len(), |n| start + n);
             let mut line = &lines[start..end];
             line = line.strip_suffix(b"\r").unwrap_or(line);
-            if opening.indented || matches!(self.closer, HeredocCloser::Flexible) {
+            if opening.indented
+                || matches!(
+                    self.closer,
+                    HeredocCloser::Flexible | HeredocCloser::IndentedLine
+                )
+            {
                 let indent = line
                     .iter()
                     .take_while(|b| matches!(b, b' ' | b'\t'))
@@ -146,7 +155,7 @@ impl Heredoc {
                 line = &line[indent..];
             }
             let closes = match self.closer {
-                HeredocCloser::Line => line == opening.word,
+                HeredocCloser::Line | HeredocCloser::IndentedLine => line == opening.word,
                 HeredocCloser::Flexible => line
                     .strip_prefix(opening.word)
                     .is_some_and(|rest| !rest.first().is_some_and(|b| is_identifier_byte(*b))),
