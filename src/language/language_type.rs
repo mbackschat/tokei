@@ -1043,6 +1043,46 @@ mod tests {
     }
 
     #[test]
+    fn a_y_file_is_happy_only_with_a_token_type() {
+        assert_eq!(
+            detect(
+                "Parser.y",
+                "{\nmodule Parser where\n}\n%tokentype { Token }\n%%\nExp : int { $1 }\n"
+            ),
+            Some(Happy)
+        );
+        assert_eq!(
+            detect(
+                "Calc.ly",
+                "> {\n> module Calc where\n> }\n\n> %tokentype { Token }\n"
+            ),
+            Some(Happy)
+        );
+        // A Bison grammar, as Perl's perly.y and PostgreSQL's gram.y are, and
+        // a GPPG one that names the directive only inside a string literal.
+        assert_eq!(
+            detect(
+                "gram.y",
+                "%{\n/* C prologue */\n%}\n%token INT\n%%\nexp: INT ;\n"
+            ),
+            Some(Yacc)
+        );
+        assert_eq!(
+            detect("gplex.y", "%token tokentypeTag \"%tokentype\"\n%%\n"),
+            Some(Yacc)
+        );
+        assert_eq!(detect("sql_yacc.yy", "%token INT\n%%\n"), Some(Yacc));
+        // A LilyPond score, the common owner of the .ly extension.
+        assert_eq!(
+            detect(
+                "score.ly",
+                "\\version \"2.24.0\"\n% a comment\n{ c' d' e' }\n"
+            ),
+            None
+        );
+    }
+
+    #[test]
     fn an_srt_subtitle_file_is_text_and_otherwise_srecode() {
         assert_eq!(
             detect("movie.srt", "1\n00:00:01,000 --> 00:00:02,500\nHello.\n\n"),

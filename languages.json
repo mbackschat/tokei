@@ -813,7 +813,7 @@
       "extensions": ["hamlet"]
     },
     "Happy": {
-      "extensions": ["y", "ly"]
+      "content_checked_extensions": {"y": ["^[ \\t]*%tokentype[ \\t]*\\{"], "ly": ["^>[ \\t]*%tokentype[ \\t]*\\{"]}
     },
     "Handlebars": {
       "quotes_in_tags": true,
@@ -2310,6 +2310,10 @@
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"], ["'''", "'''"]],
       "extensions": ["xtend"]
+    },
+    "Yacc": {
+      "syntax_of": "C",
+      "extensions": ["y", "yy", "yacc"]
     },
     "Yaml": {
       "doubled_quote_escapes": ["'"],
