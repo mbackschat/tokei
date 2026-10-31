@@ -364,9 +364,9 @@
       "extensions": ["cfc"]
     },
     "Coq": {
+      "content_checked_extensions": {"v": ["^[ \\t]*(?:#\\[[^\\]\\n]*\\][ \\t]*)?(?:(?:Local|Global|Polymorphic|Monomorphic|Program|Fail|Succeed|Time)[ \\t]+)*(?:(?:Require|From|Import|Export|Module|Section|Set|Unset|Inductive|CoInductive|Variant|Definition|Fixpoint|CoFixpoint|Lemma|Theorem|Corollary|Proposition|Fact|Remark|Example|Goal|Axiom|Axioms|Parameter|Parameters|Variable|Variables|Hypothesis|Hypotheses|Record|Structure|Class|Instance|Existing|Notation|Infix|Reserved|Ltac|Ltac2|Declare|Check|Compute|Eval|Print|Search|About|Locate|Arguments|Hint|Create|Open|Close|Scheme|Proof|Qed|Defined|Admitted|Abort|Opaque|Transparent|Canonical|Coercion|Context|Let|Universe|Universes|Constraint|Implicit|Generalizable|Obligation|Next|Function|Derive|Extraction|Register|Primitive|Strategy|Typeclasses|Include)\\b[^\\n]*|End[ \\t]+[\\w'.]+)\\.[ \\t]*\\r?$|^[ \\t]*(?:#\\[[^\\]\\n]*\\][ \\t]*)?(?:(?:Local|Global|Polymorphic|Monomorphic|Program)[ \\t]+)*(?:Definition|Fixpoint|CoFixpoint|Inductive|CoInductive|Variant|Lemma|Theorem|Record|Structure|Class|Instance|Notation|Ltac2?|Axiom|Parameter|Goal)[ \\t]+[\\w'@\"(]"]},
       "quotes": [["\\\"", "\\\""]],
-      "multi_line_comments": [["(*", "*)"]],
-      "extensions": ["v"]
+      "multi_line_comments": [["(*", "*)"]]
     },
     "Cpp": {
       "line_splices": "c",
@@ -656,6 +656,7 @@
       "extensions": ["cfg"]
     },
     "Forth": {
+      "content_checked_extensions": {"fs": ["^(?::[ \\t][^ \\t\\r\\n]|new-device\\b|\\\\[ \\t]|\\\\\\r?$)"]},
       "line_comment": ["\\\\"],
       "multi_line_comments": [["( ", ")"]],
       "extensions": [
@@ -759,6 +760,7 @@
       "extensions": ["gts"]
     },
     "Glsl": {
+      "content_checked_extensions": {"fs": ["^[ \\t]*(?:#version[ \\t]+\\d|precision[ \\t]+(?:lowp|mediump|highp)\\b|(?:uniform|varying|attribute)[ \\t]+\\w+[ \\t]+\\w+|vec[234][ \\t]+\\w)"]},
       "name": "GLSL",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
@@ -1228,6 +1230,7 @@
       "quotes": [["\\\"", "\\\""]]
     },
     "M4": {
+      "content_checked_extensions": {"mc": ["^dnl|^divert\\((?:-?\\d+)?\\)|^\\w+\\(`[^\\r\\n]*?'[),]"]},
       "extensions": ["m4"],
       "line_comment": ["#", "dnl"],
       "quote_like": "m4"
@@ -1309,8 +1312,8 @@
       "extensions": ["mojo", "🔥"]
     },
     "MonkeyC": {
+      "content_checked_extensions": {"mc": ["^[ \\t]*(?:using|import)[ \\t]+Toybox\\b|^[ \\t]*(?:(?:public|private|protected|hidden|static)[ \\t]+)*(?:class|module|function)[ \\t]+\\w+[^\\n]*\\{"]},
       "name": "Monkey C",
-      "extensions": ["mc"],
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""]]
@@ -1385,13 +1388,13 @@
       "extensions": ["nu"]
     },
     "ObjectiveC": {
+      "content_checked_extensions": {"m": ["^[ \\t]*(?:@(?:interface|class|protocol|property|synchronized|selector|implementation)\\b|@end[ \\t]*\\r?$|#import[ \\t]+.+\\.h[\">])"]},
       "character_literals": [["'", "'"]],
       "line_splices": "c",
       "name": "Objective-C",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
-      "quotes": [["\\\"", "\\\""]],
-      "extensions": ["m"]
+      "quotes": [["\\\"", "\\\""]]
     },
     "ObjectiveCpp": {
       "raw_strings": [{"start": "R\\\"", "label": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_{}[]#<>%:;.?*+-/^&|~!=,'$@`\\\"", "max_label": 16, "open": "(", "close": ")", "end": "\\\""}],
@@ -1464,11 +1467,13 @@
       "filenames": ["pkgbuild"]
     },
     "Pan": {
+      "content_checked_extensions": {"tpl": ["^[ \\t]*(?:(?:object|structure|unique|declaration)[ \\t]+)?template[ \\t]+[\\w/.+-]+[ \\t]*;"]},
       "line_comment": ["#"],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "extensions": ["pan", "tpl"]
+      "extensions": ["pan"]
     },
     "Pascal": {
+      "content_checked_extensions": {"pp": ["(?i)^[ \\t]*(?:end[ \\t]*[.;]|(?:unit|program|library|uses)[ \\t]+\\w|\\{\\$(?:i|include|define|mode|ifdef|ifndef)\\b)"]},
       "line_comment": ["//"],
       "nested_comments": [["{", "}"], ["(*", "*)"]],
       "verbatim_quotes": [["'", "'"]],
@@ -1494,12 +1499,13 @@
       "extensions": ["pest"]
     },
     "Phix": {
+      "content_checked_extensions": {"e": ["^[ \\t]*end[ \\t]+(?:function|procedure|type)\\b|^[ \\t]*(?:(?:global|public|export|override)[ \\t]+)?(?:include[ \\t]+[^\\s:]|constant(?:[ \\t]+[^:\\s]|[ \\t]*\\r?$)|namespace[ \\t]+\\w+[ \\t]*(?:--[^\\n]*)?\\r?$|enum(?:[ \\t]+[^:\\s]|[ \\t]*\\r?$))|^[ \\t]*(?:global|public|export)[ \\t]+(?:sequence|integer|atom|object|string|function|procedure|type)\\b"]},
       "line_comment": ["--", "//", "#!"],
       "multi_line_comments": [["/*", "*/"], ["--/*", "--*/"]],
       "nested": true,
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["`", "`"]],
-      "extensions": ["e","exw"]
+      "extensions": ["exw"]
     },
     "Php": {
       "code_tags": "php",
@@ -1588,10 +1594,11 @@
       "extensions": ["pde"]
     },
     "Prolog": {
+      "content_checked_extensions": {"pro": ["^:-[ \\t]*\\w|^[a-z]\\w*(?:\\([^\\n]*\\))?[ \\t]*(?::-|-->)|^[a-z]\\w*\\([^)\\n][^\\n]*\\)\\.[ \\t]*(?:%[^\\n]*)?\\r?$"], "pl": ["^:-[ \\t]*\\w|^[a-z]\\w*(?:\\([^\\n]*\\))?[ \\t]*(?::-|-->)|^[a-z]\\w*\\([^)\\n][^\\n]*\\)\\.[ \\t]*(?:%[^\\n]*)?\\r?$"]},
       "line_comment": ["%"],
       "quotes": [["\\\"", "\\\""]],
       "multi_line_comments": [["/*", "*/"]],
-      "extensions": ["p", "pro"]
+      "extensions": ["p"]
     },
     "PSL": {
       "name": "PSL Assertion",
@@ -1915,10 +1922,10 @@
       "extensions": ["sol"]
     },
     "SpecmanE": {
+      "content_checked_extensions": {"e": ["^<'[ \\t]*\\r?$"]},
       "name": "Specman e",
       "line_comment": ["--", "//"],
-      "multi_line_comments": [["'>", "<'"]],
-      "extensions": ["e"]
+      "multi_line_comments": [["'>", "<'"]]
     },
     "Spice": {
       "name": "Spice Netlist",
@@ -2056,6 +2063,7 @@
       "extensions": ["tex", "sty"]
     },
     "Text": {
+      "content_checked_extensions": {"srt": ["^\\d{2}:\\d{2}:\\d{2},\\d{3}\\s*-->\\s*\\d{2}:\\d{2}:\\d{2},\\d{3}\\s*$"]},
       "name": "Plain Text",
       "literate": true,
       "mime": ["text/plain"],
@@ -2204,6 +2212,7 @@
       "extensions": ["vm"]
     },
     "Verilog": {
+      "content_checked_extensions": {"v": ["^[ \\t]*module\\s+[^\\s()]+\\s*#?\\(|^[ \\t]*`(?:define|ifdef|ifndef|include|timescale|pragma)|^[ \\t]*always[ \\t]*@|^[ \\t]*initial[ \\t]*(begin|@)|^[ \\t]*end(?:module|function|task)\\b"]},
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""]],
@@ -2299,6 +2308,7 @@
       "extensions": ["xcconfig"]
     },
     "Xml": {
+      "content_checked_extensions": {"ts": ["<!DOCTYPE TS>|<TS[ \\t]+(?:version|language|sourcelanguage)=\""]},
       "text_sections": [["<![CDATA[", "]]>"]],
       "quotes_in_tags": true,
       "name": "XML",

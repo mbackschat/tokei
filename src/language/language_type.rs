@@ -743,6 +743,196 @@ mod tests {
     }
 
     #[test]
+    fn a_v_file_is_coq_or_verilog_by_its_text() {
+        assert_eq!(
+            detect(
+                "one.v",
+                "Require Import Arith.\n\nLemma one : 1 = 1.\nProof. reflexivity. Qed.\n"
+            ),
+            Some(Coq)
+        );
+        assert_eq!(
+            detect(
+                "top.v",
+                "`timescale 1ns/1ps\nmodule top (input clk);\nendmodule\n"
+            ),
+            Some(Verilog)
+        );
+        // V (vlang.io) writes `.v` files too, and Tokei has no V definition.
+        assert_eq!(
+            detect("main.v", "module main\n\nfn main() {\n\tprintln('hi')\n}\n"),
+            None
+        );
+    }
+
+    #[test]
+    fn an_fs_file_is_forth_or_glsl_by_its_text_and_otherwise_fsharp() {
+        assert_eq!(
+            detect("sq.fs", ": square ( n -- n*n ) dup * ;\n"),
+            Some(Forth)
+        );
+        assert_eq!(
+            detect(
+                "frag.fs",
+                "#version 330 core\nout vec4 color;\nvoid main() { color = vec4(1.0); }\n"
+            ),
+            Some(Glsl)
+        );
+        assert_eq!(
+            detect("Program.fs", "module Program\nlet x = 1\n"),
+            Some(FSharp)
+        );
+    }
+
+    #[test]
+    fn an_e_file_is_phix_or_specman_by_its_text() {
+        assert_eq!(
+            detect(
+                "app.e",
+                "include std/console.e\nglobal function f()\n    return 1\nend function\n"
+            ),
+            Some(Phix)
+        );
+        assert_eq!(
+            detect("packet.e", "<'\nstruct packet {\n};\n'>\n"),
+            Some(SpecmanE)
+        );
+        // Eiffel classes are `.e` files too, and Tokei has no Eiffel definition.
+        assert_eq!(
+            detect(
+                "application.e",
+                "class\n\tAPPLICATION\ncreate\n\tmake\nfeature\n\tmake\n\t\tdo\n\t\tend\nend\n"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn an_mc_file_is_m4_or_monkey_c_by_its_text() {
+        assert_eq!(
+            detect("sendmail.mc", "divert(-1)\ndefine(`VERSION', `1.0')\n"),
+            Some(M4)
+        );
+        assert_eq!(
+            detect(
+                "View.mc",
+                "import Toybox.WatchUi;\n\nclass View extends WatchUi.View {\n}\n"
+            ),
+            Some(MonkeyC)
+        );
+        // Windows message texts, compiled by mc.exe.
+        assert_eq!(
+            detect("msg.mc", "MessageIdTypedef=DWORD\nMessageId=0x1\nSymbolicName=MSG_X\nLanguage=English\nText.\n.\n"),
+            None
+        );
+    }
+
+    #[test]
+    fn pl_and_pro_files_are_prolog_only_with_prolog_clauses() {
+        assert_eq!(
+            detect("m.pl", ":- module(m, [p/1]).\np(X) :- q(X).\n"),
+            Some(Prolog)
+        );
+        assert_eq!(detect("family.pro", "parent(tom, bob).\n"), Some(Prolog));
+        assert_eq!(
+            detect("x.pl", "use strict;\nmy $x = 1;\nprint \"done.\\n\";\n"),
+            Some(Perl)
+        );
+        // A sentence of POD prose is no Prolog fact, as perl5's own scripts show.
+        assert_eq!(
+            detect("y.pl", "=pod\n\notherwise.\n\n=cut\nprint 1;\n"),
+            Some(Perl)
+        );
+        // QMake projects and ProGuard rules are `.pro` files too.
+        assert_eq!(detect("app.pro", "QT += core\nSOURCES += main.cpp\n"), None);
+        assert_eq!(
+            detect("proguard-rules.pro", "-keep class com.example.** { *; }\n"),
+            None
+        );
+    }
+
+    #[test]
+    fn a_qt_translation_ts_file_is_xml() {
+        assert_eq!(
+            detect(
+                "app_de.ts",
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!DOCTYPE TS>\n<TS version=\"2.1\" language=\"de\">\n</TS>\n"
+            ),
+            Some(Xml)
+        );
+        assert_eq!(
+            detect("main.ts", "const x: number = 1;\n"),
+            Some(TypeScript)
+        );
+    }
+
+    #[test]
+    fn a_tpl_file_is_pan_only_with_a_template_declaration() {
+        assert_eq!(
+            detect("schema.tpl", "structure template components/foo/schema;\n"),
+            Some(Pan)
+        );
+        assert_eq!(detect("index.tpl", "{if $x}<p>{$x}</p>{/if}\n"), None);
+        assert_eq!(
+            detect(
+                "_helpers.tpl",
+                "{{- define \"x.name\" -}}\n{{ .Chart.Name }}\n{{- end }}\n"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn an_m_file_is_objective_c_only_with_objective_c_syntax() {
+        assert_eq!(
+            detect(
+                "A.m",
+                "#import <Foundation/Foundation.h>\n@implementation A\n@end\n"
+            ),
+            Some(ObjectiveC)
+        );
+        // MATLAB and Mercury write `.m` files too.
+        assert_eq!(
+            detect("f.m", "function y = f(x)\n  y = x + 1; % add\nend\n"),
+            None
+        );
+        assert_eq!(detect("hello.m", ":- module hello.\n:- interface.\n"), None);
+    }
+
+    #[test]
+    fn a_pp_file_is_pascal_with_pascal_syntax_and_otherwise_puppet() {
+        assert_eq!(
+            detect(
+                "hello.pp",
+                "program Hello;\nbegin\n  writeln('Hi');\nend.\n"
+            ),
+            Some(Pascal)
+        );
+        assert_eq!(
+            detect(
+                "init.pp",
+                "class ntp {\n  package { 'ntp': ensure => installed }\n}\n"
+            ),
+            Some(Puppet)
+        );
+    }
+
+    #[test]
+    fn an_srt_subtitle_file_is_text_and_otherwise_srecode() {
+        assert_eq!(
+            detect("movie.srt", "1\n00:00:01,000 --> 00:00:02,500\nHello.\n\n"),
+            Some(Text)
+        );
+        assert_eq!(
+            detect(
+                "x.srt",
+                ";; x.srt\nset mode \"c-mode\"\ncontext file\ntemplate empty\n----\n----\n"
+            ),
+            Some(SRecode)
+        );
+    }
+
+    #[test]
     fn lf_embedded_language_is_counted() {
         let file_text =
             fs::read_to_string(Path::new("tests").join("data").join("linguafranca.lf")).unwrap();
