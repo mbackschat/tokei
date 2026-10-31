@@ -21,3 +21,6 @@ shell/judge-linux
 groovy/out/
 toml/target/
 dockerfile/judge-linux
+fsharp/out/
+fsharp/obj/
+fsharp/bin/

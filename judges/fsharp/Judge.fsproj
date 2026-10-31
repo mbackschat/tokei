@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <!-- FSharp.Compiler.Service 43.12.403 requires FSharp.Core 10.1.403, newer
+         than the 9.0.303 the .NET 9 SDK would reference implicitly. -->
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharp.Compiler.Service" Version="43.12.403" />
+    <PackageReference Include="FSharp.Core" Version="10.1.403" />
+  </ItemGroup>
+</Project>
