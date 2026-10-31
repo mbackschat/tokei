@@ -51,6 +51,58 @@ pub(crate) enum LineReport<'a> {
     },
 }
 
+/// A language whose own module reads a file whole, since the class of its
+/// lines depends on the lines before them. Neither the generic engine nor its
+/// shortcut for the lines before a file's first quote reads such a file, and
+/// this is the one list that both consult.
+#[derive(Clone, Copy)]
+enum WholeFile {
+    Markdown,
+    Rpm,
+    Cobol,
+    Bitbake,
+    Just,
+    PlantUml,
+    Liquid,
+    Haml,
+}
+
+impl WholeFile {
+    fn of(language: LanguageType) -> Option<Self> {
+        match language {
+            Markdown | UnrealDeveloperMarkdown => Some(Self::Markdown),
+            RPMSpecfile => Some(Self::Rpm),
+            Cobol => Some(Self::Cobol),
+            Bitbake => Some(Self::Bitbake),
+            Just => Some(Self::Just),
+            PlantUml => Some(Self::PlantUml),
+            Liquid => Some(Self::Liquid),
+            Haml => Some(Self::Haml),
+            _ => None,
+        }
+    }
+
+    fn parse(
+        self,
+        config: &Config,
+        lines: &[u8],
+        stats: CodeStats,
+        counted: Range<usize>,
+        on_line: &mut impl FnMut(LineReport<'_>),
+    ) -> CodeStats {
+        match self {
+            Self::Markdown => markdown::parse(config, lines, stats, counted, on_line),
+            Self::Rpm => rpm::parse(config, lines, stats, counted, on_line),
+            Self::Cobol => cobol::parse(config, lines, stats, counted, on_line),
+            Self::Bitbake => bitbake::parse(config, lines, stats, counted, on_line),
+            Self::Just => just::parse(config, lines, stats, counted, on_line),
+            Self::PlantUml => plantuml::parse(config, lines, stats, counted, on_line),
+            Self::Liquid => liquid::parse(config, lines, stats, counted, on_line),
+            Self::Haml => haml::parse(config, lines, stats, counted, on_line),
+        }
+    }
+}
+
 /// The classes of the lines of a data block's `text` that the host counts:
 /// its text is code, or blank where only whitespace.
 fn data_line_classes(text: &[u8]) -> impl Iterator<Item = LineClass> + '_ {
@@ -119,16 +171,21 @@ impl LanguageType {
 
         let syntax = self.syntax_counter_for(text);
 
-        // A YAML line can continue the plain scalar of the line before it, so
-        // no YAML line can be classified on its own; a shebang or frontmatter
-        // is read by the full parse only, and so is a line before PHP's code
-        // tags, which is output text. Whether a Markdown line opens a code
-        // block depends on the lines before it, such as the list item that
-        // holds its fence, so a Markdown file is read whole, and so is a COBOL
-        // file, whose comment paragraphs and debugging lines depend on lines
-        // before them.
+        // The lines before the first important syntax are classified one by
+        // one, which holds only where no earlier line decides a later one and
+        // the search finds every construct; the guard that counts every
+        // fixture from each of its lines checks it. It does not hold for a
+        // YAML line, which can continue the plain scalar before it; a shebang
+        // or frontmatter, read by the full parse only; a line before PHP's
+        // code tags, which is output text; a language read whole by its own
+        // module, such as Markdown, whose code blocks depend on the list items
+        // that hold their fences; a MASM `COMMENT` block, which opens with a
+        // word in any case that the case-sensitive search cannot find; or a
+        // Visual Basic XML literal, which only the code before its `<` opens.
         let simple_prefix = !syntax.shared.block_scalars
-            && !matches!(self, Markdown | UnrealDeveloperMarkdown | Cobol)
+            && WholeFile::of(self).is_none()
+            && !syntax.shared.masm_comments
+            && !syntax.shared.xml_literals
             && syntax.shared.code_tags.is_none()
             && !syntax.opens_with_whole_lines(text);
         if let Some(end) = simple_prefix
@@ -303,29 +360,8 @@ impl LanguageType {
         mut counted: Range<usize>,
         on_line: &mut impl FnMut(LineReport<'_>),
     ) -> CodeStats {
-        if matches!(self, Markdown | UnrealDeveloperMarkdown) {
-            return markdown::parse(config, lines, stats, counted, on_line);
-        }
-        if self == RPMSpecfile {
-            return rpm::parse(config, lines, stats, counted, on_line);
-        }
-        if self == Cobol {
-            return cobol::parse(config, lines, stats, counted, on_line);
-        }
-        if self == Bitbake {
-            return bitbake::parse(config, lines, stats, counted, on_line);
-        }
-        if self == Just {
-            return just::parse(config, lines, stats, counted, on_line);
-        }
-        if self == PlantUml {
-            return plantuml::parse(config, lines, stats, counted, on_line);
-        }
-        if self == Liquid {
-            return liquid::parse(config, lines, stats, counted, on_line);
-        }
-        if self == Haml {
-            return haml::parse(config, lines, stats, counted, on_line);
+        if let Some(dialect) = WholeFile::of(self) {
+            return dialect.parse(config, lines, stats, counted, on_line);
         }
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
         let splices_continue_lines = syntax.shared.line_splices == Some(LineSplices::C)

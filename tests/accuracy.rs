@@ -153,6 +153,72 @@ mod line_classes {
         }
         assert!(checked > 250, "only {checked} fixtures classified");
     }
+
+    /// `parse_from_slice` counts the lines before a file's first quote or
+    /// comment marker by a shortcut, which must agree with the full parse
+    /// wherever that boundary falls; starting each fixture at every line moves
+    /// it across every construct the fixtures hold.
+    #[test]
+    fn classes_tally_to_the_counts_from_every_line_of_every_fixture() {
+        let config = Config::default();
+        for entry in std::fs::read_dir("tests/data").unwrap() {
+            let path = entry.unwrap().path();
+            let Some(language) = LanguageType::from_path(&path, &config) else {
+                continue;
+            };
+            let text = std::fs::read(&path).unwrap();
+            let starts = std::iter::once(0).chain(
+                text.iter()
+                    .enumerate()
+                    .filter(|(_, b)| **b == b'\n')
+                    .map(|(i, _)| i + 1),
+            );
+            for start in starts.filter(|&start| start < text.len()) {
+                let suffix = &text[start..];
+                let Some(classes) = language.line_classes(suffix, &config) else {
+                    continue;
+                };
+                let stats = language.parse_from_slice(suffix, &config).summarise();
+                let tally = |class| classes.iter().filter(|c| **c == class).count();
+                assert_eq!(
+                    (
+                        tally(LineClass::Code),
+                        tally(LineClass::Comment),
+                        tally(LineClass::Blank)
+                    ),
+                    (stats.code, stats.comments, stats.blanks),
+                    "{} from byte {start}",
+                    path.display()
+                );
+            }
+        }
+    }
+
+    /// Lines that a dialect reads by the lines before them, such as those
+    /// nested under a Haml `-#` comment or inside a Liquid `{% liquid %}` tag,
+    /// keep their class before the file's first quote.
+    #[test]
+    fn dialects_count_the_lines_before_the_first_quote() {
+        let config = Config::default();
+        let counts = |language: LanguageType, text: &str| {
+            let stats = language.parse_from_slice(text, &config).summarise();
+            (stats.code, stats.comments, stats.blanks)
+        };
+        assert_eq!(
+            counts(
+                LanguageType::Haml,
+                "-# comment\n  indented comment line\n  another\n%p= \"x\"\n"
+            ),
+            (1, 3, 0)
+        );
+        assert_eq!(
+            counts(
+                LanguageType::Liquid,
+                "{% # note %}\n{% liquid\n  # c\n  echo 1\n%}\n<p class=\"x\">\n"
+            ),
+            (4, 2, 0)
+        );
+    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/tests.rs"));
