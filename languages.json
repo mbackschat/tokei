@@ -599,6 +599,10 @@
     },
     "Erlang": {
       "line_comment": ["%"],
+      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "raw_strings": [{"start": "\\\"\\\"\\\"", "repeat": "\"", "close": "\\\"\\\"\\\"", "line_start": true}],
+      "prefix_characters": "erlang",
+      "quote_like": "erlang_sigil",
       "extensions": ["erl", "hrl"]
     },
     "Factor": {

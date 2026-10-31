@@ -15,7 +15,9 @@ use super::dialects::rust::frontmatter_end;
 use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
-use super::dialects::{batch, elixir, fsharp, haskell, julia, m4, make, perl, ruby, visual_basic};
+use super::dialects::{
+    batch, elixir, erlang, fsharp, haskell, julia, m4, make, perl, ruby, visual_basic,
+};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
@@ -51,6 +53,8 @@ pub(crate) struct SyntaxCounter {
     pub(crate) quote: Option<Cow<'static, str>>,
     /// The escape of the current raw literal, such as Swift's `\#` in `#"…"#`.
     pub(crate) quote_escape: Option<String>,
+    /// Whether the open quote's closer closes only at the start of a line.
+    quote_closes_at_line_start: bool,
     /// The opener of the current literal, which selects its interpolations.
     pub(crate) quote_opener: &'static str,
     /// Strings suspended while the code of their holes is read, innermost last.
@@ -359,7 +363,7 @@ impl SharedMatchers {
             Some(QuoteLikeSyntax::RubyPercent) => {
                 opener_pairs.allow_any(b'%');
             }
-            Some(QuoteLikeSyntax::ElixirSigil) => {
+            Some(QuoteLikeSyntax::ElixirSigil | QuoteLikeSyntax::ErlangSigil) => {
                 opener_pairs.allow_any(b'~');
             }
             Some(QuoteLikeSyntax::MakeReference) => {
@@ -455,7 +459,9 @@ impl SharedMatchers {
                 match language.quote_like() {
                     Some(QuoteLikeSyntax::Perl) => vec!["q", "m", "s", "y"],
                     Some(QuoteLikeSyntax::RubyPercent) => vec!["%"],
-                    Some(QuoteLikeSyntax::ElixirSigil) => vec!["~"],
+                    Some(QuoteLikeSyntax::ElixirSigil | QuoteLikeSyntax::ErlangSigil) => {
+                        vec!["~"]
+                    }
                     Some(QuoteLikeSyntax::M4 { open, .. }) => vec![open],
                     // Only files that turn quasi-quotes on search for their
                     // `|`, which `may_open_quasi_quote` does.
@@ -621,6 +627,7 @@ impl SyntaxCounter {
             lf_embedded_language: None,
             quote: None,
             quote_escape: None,
+            quote_closes_at_line_start: false,
             quote_opener: "",
             holes: Vec::new(),
             literal_end: 0,
@@ -1413,6 +1420,7 @@ impl SyntaxCounter {
             trace!("Start raw, closed by {:?}", opening.closer);
             self.quote = Some(Cow::Owned(opening.closer));
             self.quote_escape = opening.escape;
+            self.quote_closes_at_line_start = opening.line_start;
             self.quote_opener = raw.start;
             self.quote_is_verbatim = true;
             self.quote_is_doc_quote = false;
@@ -1582,7 +1590,9 @@ impl SyntaxCounter {
             .and_then(|quote| Some((quote, self.closer_len(window, quote)?)))
         {
             // Elsewhere on its line, a heredoc's closer is text.
-            if self.shared.line_start_closers.contains(&quote) && !starts_line(lines, i) {
+            if (self.quote_closes_at_line_start || self.shared.line_start_closers.contains(&quote))
+                && !starts_line(lines, i)
+            {
                 return Some(1);
             }
             // A run of more quotes closes at its end, the ones before the
@@ -1601,6 +1611,7 @@ impl SyntaxCounter {
             trace!("End {:?}", quote);
             self.quote = None;
             self.quote_escape = None;
+            self.quote_closes_at_line_start = false;
             self.quote_opener = "";
             self.quote_is_verbatim = false;
             Some(len)
@@ -1831,6 +1842,7 @@ impl SyntaxCounter {
                 delimited_len(lines, i, open, parts)
             }
             QuoteLikeSyntax::ElixirSigil => elixir::sigil_len(lines, i),
+            QuoteLikeSyntax::ErlangSigil => erlang::sigil_len(lines, i),
             QuoteLikeSyntax::HaskellQuasiQuote => {
                 haskell::quasi_quote_len(lines, i, || self.quasi_quoting(lines))
             }

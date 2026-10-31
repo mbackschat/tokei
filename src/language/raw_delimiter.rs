@@ -28,6 +28,9 @@ pub(crate) struct RawDelimiter {
     /// without a closer there is left to the next delimiter; Swift reads
     /// `#"""#` as a one-line string holding `"` this way.
     pub(crate) single_line: bool,
+    /// Whether the closer closes only at the start of a line, after spaces
+    /// and tabs, as that of Erlang's triple-quoted strings does (EEP 64).
+    pub(crate) line_start: bool,
 }
 
 /// An opener found at the start of a window.
@@ -35,6 +38,7 @@ pub(crate) struct RawOpening {
     pub(crate) len: usize,
     pub(crate) closer: String,
     pub(crate) escape: Option<String>,
+    pub(crate) line_start: bool,
 }
 
 impl RawDelimiter {
@@ -74,6 +78,7 @@ impl RawDelimiter {
             len,
             closer,
             escape: (!self.escape.is_empty()).then(|| [self.escape, middle].concat()),
+            line_start: self.line_start,
         })
     }
 

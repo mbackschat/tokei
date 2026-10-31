@@ -6,7 +6,7 @@
 //! closes at its partner and nests; any other delimiter closes at its next
 //! occurrence; a backslash escapes either.
 
-use super::dialects::{elixir, ruby};
+use super::dialects::{elixir, erlang, ruby};
 
 /// Which family of chosen-delimiter literals a language has.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -14,6 +14,7 @@ pub(crate) enum QuoteLikeSyntax {
     Perl,
     RubyPercent,
     ElixirSigil,
+    ErlangSigil,
     HaskellQuasiQuote,
     MakeReference,
     /// m4's quoted strings, with the quotes in effect: `` ` `` and `'` by
@@ -26,11 +27,12 @@ pub(crate) enum QuoteLikeSyntax {
 }
 
 /// Whose character literals a prefix and one character form, as Ruby's and
-/// Elixir's `?a` do.
+/// Elixir's `?a` and Erlang's `$a` do.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum PrefixCharacterSyntax {
     Ruby,
     Elixir,
+    Erlang,
 }
 
 impl PrefixCharacterSyntax {
@@ -38,6 +40,7 @@ impl PrefixCharacterSyntax {
     pub(crate) fn prefix(self) -> u8 {
         match self {
             PrefixCharacterSyntax::Ruby | PrefixCharacterSyntax::Elixir => b'?',
+            PrefixCharacterSyntax::Erlang => b'$',
         }
     }
 
@@ -46,6 +49,7 @@ impl PrefixCharacterSyntax {
         match self {
             PrefixCharacterSyntax::Ruby => ruby::character_len(lines, i),
             PrefixCharacterSyntax::Elixir => elixir::character_len(lines, i),
+            PrefixCharacterSyntax::Erlang => erlang::character_len(lines, i),
         }
     }
 }
