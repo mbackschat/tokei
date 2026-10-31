@@ -4,6 +4,7 @@
 pub(crate) mod batch;
 pub(crate) mod commonmark;
 pub(crate) mod elixir;
+pub(crate) mod fsharp;
 pub(crate) mod haskell;
 pub(crate) mod jsx;
 pub(crate) mod m4;

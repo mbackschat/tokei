@@ -677,7 +677,9 @@
       "line_comment": ["//"],
       "multi_line_comments": [["(*", "*)"]],
       "quotes": [["\\\"", "\\\""]],
-      "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["@\\\"", "\\\""]],
+      "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["@\\\"", "\\\""], ["@$\\\"", "\\\""], ["``", "``"]],
+      "comment_literals": true,
+      "shebang": "plain",
       "extensions": ["fs", "fsi", "fsx", "fsscript"]
     },
     "Fstar": {

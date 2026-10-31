@@ -15,7 +15,7 @@ use super::dialects::rust::frontmatter_end;
 use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
-use super::dialects::{batch, elixir, haskell, m4, make, perl, ruby, visual_basic};
+use super::dialects::{batch, elixir, fsharp, haskell, m4, make, perl, ruby, visual_basic};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
@@ -138,6 +138,7 @@ pub(crate) struct SharedMatchers {
     pub line_comment_flags: &'static [u8],
     pub batch_remarks: bool,
     pub rem_comments: bool,
+    pub comment_literals: bool,
     pub xml_literals: bool,
     pub line_start_closers: &'static [&'static str],
     pub pod: Option<PodSyntax>,
@@ -487,6 +488,7 @@ impl SharedMatchers {
             line_comment_flags: language.line_comment_flags(),
             batch_remarks: language.batch_remarks(),
             rem_comments: language.rem_comments(),
+            comment_literals: language.comment_literals(),
             xml_literals: language.xml_literals(),
             line_start_closers: language.line_start_closers(),
             pod: language.pod(),
@@ -1883,6 +1885,26 @@ impl SyntaxCounter {
     pub(crate) fn parse_multi_line_comment(&mut self, window: &[u8]) -> Option<usize> {
         if self.quote.is_some() {
             return None;
+        }
+
+        if !self.stack.is_empty() {
+            // A code token is one token in a comment too, so F#'s `(*)`
+            // opens no nested comment there (lex.fsl, rule `comment`).
+            let text_len = self
+                .shared
+                .code_tokens
+                .iter()
+                .find(|token| window.starts_with(token.as_bytes()))
+                .map(|token| token.len())
+                .or_else(|| {
+                    self.shared
+                        .comment_literals
+                        .then(|| fsharp::comment_literal_len(window))
+                        .flatten()
+                });
+            if text_len.is_some() {
+                return text_len;
+            }
         }
 
         if self.stack.is_empty() || self.shared.allows_nested {

@@ -513,6 +513,16 @@ impl LanguageType {
         }
     }
 
+    /// Returns whether a block comment reads strings and character literals
+    /// as text, as `fsharp::comment_literal_len` reads them.
+    pub(crate) fn comment_literals(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.comment_literals | default(value=false) }},
+            {% endfor %}
+        }
+    }
+
     /// Returns whether a `<` where an expression may start opens an XML
     /// literal, as `visual_basic::xml_literal_len` reads it.
     pub(crate) fn xml_literals(self) -> bool {
