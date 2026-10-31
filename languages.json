@@ -658,14 +658,17 @@
     },
     "FortranLegacy": {
       "name": "FORTRAN Legacy",
-      "line_comment": ["c", "C", "!", "*"],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "line_comment": ["!"],
+      "fixed_form": true,
+      "verbatim_quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "doubled_quote_escapes": ["\\\"", "'"],
       "extensions": ["f", "for", "ftn", "f77", "pfo"]
     },
     "FortranModern": {
       "name": "FORTRAN Modern",
       "line_comment": ["!"],
-      "quotes": [["\\\"", "\\\""]],
+      "verbatim_quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "doubled_quote_escapes": ["\\\"", "'"],
       "extensions": ["f03", "f08", "f90", "f95", "fpp"]
     },
     "FreeMarker": {

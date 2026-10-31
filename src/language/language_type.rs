@@ -10,7 +10,7 @@ use std::{
 use crate::{
     config::Config,
     language::{
-        dialects::{markdown, rpm},
+        dialects::{fortran, markdown, rpm},
         syntax::{line_end, FileContext, LanguageContext, LineClass, SyntaxCounter},
     },
     stats::{CodeStats, Report},
@@ -116,13 +116,7 @@ impl LanguageType {
                 .unwrap_or_default();
         }
 
-        let syntax = {
-            let mut syntax_mut = SyntaxCounter::new(self);
-            if self == LinguaFranca {
-                syntax_mut.lf_embedded_language = self.find_lf_target_language(text);
-            }
-            syntax_mut
-        };
+        let syntax = self.syntax_counter_for(text);
 
         // A YAML line can continue the plain scalar of the line before it, so
         // no YAML line can be classified on its own; a shebang or frontmatter
@@ -150,6 +144,7 @@ impl LanguageType {
         {
             let (skippable_text, rest) = text.split_at(end + 1);
             let shared = syntax.shared.clone();
+            let fixed_form = syntax.fixed_form;
             trace!(
                 "Using Simple Parse on {:?}",
                 String::from_utf8_lossy(skippable_text)
@@ -168,11 +163,11 @@ impl LanguageType {
                 LineIter::new(b'\n', skippable_text)
                     .par_bridge()
                     .map(|line| {
-                        // FORTRAN has a rule where it only counts as a comment if it's the
-                        // first character in the column, so removing starting whitespace
-                        // could cause a miscount.
-                        let line = if shared.is_fortran { line } else { line.trim() };
-                        match shared.plain_line_class(line) {
+                        let class = fixed_form
+                            .then(|| fortran::line_class(line))
+                            .flatten()
+                            .unwrap_or_else(|| shared.plain_line_class(line.trim()));
+                        match class {
                             LineClass::Blank => (1, 0, 0),
                             LineClass::Code => (0, 1, 0),
                             LineClass::Comment => (0, 0, 1),
@@ -211,10 +206,7 @@ impl LanguageType {
         if self == Jupyter {
             return None;
         }
-        let mut syntax = SyntaxCounter::new(self);
-        if self == LinguaFranca {
-            syntax.lf_embedded_language = self.find_lf_target_language(text);
-        }
+        let syntax = self.syntax_counter_for(text);
         // The simple parse of the lines before the first important syntax is
         // a shortcut that counts them as this full parse does.
         self.collect_line_classes(config, text, syntax, 0..text.len())
@@ -336,15 +328,7 @@ impl LanguageType {
                     }
                     break 'line;
                 }
-                let line = &lines[start..end];
-                // FORTRAN has a rule where it only counts as a comment if it's the
-                // first character in the column, so removing starting whitespace
-                // could cause a miscount.
-                let line = if syntax.shared.is_fortran {
-                    line
-                } else {
-                    line.trim()
-                };
+                let line = lines[start..end].trim();
                 trace!("{}", String::from_utf8_lossy(line));
 
                 if syntax.try_perform_single_line_analysis(lines, line, &mut stats) {
@@ -519,6 +503,20 @@ impl LanguageType {
         }
 
         Some(jupyter_stats)
+    }
+
+    /// The syntax counter for reading `text` as this language, with the
+    /// settings its content decides: the target language of a LinguaFranca
+    /// file, and the source form of a fixed-form Fortran one.
+    fn syntax_counter_for(self, text: &[u8]) -> SyntaxCounter {
+        let mut syntax = SyntaxCounter::new(self);
+        if self == LinguaFranca {
+            syntax.lf_embedded_language = self.find_lf_target_language(text);
+        }
+        if syntax.fixed_form {
+            syntax.fixed_form = !fortran::is_free_form(text);
+        }
+        syntax
     }
 
     /// The embedded language in LF is declared in a construct that looks like this: `target C;`, `target Python`.

@@ -72,11 +72,6 @@ impl LanguageType {
         }
     }
 
-    pub(crate) fn is_fortran(self) -> bool {
-        self == LanguageType::FortranModern ||
-        self == LanguageType::FortranLegacy
-    }
-
     /// Returns whether the language is "literate", meaning that it considered
     /// to primarily be documentation and is counted primarily as comments
     /// rather than procedural code.
@@ -554,6 +549,16 @@ impl LanguageType {
         match self {
             {% for key, value in languages -%}
                 {{key}} => b"{{ value.line_comment_flags | default(value="") }}",
+            {% endfor %}
+        }
+    }
+
+    /// Returns whether the language's files are in Fortran's fixed source
+    /// form unless their content is free form, as `fortran` reads them.
+    pub(crate) fn fixed_form(self) -> bool {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => {{ value.fixed_form | default(value=false) }},
             {% endfor %}
         }
     }

@@ -16,7 +16,9 @@ use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
 use super::dialects::CommentLiterals;
-use super::dialects::{batch, elixir, erlang, haskell, julia, m4, make, perl, ruby, visual_basic};
+use super::dialects::{
+    batch, elixir, erlang, fortran, haskell, julia, m4, make, perl, ruby, visual_basic,
+};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
@@ -89,6 +91,8 @@ pub(crate) struct SyntaxCounter {
     pub(crate) stack: Vec<Cow<'static, str>>,
     pub(crate) quote_is_verbatim: bool,
     pub(crate) lf_embedded_language: Option<LanguageType>,
+    /// Whether the file is read in Fortran's fixed source form.
+    pub(crate) fixed_form: bool,
     /// Whether a non-blank byte of the line being read lies outside every
     /// comment, which makes the line code.
     pub(crate) line_has_code: bool,
@@ -134,7 +138,6 @@ pub(crate) struct SharedMatchers {
     pub important_syntax: Option<AhoCorasick>,
     #[allow(dead_code)]
     pub any_comments: &'static [&'static str],
-    pub is_fortran: bool,
     pub is_literate: bool,
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
@@ -484,7 +487,6 @@ impl SharedMatchers {
             language,
             allows_nested: language.allows_nested(),
             doc_quotes: language.doc_quotes(),
-            is_fortran: language.is_fortran(),
             is_literate: language.is_literate(),
             important_syntax: (!important_syntax.is_empty())
                 .then(|| init_corasick(&important_syntax)),
@@ -624,6 +626,7 @@ impl SyntaxCounter {
             quote_is_verbatim: false,
             stack: Vec::with_capacity(1),
             lf_embedded_language: None,
+            fixed_form: language.fixed_form(),
             quote: None,
             quote_escape: None,
             quote_closes_at_line_start: false,
@@ -670,6 +673,13 @@ impl SyntaxCounter {
         }
         if !self.is_plain_mode() {
             return None;
+        }
+        if let Some(class) = self
+            .fixed_form
+            .then(|| fortran::line_class(&lines[start..end]))
+            .flatten()
+        {
+            return Some(class);
         }
         if start == 0
             && self
@@ -931,6 +941,10 @@ impl SyntaxCounter {
         }
 
         let mut positions = start..end;
+        if self.fixed_form && fortran::has_continuation_mark(&lines[start..end]) {
+            self.line_has_code = true;
+            positions.start += 6;
+        }
         while let Some(i) = positions.next() {
             // Resumes the analysis after the `len` bytes from `i` on.
             macro_rules! skip {
