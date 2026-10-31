@@ -967,8 +967,17 @@ impl LanguageType {
     ///
     /// assert_eq!(rust, Some(LanguageType::Rust));
     /// ```
-    pub fn from_path<P: AsRef<Path>>(entry: P, _config: &Config)
+    pub fn from_path<P: AsRef<Path>>(entry: P, config: &Config)
         -> Option<Self>
+    {
+        Self::from_path_with_bytes(entry, config).map(|(language, _)| language)
+    }
+
+    /// The language `from_path` finds, with the bytes of the file it read
+    /// to decide by its content, if it read them, so that counting the file
+    /// with [`LanguageType::parse_bytes`] need not read it again.
+    pub fn from_path_with_bytes<P: AsRef<Path>>(entry: P, _config: &Config)
+        -> Option<(Self, Option<Vec<u8>>)>
     {
         let entry = entry.as_ref();
 
@@ -980,7 +989,7 @@ impl LanguageType {
                     {%- for item in value.exact_filenames -%}
                         | Some("{{item}}")
                     {%- endfor -%}
-                        => return Some({{key}}),
+                        => return Some(({{key}}, None)),
                 {% endif -%}
             {%- endfor %}
             _ => ()
@@ -993,7 +1002,7 @@ impl LanguageType {
                         {%- for item in value.filenames -%}
                             | "{{item}}"
                         {%- endfor -%}
-                            => return Some({{key}}),
+                            => return Some(({{key}}, None)),
                     {% endif -%}
                 {%- endfor %}
                 _ => ()
@@ -1003,7 +1012,7 @@ impl LanguageType {
                 {%- if value.path_suffixes -%}
                     {%- for suffix in value.path_suffixes %}
             if filename.ends_with("{{suffix}}") {
-                return Some({{key}});
+                return Some(({{key}}, None));
             }
                     {%- endfor %}
                 {% endif -%}
@@ -1013,16 +1022,21 @@ impl LanguageType {
         match fsutils::get_extension(entry) {
             // A checked extension's patterns decide before a language that
             // claims the extension plainly, as Autoconf's macros do for `.m4`.
-            Some(extension) => LanguageType::from_checked_extension(entry, &extension)
-                .or_else(|| LanguageType::from_file_extension(extension.as_str())),
-            None => LanguageType::from_shebang(entry),
+            Some(extension) => {
+                let (checked, bytes) = LanguageType::from_checked_extension(entry, &extension);
+                checked
+                    .or_else(|| LanguageType::from_file_extension(extension.as_str()))
+                    .map(|language| (language, bytes))
+            }
+            None => LanguageType::from_shebang(entry).map(|language| (language, None)),
         }
     }
 
     /// The language of a file whose extension other formats share, such as
     /// `.spec` for RPM and PostgreSQL's isolation tests: the one whose
-    /// patterns for that extension all match the file's text, if any.
-    fn from_checked_extension(entry: &Path, extension: &str) -> Option<Self> {
+    /// patterns for that extension all match the file's text, if any, with
+    /// the bytes read to decide, if the extension has checks.
+    fn from_checked_extension(entry: &Path, extension: &str) -> (Option<Self>, Option<Vec<u8>>) {
         type Check = (
             &'static str,
             LanguageType,
@@ -1057,16 +1071,21 @@ impl LanguageType {
         };
 
         let mut checks = CHECKS.iter().filter(|(checked, ..)| *checked == extension).peekable();
-        checks.peek()?;
-        let text = std::fs::read(entry).ok()?;
-        checks
+        if checks.peek().is_none() {
+            return (None, None);
+        }
+        let Ok(text) = std::fs::read(entry) else {
+            return (None, None);
+        };
+        let language = checks
             .find(|(_, _, sources, patterns)| {
                 patterns
                     .get_or_init(|| compile(sources))
                     .iter()
                     .all(|pattern| pattern.is_match(&text))
             })
-            .map(|(_, language, ..)| *language)
+            .map(|(_, language, ..)| *language);
+        (language, Some(text))
     }
 
     /// Get language from a file extension.

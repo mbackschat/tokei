@@ -154,6 +154,28 @@ impl LanguageType {
         Ok(stats)
     }
 
+    /// Parses `bytes`, the contents of the file at `path`, as
+    /// [`LanguageType::parse`] parses the file, decoding them by their byte
+    /// order mark; for bytes [`LanguageType::from_path_with_bytes`] already
+    /// read.
+    pub fn parse_bytes(
+        self,
+        path: PathBuf,
+        bytes: Vec<u8>,
+        config: &Config,
+    ) -> Result<Report, (io::Error, PathBuf)> {
+        let mut text = Vec::new();
+        if let Err(e) = DecodeReaderBytesBuilder::new()
+            .build(bytes.as_slice())
+            .read_to_end(&mut text)
+        {
+            return Err((e, path));
+        }
+        let mut stats = Report::new(path);
+        stats += self.parse_from_slice(text, config);
+        Ok(stats)
+    }
+
     /// Parses the text provided as the given [`LanguageType`].
     pub fn parse_from_str<A: AsRef<str>>(self, text: A, config: &Config) -> CodeStats {
         self.parse_from_slice(text.as_ref().as_bytes(), config)
@@ -644,6 +666,48 @@ mod tests {
             .unwrap();
 
         assert_stats(&stats, 115, 528, 333);
+    }
+
+    #[test]
+    fn detection_hands_over_the_bytes_it_read_to_decide_by_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config::default();
+        let checked = dir.path().join("main.ts");
+        fs::write(&checked, "const x = 1;\n").unwrap();
+        assert_eq!(
+            LanguageType::from_path_with_bytes(&checked, &config),
+            Some((TypeScript, Some(b"const x = 1;\n".to_vec())))
+        );
+        let plain = dir.path().join("main.rs");
+        fs::write(&plain, "fn main() {}\n").unwrap();
+        assert_eq!(
+            LanguageType::from_path_with_bytes(&plain, &config),
+            Some((Rust, None))
+        );
+    }
+
+    /// Counting the bytes detection read decodes them as reading the file
+    /// does, byte order mark included.
+    #[test]
+    fn counting_read_bytes_matches_counting_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config::default();
+        let path = dir.path().join("a.ts");
+        let mut utf16 = vec![0xFF, 0xFE];
+        for unit in "// c\nlet a = '\u{e9}';\n\n".encode_utf16() {
+            utf16.extend_from_slice(&unit.to_le_bytes());
+        }
+        fs::write(&path, &utf16).unwrap();
+        let from_file = TypeScript.parse(path.clone(), &config).unwrap().stats;
+        let from_bytes = TypeScript.parse_bytes(path, utf16, &config).unwrap().stats;
+        assert_eq!(
+            (from_bytes.code, from_bytes.comments, from_bytes.blanks),
+            (from_file.code, from_file.comments, from_file.blanks)
+        );
+        assert_eq!(
+            (from_file.code, from_file.comments, from_file.blanks),
+            (1, 1, 1)
+        );
     }
 
     /// The language `from_path` detects for a file `name` holding `text`.

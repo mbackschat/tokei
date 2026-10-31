@@ -85,13 +85,15 @@ pub fn get_all_files<A: AsRef<Path>>(
         })
     });
 
-    let rx_iter = rx
-        .into_iter()
-        .par_bridge()
-        .filter_map(|e| LanguageType::from_path(e.path(), config).map(|l| (e, l)));
+    let rx_iter = rx.into_iter().par_bridge().filter_map(|e| {
+        LanguageType::from_path_with_bytes(e.path(), config).map(|(l, bytes)| (e, l, bytes))
+    });
 
-    let process = |(entry, language): (DirEntry, LanguageType)| {
-        let result = language.parse(entry.into_path(), config);
+    let process = |(entry, language, bytes): (DirEntry, LanguageType, Option<Vec<u8>>)| {
+        let result = match bytes {
+            Some(bytes) => language.parse_bytes(entry.into_path(), bytes, config),
+            None => language.parse(entry.into_path(), config),
+        };
         let mut lock = languages.lock();
         let entry = lock.entry(language).or_insert_with(Language::new);
         match result {
@@ -110,7 +112,9 @@ pub fn get_all_files<A: AsRef<Path>>(
     };
 
     if let Some(types) = config.types.as_deref() {
-        rx_iter.filter(|(_, l)| types.contains(l)).for_each(process)
+        rx_iter
+            .filter(|(_, l, _)| types.contains(l))
+            .for_each(process)
     } else {
         rx_iter.for_each(process)
     }
