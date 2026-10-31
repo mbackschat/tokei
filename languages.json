@@ -1018,6 +1018,8 @@
       "line_comment": ["//", "#"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "verbatim_quotes": [["@\\\"", "\\\""], ["@'", "'"], ["|||", "|||"]],
+      "doubled_quote_escapes": ["\\\"", "'"],
       "extensions": ["jsonnet", "libsonnet"]
     },
     "Jsx": {
