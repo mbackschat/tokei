@@ -1,9 +1,9 @@
 //! Fortran's fixed source form, the one `.f` files and their kin are read in
-//! unless their content is free form (Fortran 2018 §6.3.3): a `C`, `c` or
-//! `*` in the first column opens a comment line, and a character other than
-//! a blank or a zero in the sixth column of a line whose first five are
-//! blank marks it as continuing the one before, even an `!`, which opens a
-//! comment in any other column (§6.3.3.1).
+//! unless their content is free form (Fortran 2018, J3/18-007r1, §6.3.3): a
+//! `C`, `c` or `*` in the first column opens a comment line (§6.3.3.2), and a
+//! character other than a blank or a zero in the sixth column marks a line
+//! as continuing the one before, even an `!`, which opens a comment in any
+//! other column (§6.3.3.3).
 
 use crate::{utils::ext::SliceExt, LineClass};
 
