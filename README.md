@@ -176,6 +176,7 @@ Declarations in `languages.json`, each grounded in the cited specification or re
 | HCL | `<<` and `<<-` heredocs, whose closing line holds only the marker, and `${…}` interpolations and `%{…}` directives in strings, except the `$${` and `%%{` escapes | `1281560` | [HCL Native Syntax Specification](https://github.com/hashicorp/hcl/blob/v2.25.0/hclsyntax/spec.md), Template Expressions; `hclsyntax/scan_tokens.rl` |
 | Nix | `''…''` strings with their `'''`, `''$` and `''\` escapes, `${…}` holes in both kinds of string, where `$$` is text, and identifiers such as `x''` that hold quotes | `559d1a4` | [Nix Reference Manual, String literals](https://nix.dev/manual/nix/2.35/language/string-literals); `src/libexpr/lexer.l`, Nix 2.35.4 |
 | Jsonnet | `\|\|\|` text blocks and `@"…"` and `@'…'` verbatim strings, whose doubled quote stands for a quote and whose backslash is text | `215dc41` | [Jsonnet language reference, Lexing](https://jsonnet.org/ref/spec.html#lexing); go-jsonnet v0.22.0 `internal/parser/lexer.go` |
+| Bicep | `'''` strings read without escapes and closed by the last three quotes of a run, as in `''''abc''''` | `ecf3ba1` | [Bicep data types, Strings](https://learn.microsoft.com/azure/azure-resource-manager/bicep/data-types#strings); `ScanMultilineString` in `src/Bicep.Core/Parsing/Lexer.cs`, Bicep v0.48.1 |
 
 `locmetry-spike/` holds the development harness that compares these counts with tree-sitter on public repositories; it is not part of the crate.
 
