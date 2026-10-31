@@ -688,7 +688,7 @@
       "extensions": ["f03", "f08", "f90", "f95", "fpp"]
     },
     "FreeMarker": {
-      "multi_line_comments": [["<#--", "-->"]],
+      "multi_line_comments": [["<#--", "-->"], ["[#--", "--]"]],
       "extensions": ["ftl", "ftlh", "ftlx"]
     },
     "FSharp": {
