@@ -1323,7 +1323,13 @@
     },
     "Nim": {
       "line_comment": ["#"],
-      "quotes": [["\\\"", "\\\""], ["\\\"\\\"\\\"", "\\\"\\\"\\\""]],
+      "nested_comments": [["#[", "]#"], ["##[", "]##"]],
+      "quotes": [["\\\"", "\\\""]],
+      "verbatim_quotes": [["r\\\"\\\"\\\"", "\\\"\\\"\\\""], ["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["r\\\"", "\\\""]],
+      "doubled_quote_escapes": ["\\\""],
+      "run_closers": ["\\\"\\\"\\\""],
+      "identifier_quote_prefix": "r",
+      "character_literals": [["'", "'"]],
       "extensions": ["nim"]
     },
     "Nix": {
