@@ -322,7 +322,9 @@
     },
     "Cobol": {
       "name": "COBOL",
-      "line_comment": ["*"],
+      "line_comment": ["*>"],
+      "verbatim_quotes": [["\\\"", "\\\""], ["'", "'"]],
+      "doubled_quote_escapes": ["\\\"", "'"],
       "extensions": ["cob", "cbl", "ccp", "cobol", "cpy"]
     },
     "CodeQL": {

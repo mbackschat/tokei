@@ -10,7 +10,7 @@ use std::{
 use crate::{
     config::Config,
     language::{
-        dialects::{fortran, markdown, pascal, rpm},
+        dialects::{cobol, fortran, markdown, pascal, rpm},
         syntax::{line_end, FileContext, LanguageContext, LineClass, SyntaxCounter},
     },
     stats::{CodeStats, Report},
@@ -123,9 +123,11 @@ impl LanguageType {
         // is read by the full parse only, and so is a line before PHP's code
         // tags, which is output text. Whether a Markdown line opens a code
         // block depends on the lines before it, such as the list item that
-        // holds its fence, so a Markdown file is read whole.
+        // holds its fence, so a Markdown file is read whole, and so is a COBOL
+        // file, whose comment paragraphs and debugging lines depend on lines
+        // before them.
         let simple_prefix = !syntax.shared.block_scalars
-            && !matches!(self, Markdown | UnrealDeveloperMarkdown)
+            && !matches!(self, Markdown | UnrealDeveloperMarkdown | Cobol)
             && syntax.shared.code_tags.is_none()
             && !syntax.opens_with_whole_lines(text);
         if let Some(end) = simple_prefix
@@ -305,6 +307,9 @@ impl LanguageType {
         }
         if self == RPMSpecfile {
             return rpm::parse(config, lines, stats, counted, on_line);
+        }
+        if self == Cobol {
+            return cobol::parse(config, lines, stats, counted, on_line);
         }
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
 

@@ -2,6 +2,7 @@
 //! has, kept apart from the engine's shared mechanisms in `syntax.rs`.
 
 pub(crate) mod batch;
+pub(crate) mod cobol;
 pub(crate) mod commonmark;
 pub(crate) mod elixir;
 pub(crate) mod erlang;
