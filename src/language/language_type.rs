@@ -891,6 +891,14 @@ mod tests {
             ),
             Some(ObjectiveC)
         );
+        // A unity build, as protobuf's GPBProtocolBuffers.m, imports only `.m` files.
+        assert_eq!(
+            detect(
+                "All.m",
+                "#import \"GPBArray.m\"\n#import \"GPBMessage.m\"\n"
+            ),
+            Some(ObjectiveC)
+        );
         // MATLAB and Mercury write `.m` files too.
         assert_eq!(
             detect("f.m", "function y = f(x)\n  y = x + 1; % add\nend\n"),

@@ -1388,7 +1388,7 @@
       "extensions": ["nu"]
     },
     "ObjectiveC": {
-      "content_checked_extensions": {"m": ["^[ \\t]*(?:@(?:interface|class|protocol|property|synchronized|selector|implementation)\\b|@end[ \\t]*\\r?$|#import[ \\t]+.+\\.h[\">])"]},
+      "content_checked_extensions": {"m": ["^[ \\t]*(?:@(?:interface|class|protocol|property|synchronized|selector|implementation)\\b|@end[ \\t]*\\r?$|#import[ \\t]*[\"<])"]},
       "character_literals": [["'", "'"]],
       "line_splices": "c",
       "name": "Objective-C",
