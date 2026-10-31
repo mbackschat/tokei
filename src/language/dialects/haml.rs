@@ -9,10 +9,8 @@
 
 use std::ops::Range;
 
-use grep_searcher::LineStep;
-
 use crate::language::{language_type::LineReport, syntax::LineClass};
-use crate::utils::ext::SliceExt;
+use crate::utils::ext::{leading_blanks, SliceExt};
 use crate::{CodeStats, Config};
 
 #[derive(Clone, Copy, PartialEq)]
@@ -24,22 +22,13 @@ enum Block {
 pub(crate) fn parse(
     _config: &Config,
     text: &[u8],
-    mut stats: CodeStats,
+    stats: CodeStats,
     counted: Range<usize>,
     on_line: &mut impl FnMut(LineReport<'_>),
 ) -> CodeStats {
-    let mut lines = Vec::new();
-    let mut stepper = LineStep::new(b'\n', 0, text.len());
-    while let Some((start, end)) = stepper.next(text) {
-        lines.push(start..end);
-    }
-    for (line, class) in lines.iter().zip(classes(text, &lines)) {
-        if counted.contains(&line.start) {
-            stats.add_line(class);
-            on_line(LineReport::Class(Some(class)));
-        }
-    }
-    stats
+    let lines: Vec<_> = super::lines(text).collect();
+    let classes = classes(text, &lines);
+    super::report(lines.into_iter().zip(classes), stats, counted, on_line)
 }
 
 fn classes(text: &[u8], lines: &[Range<usize>]) -> Vec<LineClass> {
@@ -50,10 +39,7 @@ fn classes(text: &[u8], lines: &[Range<usize>]) -> Vec<LineClass> {
     let mut blanks = 0;
     for line in lines {
         let line = &text[line.clone()];
-        let indent = line
-            .iter()
-            .take_while(|&&b| b == b' ' || b == b'\t')
-            .count();
+        let indent = leading_blanks(line);
         let content = line[indent..].trim_end();
         if content.is_empty() {
             classes.push(LineClass::Blank);

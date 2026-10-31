@@ -11,8 +11,6 @@
 
 use std::ops::Range;
 
-use grep_searcher::LineStep;
-
 use crate::language::{language_type::LineReport, syntax::LineClass};
 use crate::utils::ext::SliceExt;
 use crate::{CodeStats, Config};
@@ -20,14 +18,13 @@ use crate::{CodeStats, Config};
 pub(crate) fn parse(
     _config: &Config,
     text: &[u8],
-    mut stats: CodeStats,
+    stats: CodeStats,
     counted: Range<usize>,
     on_line: &mut impl FnMut(LineReport<'_>),
 ) -> CodeStats {
     let mut in_comment = false;
-    let mut stepper = LineStep::new(b'\n', 0, text.len());
-    while let Some((start, end)) = stepper.next(text) {
-        let line = &text[start..end];
+    let classes = super::lines(text).map(|range| {
+        let line = &text[range.clone()];
         let class = if in_comment {
             in_comment = !trin_end(line).ends_with(b"'/");
             LineClass::Comment
@@ -41,12 +38,9 @@ pub(crate) fn parse(
         } else {
             LineClass::Code
         };
-        if counted.contains(&start) {
-            stats.add_line(class);
-            on_line(LineReport::Class(Some(class)));
-        }
-    }
-    stats
+        (range, class)
+    });
+    super::report(classes, stats, counted, on_line)
 }
 
 /// `COMMENT_LONG_START`: `/'` after blanks, with no `'/` on the line.

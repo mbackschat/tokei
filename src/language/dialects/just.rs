@@ -14,10 +14,9 @@
 
 use std::ops::Range;
 
-use grep_searcher::LineStep;
-
 use crate::language::{language_type::LineReport, syntax::LineClass};
-use crate::{utils::ext::SliceExt, CodeStats, Config, LanguageType};
+use crate::utils::ext::{leading_blanks, SliceExt};
+use crate::{CodeStats, Config, LanguageType};
 
 /// What a line holds outside recipe bodies, by the bytes it holds.
 #[derive(Clone, Copy, Default)]
@@ -220,13 +219,6 @@ impl<'a> Reader<'a> {
         }
         at
     }
-}
-
-/// The leading blanks of a line.
-fn leading_blanks(line: &[u8]) -> usize {
-    line.iter()
-        .take_while(|b| matches!(b, b' ' | b'\t'))
-        .count()
 }
 
 /// Whether only blank lines lie between `at` and the next line that starts
@@ -444,24 +436,17 @@ fn script_classes(
         });
     }
     blank_interpolations(&mut script);
-    language
-        .line_classes(&script, config)
-        .filter(|classes| classes.len() == lines.len())
-        .unwrap_or_else(|| vec![LineClass::Code; lines.len()])
+    super::classes_or_code(config, language, &script, lines.len())
 }
 
 pub(crate) fn parse(
     config: &Config,
     text: &[u8],
-    mut stats: CodeStats,
+    stats: CodeStats,
     counted: Range<usize>,
     on_line: &mut impl FnMut(LineReport<'_>),
 ) -> CodeStats {
-    let mut lines = Vec::new();
-    let mut stepper = LineStep::new(b'\n', 0, text.len());
-    while let Some((start, end)) = stepper.next(text) {
-        lines.push(start..end);
-    }
+    let lines: Vec<_> = super::lines(text).collect();
     if lines.is_empty() {
         return stats;
     }
@@ -489,11 +474,5 @@ pub(crate) fn parse(
         };
         classes[body.lines].copy_from_slice(&body_classes);
     }
-    for (line, class) in lines.iter().zip(classes) {
-        if counted.contains(&line.start) {
-            stats.add_line(class);
-            on_line(LineReport::Class(Some(class)));
-        }
-    }
-    stats
+    super::report(lines.into_iter().zip(classes), stats, counted, on_line)
 }

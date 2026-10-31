@@ -12,8 +12,6 @@
 
 use std::{borrow::Cow, ops::Range};
 
-use grep_searcher::LineStep;
-
 use crate::language::{language_type::LineReport, syntax::LineClass};
 use crate::{CodeStats, Config};
 
@@ -37,20 +35,16 @@ const TEXT_END: usize = 72;
 pub(crate) fn parse(
     _config: &Config,
     text: &[u8],
-    mut stats: CodeStats,
+    stats: CodeStats,
     counted: Range<usize>,
     on_line: &mut impl FnMut(LineReport<'_>),
 ) -> CodeStats {
     let mut reader = Reader::new(text);
-    let mut stepper = LineStep::new(b'\n', 0, text.len());
-    while let Some((start, end)) = stepper.next(text) {
-        let class = reader.class(&text[start..end]);
-        if counted.contains(&start) {
-            stats.add_line(class);
-            on_line(LineReport::Class(Some(class)));
-        }
-    }
-    stats
+    let classes = super::lines(text).map(|line| {
+        let class = reader.class(&text[line.clone()]);
+        (line, class)
+    });
+    super::report(classes, stats, counted, on_line)
 }
 
 /// The state that carries from line to line.

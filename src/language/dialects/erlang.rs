@@ -39,7 +39,7 @@ pub(crate) fn sigil_len(lines: &[u8], i: usize) -> Option<usize> {
             delimiter => closing_bracket(delimiter)?,
         };
         let escapes = matches!(name, b"" | b"b" | b"s");
-        text_end(lines, open + 1, close, escapes)?
+        super::text_end(lines, open + 1, close, escapes)?
     };
     let suffix = lines[end..]
         .iter()
@@ -52,22 +52,6 @@ pub(crate) fn sigil_len(lines: &[u8], i: usize) -> Option<usize> {
 /// `_` or `@`, or a byte of a non-ASCII letter (erl_scan.erl, `scan_name`).
 fn is_name_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'@') || byte >= 0x80
-}
-
-/// The end of a sigil's text from `lines[from]`, after its `close`.
-fn text_end(lines: &[u8], from: usize, close: u8, escapes: bool) -> Option<usize> {
-    let mut j = from;
-    while let Some(&byte) = lines.get(j) {
-        if escapes && byte == b'\\' {
-            j += 2;
-            continue;
-        }
-        if byte == close {
-            return Some(j + 1);
-        }
-        j += 1;
-    }
-    None
 }
 
 /// The end of the triple-quoted text whose quotes start at `lines[open]`:

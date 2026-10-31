@@ -26,6 +26,13 @@ pub(crate) fn utf8_len(lead: u8) -> usize {
     }
 }
 
+/// The number of spaces and tabs that start `line`.
+pub(crate) fn leading_blanks(line: &[u8]) -> usize {
+    line.iter()
+        .take_while(|b| matches!(b, b' ' | b'\t'))
+        .count()
+}
+
 pub(crate) trait SliceExt {
     fn trim_first_and_last_line_of_whitespace(&self) -> &Self;
     fn trim_start(&self) -> &Self;

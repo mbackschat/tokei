@@ -4,6 +4,8 @@
 //! `stringInComment`, `verbatimStringInComment` and
 //! `tripleQuoteStringInComment` rules).
 
+use crate::utils::ext::utf8_len;
+
 /// Length of the literal starting `window` inside a block comment, when it
 /// closes on its line: a `"""` string, an `@"` string with doubled quotes, a
 /// `"` string with backslash escapes, or a character literal.
@@ -14,37 +16,11 @@ pub(crate) fn comment_literal_len(window: &[u8]) -> Option<usize> {
     let line = &window[..memchr::memchr(b'\n', window).unwrap_or(window.len())];
     match line {
         [b'"', b'"', b'"', rest @ ..] => memchr::memmem::find(rest, b"\"\"\"").map(|at| 3 + at + 3),
-        [b'@', b'"', rest @ ..] => verbatim_end(rest).map(|end| 2 + end),
-        [b'"', rest @ ..] => string_end(rest).map(|end| 1 + end),
+        [b'@', b'"', rest @ ..] => super::doubled_quote_end(rest, 0).map(|end| 2 + end),
+        [b'"', rest @ ..] => super::text_end(rest, 0, b'"', true).map(|end| 1 + end),
         [b'\'', rest @ ..] => character_len(rest).map(|len| 1 + len),
         _ => None,
     }
-}
-
-/// Length up to and including the closing quote of an `@"` string's text.
-fn verbatim_end(text: &[u8]) -> Option<usize> {
-    let mut i = 0;
-    while i < text.len() {
-        match text[i..] {
-            [b'"', b'"', ..] => i += 2,
-            [b'"', ..] => return Some(i + 1),
-            _ => i += 1,
-        }
-    }
-    None
-}
-
-/// Length up to and including the closing quote of a `"` string's text.
-fn string_end(text: &[u8]) -> Option<usize> {
-    let mut i = 0;
-    while i < text.len() {
-        match text[i] {
-            b'\\' => i += 2,
-            b'"' => return Some(i + 1),
-            _ => i += 1,
-        }
-    }
-    None
 }
 
 /// Length up to and including the closing `'` of a character literal's
@@ -59,10 +35,10 @@ fn character_len(text: &[u8]) -> Option<usize> {
             _ => return None,
         },
         b'\t' | 0x08 | b'\r' => return None,
-        b if b < 0x80 => 1,
-        b if b >= 0xF0 => return None,
-        b if b >= 0xE0 => 3,
-        _ => 2,
+        lead => match utf8_len(lead) {
+            4 => return None,
+            len => len,
+        },
     };
     (text.get(len) == Some(&b'\'')).then_some(len + 1)
 }

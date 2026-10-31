@@ -12,25 +12,12 @@
 pub(crate) fn comment_literal_len(window: &[u8]) -> Option<usize> {
     let line = &window[..memchr::memchr(b'\n', window).unwrap_or(window.len())];
     match line {
-        [b'"', rest @ ..] => string_end(rest).map(|end| 1 + end),
+        [b'"', rest @ ..] => super::text_end(rest, 0, b'"', true).map(|end| 1 + end),
         [b'{', rest @ ..] => quoted_string_len(rest).map(|len| 1 + len),
         [b'\'', b'\'', ..] => Some(2),
         [b'\'', rest @ ..] => character_len(rest).map(|len| 1 + len),
         _ => None,
     }
-}
-
-/// Length up to and including the closing quote of a `"` string's text.
-fn string_end(text: &[u8]) -> Option<usize> {
-    let mut i = 0;
-    while i < text.len() {
-        match text[i] {
-            b'\\' => i += 2,
-            b'"' => return Some(i + 1),
-            _ => i += 1,
-        }
-    }
-    None
 }
 
 /// Length of a quoted string after its `{`: an optional `%` or `%%`

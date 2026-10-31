@@ -16,9 +16,8 @@
 
 use std::ops::Range;
 
-use grep_searcher::LineStep;
-
 use crate::language::{language_type::LineReport, syntax::LineClass};
+use crate::utils::ext::AsciiExt;
 use crate::{CodeStats, Config};
 
 #[derive(Clone, Copy, PartialEq)]
@@ -31,30 +30,22 @@ enum Byte {
 pub(crate) fn parse(
     _config: &Config,
     text: &[u8],
-    mut stats: CodeStats,
+    stats: CodeStats,
     counted: Range<usize>,
     on_line: &mut impl FnMut(LineReport<'_>),
 ) -> CodeStats {
     let bytes = classes(text);
-    let mut stepper = LineStep::new(b'\n', 0, text.len());
-    while let Some((start, end)) = stepper.next(text) {
-        let class = line_class(&text[start..end], &bytes[start..end]);
-        if counted.contains(&start) {
-            stats.add_line(class);
-            on_line(LineReport::Class(Some(class)));
-        }
-    }
-    stats
-}
-
-fn is_whitespace(byte: u8) -> bool {
-    byte.is_ascii_whitespace() || byte == 0x0b
+    let classes = super::lines(text).map(|line| {
+        let class = line_class(&text[line.clone()], &bytes[line.clone()]);
+        (line, class)
+    });
+    super::report(classes, stats, counted, on_line)
 }
 
 fn line_class(line: &[u8], bytes: &[Byte]) -> LineClass {
     let mut text_seen = false;
     for (&byte, &class) in line.iter().zip(bytes) {
-        if !is_whitespace(byte) {
+        if !byte.is_whitespace() {
             if class != Byte::Comment {
                 return LineClass::Code;
             }
@@ -163,7 +154,7 @@ fn liquid_tag(text: &[u8], markup: Range<usize>, bytes: &mut [Byte]) {
             memchr::memchr(b'\n', &text[start..markup.end]).map_or(markup.end, |at| start + at);
         let leading = text[start..end]
             .iter()
-            .take_while(|&&b| is_whitespace(b))
+            .take_while(|b| b.is_whitespace())
             .count();
         let name_start = start + leading;
         let name = tag_name(&text[name_start..end]);
@@ -216,7 +207,7 @@ fn full_token(token: &[u8]) -> Option<(&[u8], Range<usize>)> {
     let mut at = 2 + usize::from(token.get(2) == Some(&b'-'));
     at += token[at..inner_end]
         .iter()
-        .take_while(|&&b| is_whitespace(b))
+        .take_while(|b| b.is_whitespace())
         .count();
     let name = tag_name(&token[at..inner_end]);
     if name.is_empty() {
@@ -225,7 +216,7 @@ fn full_token(token: &[u8]) -> Option<(&[u8], Range<usize>)> {
     at += name.len();
     at += token[at..inner_end]
         .iter()
-        .take_while(|&&b| is_whitespace(b))
+        .take_while(|b| b.is_whitespace())
         .count();
     let markup_end = if inner_end > at && token[inner_end - 1] == b'-' {
         inner_end - 1
@@ -243,10 +234,7 @@ fn possibly_invalid_name(token: &[u8]) -> Option<&[u8]> {
     }
     memchr::memmem::rfind_iter(token, b"{%").find_map(|open| {
         let mut at = open + 2 + usize::from(token.get(open + 2) == Some(&b'-'));
-        at += token[at..]
-            .iter()
-            .take_while(|&&b| is_whitespace(b))
-            .count();
+        at += token[at..].iter().take_while(|b| b.is_whitespace()).count();
         let name = tag_name(&token[at..]);
         (!name.is_empty() && name != b"#").then_some(name)
     })

@@ -9,6 +9,7 @@
 //! marker in it opens nothing, while its `<%= … %>` holes hold Visual Basic
 //! code (Visual Basic Language Specification, "XML Literal Expressions").
 
+use crate::language::heredoc::is_identifier_byte;
 use crate::utils::ext::SliceExt;
 
 /// Whether a `REM` comment starts at `lines[i]`. A `REM` after an identifier
@@ -21,12 +22,6 @@ pub(crate) fn starts_rem(lines: &[u8], i: usize) -> bool {
             .get(i..i + 3)
             .is_some_and(|word| word.eq_ignore_ascii_case(b"rem"))
         && lines.get(i + 3).map_or(true, |&b| !is_identifier_byte(b))
-}
-
-/// Bytes that may continue an identifier; every byte of a non-ASCII
-/// character counts, as most of them are letters.
-fn is_identifier_byte(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_' || !b.is_ascii()
 }
 
 /// The keywords after which an expression, and so an XML literal, may start.
@@ -191,24 +186,12 @@ fn embedded_end(lines: &[u8], k: usize) -> Option<usize> {
     while let Some(&byte) = lines.get(j) {
         j = match byte {
             b'%' if lines.get(j + 1) == Some(&b'>') => return Some(j + 2),
-            b'"' => string_end(lines, j)?,
+            b'"' => super::doubled_quote_end(lines, j + 1)?,
             b'<' => xml_literal_len(lines, j).map_or(j + 1, |len| j + len),
             _ => j + 1,
         };
     }
     None
-}
-
-/// The end of the string at `lines[j]`, in which `""` is a quote.
-fn string_end(lines: &[u8], j: usize) -> Option<usize> {
-    let mut k = j + 1;
-    loop {
-        k += memchr::memchr(b'"', &lines[k..])? + 1;
-        if lines.get(k) != Some(&b'"') {
-            return Some(k);
-        }
-        k += 1;
-    }
 }
 
 fn skip_whitespace(lines: &[u8], k: usize) -> usize {

@@ -13,8 +13,6 @@
 
 use std::ops::Range;
 
-use grep_searcher::LineStep;
-
 use crate::language::{language_type::LineReport, syntax::LineClass};
 use crate::{utils::ext::SliceExt, CodeStats, Config, LanguageType};
 
@@ -105,24 +103,17 @@ fn body_classes(
     let Some((first, last)) = lines.first().zip(lines.last()) else {
         return Vec::new();
     };
-    language
-        .line_classes(&text[first.start..last.end], config)
-        .filter(|classes| classes.len() == lines.len())
-        .unwrap_or_else(|| vec![LineClass::Code; lines.len()])
+    super::classes_or_code(config, language, &text[first.start..last.end], lines.len())
 }
 
 pub(crate) fn parse(
     config: &Config,
     text: &[u8],
-    mut stats: CodeStats,
+    stats: CodeStats,
     counted: Range<usize>,
     on_line: &mut impl FnMut(LineReport<'_>),
 ) -> CodeStats {
-    let mut lines = Vec::new();
-    let mut stepper = LineStep::new(b'\n', 0, text.len());
-    while let Some((start, end)) = stepper.next(text) {
-        lines.push(start..end);
-    }
+    let lines: Vec<_> = super::lines(text).collect();
     let mut classes = Vec::with_capacity(lines.len());
     let mut body: Option<Body> = None;
     // The statement read so far, joined, and its first line.
@@ -185,11 +176,5 @@ pub(crate) fn parse(
         }
         (None, None) => {}
     }
-    for (line, class) in lines.iter().zip(classes) {
-        if counted.contains(&line.start) {
-            stats.add_line(class);
-            on_line(LineReport::Class(Some(class)));
-        }
-    }
-    stats
+    super::report(lines.into_iter().zip(classes), stats, counted, on_line)
 }
