@@ -203,6 +203,7 @@ pub(crate) struct SharedMatchers {
     pub quotes_in_tags: bool,
     pub template_expressions: &'static [(&'static str, &'static str)],
     pub word_delimiters: &'static [u8],
+    pub identifier_bytes: &'static [u8],
     pub quotes_after: Option<&'static [&'static str]>,
     pub block_scalars: bool,
     pub jsx: bool,
@@ -585,6 +586,7 @@ impl SharedMatchers {
             quotes_in_tags: language.quotes_in_tags(),
             template_expressions: language.template_expressions(),
             word_delimiters: language.word_delimiters().as_bytes(),
+            identifier_bytes: language.identifier_bytes().as_bytes(),
             quotes_after: language.quotes_after(),
             block_scalars: language.block_scalars(),
             jsx: language.jsx(),
@@ -1197,7 +1199,7 @@ impl SyntaxCounter {
             }
 
             self.track_flow_collection(lines, i);
-            let may_quote = self.may_open_quote(lines, i);
+            let may_quote = self.may_open_quote(lines, i) && !self.continues_identifier(lines, i);
             let is_quote_or_multi_line = may_quote
                 .then(|| self.parse_quote(window, i > 0 && is_word_byte(lines[i - 1])))
                 .flatten()
@@ -1651,6 +1653,13 @@ impl SyntaxCounter {
     #[inline]
     pub(crate) fn parse_end_of_quote(&mut self, lines: &[u8], i: usize) -> Option<usize> {
         let window = &lines[i..];
+        // A text standing for a character comes before the closer, which it
+        // may start with, as Nix's `'''` does in `''…''` strings (Nix
+        // Reference Manual, "String literals"; `IND_STRING` rules in
+        // `src/libexpr/lexer.l`, Nix 2.35.4).
+        if let Some(len) = self.hole_literal_len(window) {
+            return Some(len);
+        }
         #[allow(clippy::if_same_then_else)]
         if let Some((quote, len)) = self
             .quote
@@ -1759,33 +1768,36 @@ impl SyntaxCounter {
 
     /// Inside an interpolating string, skips text that only looks like a hole
     /// or is escaped, or suspends the string at the start of a hole.
-    fn parse_start_of_hole(&mut self, window: &[u8]) -> Option<usize> {
+    /// The interpolations of the string being read, if `window` can start a
+    /// hole or a literal of one.
+    fn hole_kinds(&self, window: &[u8]) -> Option<impl Iterator<Item = &'static Interpolation>> {
         let opener = self.quote_opener;
         if !self.shared.hole_bytes[usize::from(*window.first()?)]
             || !self.shared.interpolating_quote_bytes[usize::from(*opener.as_bytes().first()?)]
         {
             return None;
         }
-        let mut kinds = self
-            .shared
-            .interpolations
-            .iter()
-            .filter(|kind| kind.quote == opener)
-            .peekable();
-        kinds.peek()?;
-        let mut hole = None;
-        for kind in kinds {
-            if let Some(literal) = kind
-                .literal
+        let interpolations: &'static [Interpolation] = self.shared.interpolations;
+        Some(
+            interpolations
                 .iter()
-                .find(|l| window.starts_with(l.as_bytes()))
-            {
-                return Some(literal.len());
-            }
-            if hole.is_none() && window.starts_with(kind.open.as_bytes()) {
-                hole = Some(kind);
-            }
-        }
+                .filter(move |kind| kind.quote == opener),
+        )
+    }
+
+    /// The length of a text in the string being read that would otherwise
+    /// open a hole or close the string, such as C#'s `{{`.
+    fn hole_literal_len(&self, window: &[u8]) -> Option<usize> {
+        self.hole_kinds(window)?
+            .flat_map(|kind| kind.literal)
+            .find(|literal| window.starts_with(literal.as_bytes()))
+            .map(|literal| literal.len())
+    }
+
+    fn parse_start_of_hole(&mut self, window: &[u8]) -> Option<usize> {
+        let mut kinds = self.hole_kinds(window)?.peekable();
+        kinds.peek()?;
+        let hole = kinds.find(|kind| window.starts_with(kind.open.as_bytes()));
         let Some(kind) = hole else {
             // An escaped character, such as the `$` of JavaScript's `\${`,
             // cannot open a hole.
@@ -1875,6 +1887,21 @@ impl SyntaxCounter {
             trace!("Start heredoc, body ends at {}", self.literal_end);
             Some(opening.len)
         })
+    }
+
+    /// Whether `lines[i]` continues an identifier, as the quotes of `x''`
+    /// do in Nix, whose identifiers are `[a-zA-Z_][a-zA-Z0-9_'-]*` (`ID` in
+    /// `src/libexpr/lexer.l`, Nix 2.35.4): it is one of the language's
+    /// identifier bytes and the run of identifier characters before it holds
+    /// a letter or underscore, which starts an identifier.
+    fn continues_identifier(&self, lines: &[u8], i: usize) -> bool {
+        let continues = |b: &u8| is_word_byte(*b) || self.shared.identifier_bytes.contains(b);
+        self.shared.identifier_bytes.contains(&lines[i])
+            && lines[..i]
+                .iter()
+                .rev()
+                .take_while(|b| continues(b))
+                .any(|b| b.is_ascii_alphabetic() || *b == b'_')
     }
 
     /// Whether a word can start at `lines[i]`: at the start of the text, or

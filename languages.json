@@ -1350,7 +1350,10 @@
     },
     "Nix": {
       "multi_line_comments": [["/*", "*/"]],
+      "identifier_bytes": "'-",
       "quotes": [["\\\"", "\\\""]],
+      "verbatim_quotes": [["''", "''"]],
+      "interpolations": [{"quote": "\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$$"]}, {"quote": "''", "open": "${", "close": "}", "nest": "{", "literal": ["'''", "''$", "''\\\\'", "''\\\\$", "''\\\\", "$$"]}],
       "line_comment": ["#"],
       "extensions": ["nix"]
     },

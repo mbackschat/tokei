@@ -683,6 +683,17 @@ impl LanguageType {
         }
     }
 
+    /// Returns the characters besides letters, digits and underscores that
+    /// continue an identifier, for languages where a quote made of them is
+    /// part of an identifier it follows, as `''` is in Nix's `x''`.
+    pub(crate) fn identifier_bytes(self) -> &'static str {
+        match self {
+            {% for key, value in languages -%}
+                {{key}} => "{{ value.identifier_bytes | default(value="") }}",
+            {% endfor %}
+        }
+    }
+
     /// Returns the characters besides whitespace after which a word can
     /// start, for languages whose comments or quotes must start a word.
     pub(crate) fn word_delimiters(self) -> &'static str {
