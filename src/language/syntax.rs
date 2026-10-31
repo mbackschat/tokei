@@ -148,6 +148,14 @@ pub(crate) struct SharedMatchers {
     pub is_literate: bool,
     pub line_comments: &'static [&'static str],
     pub line_start_comments: &'static [&'static str],
+    /// Whether any rule makes a comment of a line by how it starts besides
+    /// its line comments, which `starts_with_line_start_comment` reads.
+    pub line_start_rules: bool,
+    /// Whether a rule other than a shebang or a frontmatter, which open a
+    /// file only, may classify any line whole before it is read, as
+    /// `whole_line_class` does; checking them all cost a Rust line without
+    /// syntax 58 instructions (callgrind, 2026-10-31).
+    pub whole_line_rules: bool,
     pub preprocessor_directives: &'static [&'static str],
     pub line_comment_flags: &'static [u8],
     pub batch_remarks: bool,
@@ -243,13 +251,20 @@ impl SharedMatchers {
     pub(crate) fn plain_line_class(&self, line: &[u8]) -> LineClass {
         if self.blank_symbols.trim_start(line).is_empty() {
             LineClass::Blank
-        } else if self.is_literate
+        } else {
+            self.non_blank_line_class(line)
+        }
+    }
+
+    /// The class of a line without syntax that is not blank.
+    pub(crate) fn non_blank_line_class(&self, line: &[u8]) -> LineClass {
+        if self.is_literate
             || self
                 .line_comments
                 .iter()
                 .any(|c| line.starts_with(c.as_bytes()))
             || (self.rem_comments && visual_basic::starts_rem(line, 0))
-            || self.starts_with_line_start_comment(line)
+            || (self.line_start_rules && self.starts_with_line_start_comment(line))
         {
             LineClass::Comment
         } else {
@@ -533,6 +548,13 @@ impl SharedMatchers {
             any_comments: language.any_comments(),
             line_comments: language.line_comments(),
             line_start_comments: language.line_start_comments(),
+            line_start_rules: !language.line_start_comments().is_empty()
+                || language.batch_remarks()
+                || !language.line_comment_flags().is_empty(),
+            whole_line_rules: language.masm_comments()
+                || language.pod().is_some()
+                || !language.line_directives().is_empty()
+                || !language.end_markers().is_empty(),
             preprocessor_directives: language.preprocessor_directives(),
             line_comment_flags: language.line_comment_flags(),
             batch_remarks: language.batch_remarks(),
@@ -699,12 +721,31 @@ impl SyntaxCounter {
     /// of a Perl POD block is a comment (perlpod); and a line after an end
     /// marker such as `__END__` is data, so code or blank (perldata, "Special
     /// Literals").
+    #[inline]
     pub(crate) fn whole_line_class(
         &mut self,
         lines: &[u8],
         start: usize,
         end: usize,
     ) -> Option<LineClass> {
+        // Most lines meet no rule, so they are told apart here, inlined,
+        // from the few that `read_whole_line` must read: the first line,
+        // which a shebang may open, and a line starting with a frontmatter
+        // fence's dash.
+        let may_meet_rule = self.fixed_form
+            || self.shared.whole_line_rules
+            || start == 0
+            || (self.shared.frontmatter && lines.get(start) == Some(&b'-'));
+        if start >= self.literal_end
+            && start >= self.comment_end
+            && (!may_meet_rule || !self.is_plain_mode())
+        {
+            return None;
+        }
+        self.read_whole_line(lines, start, end)
+    }
+
+    fn read_whole_line(&mut self, lines: &[u8], start: usize, end: usize) -> Option<LineClass> {
         if start < self.literal_end {
             return Some(
                 if start < self.text_end && lines[start..end].trim().is_empty() {
@@ -735,12 +776,16 @@ impl SyntaxCounter {
         {
             return Some(LineClass::Comment);
         }
-        if self.shared.frontmatter {
+        // A frontmatter's fence starts its line with dashes.
+        if self.shared.frontmatter && lines.get(start) == Some(&b'-') {
             if let Some(frontmatter_end) = frontmatter_end(lines, start) {
                 trace!("Start frontmatter, ends at {}", frontmatter_end);
                 self.literal_end = frontmatter_end;
                 return Some(LineClass::Code);
             }
+        }
+        if !self.shared.whole_line_rules {
+            return None;
         }
         if self.shared.masm_comments {
             if let Some(end) = masm::comment_block_end(lines, start) {
@@ -968,7 +1013,8 @@ impl SyntaxCounter {
             false
         } else {
             trace!("^ Skippable");
-            stats.add_line(self.shared.plain_line_class(line));
+            // The line is not blank, as checked above.
+            stats.add_line(self.shared.non_blank_line_class(line));
             true
         }
     }

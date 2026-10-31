@@ -338,13 +338,9 @@ impl SyntaxCounter {
 
     /// Reads the end of a YAML line that did not start inside a literal: when
     /// it ends in a plain scalar that continues on the next lines, those
-    /// lines are its text.
+    /// lines are its text. Only languages with block scalars call it.
     pub(crate) fn end_line(&mut self, lines: &[u8], start: usize) {
-        if !self.shared.block_scalars
-            || self.flow_depth > 0
-            || !self.is_plain_mode()
-            || self.literal_end > start
-        {
+        if self.flow_depth > 0 || !self.is_plain_mode() || self.literal_end > start {
             return;
         }
         if let Some(scalar_end) = plain_scalar_end(lines, start) {

@@ -429,7 +429,8 @@ impl LanguageType {
                     trace!("Code No.{}", stats.code);
                 }
             }
-            if reads_line {
+            // Only a block scalar's plain scalar continues past its line.
+            if reads_line && syntax.shared.block_scalars {
                 syntax.end_line(lines, start);
             }
             if !is_counted {
