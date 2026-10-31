@@ -1083,6 +1083,19 @@ mod tests {
     }
 
     #[test]
+    fn powershell_xml_files_are_xml() {
+        let xml = "<?xml version=\"1.0\"?>\n<!-- # not a comment in PowerShell -->\n<Types/>\n";
+        for name in ["Pester.Format.ps1xml", "MSFT_MpScan.cdxml", "console.psc1"] {
+            assert_eq!(detect(name, xml), Some(Xml), "{name}");
+        }
+        // Session configuration files are a PowerShell hashtable.
+        assert_eq!(
+            detect("app.pssc", "@{ SchemaVersion = '2.0.0.0' }\n"),
+            Some(PowerShell)
+        );
+    }
+
+    #[test]
     fn an_srt_subtitle_file_is_text_and_otherwise_srecode() {
         assert_eq!(
             detect("movie.srt", "1\n00:00:01,000 --> 00:00:02,500\nHello.\n\n"),

@@ -1566,7 +1566,7 @@
         {"quote": "„", "open": "$(", "close": ")", "nest": "("}
       ],
       "line_start_closers": ["\\\"@", "'@"],
-      "extensions": ["ps1", "psm1", "psd1", "ps1xml", "cdxml", "pssc", "psc1"]
+      "extensions": ["ps1", "psm1", "psd1", "pssc"]
     },
     "PRACTICE": {
       "name": "Lauterbach PRACTICE Script",
@@ -2298,7 +2298,7 @@
       "name": "XML",
       "multi_line_comments": [["<!--", "-->"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "extensions": ["xml"]
+      "extensions": ["xml", "ps1xml", "cdxml", "psc1"]
     },
     "XSL": {
       "name": "XSL",
