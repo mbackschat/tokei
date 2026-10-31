@@ -1287,10 +1287,11 @@
       "extensions": ["mlt"]
     },
     "Modelica": {
+      "content_checked_extensions": {"mo": ["(?-u)\\A[^\\x00]*\\z"]},
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""]],
-      "extensions": ["mo", "mos"]
+      "extensions": ["mos"]
     },
     "ModuleDef": {
       "name": "Module-Definition",

@@ -711,7 +711,7 @@ mod tests {
     }
 
     /// The language `from_path` detects for a file `name` holding `text`.
-    fn detect(name: &str, text: &str) -> Option<LanguageType> {
+    fn detect(name: &str, text: impl AsRef<[u8]>) -> Option<LanguageType> {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join(name);
         fs::write(&path, text).unwrap();
@@ -1023,6 +1023,23 @@ mod tests {
             ),
             Some(Puppet)
         );
+    }
+
+    #[test]
+    fn a_mo_file_is_modelica_only_as_text() {
+        assert_eq!(
+            detect("Tank.mo", "model Tank\n  Real level;\nend Tank;\n"),
+            Some(Modelica)
+        );
+        assert_eq!(detect("run.mos", "simulate(Tank);\n"), Some(Modelica));
+        // A compiled gettext catalog, as Django ships hundreds of: the GNU MO
+        // header of little-endian integers, then NUL-terminated strings.
+        let mut catalog = Vec::new();
+        for word in [0x9504_12de_u32, 0, 1, 28, 36, 0, 0, 0, 44, 5, 45] {
+            catalog.extend_from_slice(&word.to_le_bytes());
+        }
+        catalog.extend_from_slice(b"\0hello\nworld\0");
+        assert_eq!(detect("django.mo", catalog), None);
     }
 
     #[test]
