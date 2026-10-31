@@ -12,6 +12,7 @@ pub(crate) mod julia;
 pub(crate) mod m4;
 pub(crate) mod make;
 pub(crate) mod markdown;
+pub(crate) mod ocaml;
 pub(crate) mod perl;
 pub(crate) mod php;
 pub(crate) mod rpm;
@@ -27,6 +28,7 @@ pub(crate) mod yaml;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CommentLiterals {
     FSharp,
+    OCaml,
 }
 
 impl CommentLiterals {
@@ -34,6 +36,7 @@ impl CommentLiterals {
     pub(crate) fn len(self, window: &[u8]) -> Option<usize> {
         match self {
             CommentLiterals::FSharp => fsharp::comment_literal_len(window),
+            CommentLiterals::OCaml => ocaml::comment_literal_len(window),
         }
     }
 }

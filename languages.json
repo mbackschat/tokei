@@ -1377,6 +1377,7 @@
       "character_literals": [["'", "'"]],
       "quotes": [["\\\"", "\\\""]],
       "multi_line_comments": [["(*", "*)"]],
+      "comment_literals": "ocaml",
       "extensions": ["ml", "mli", "re", "rei"]
     },
     "Odin": {

@@ -530,7 +530,7 @@ impl LanguageType {
     pub(crate) fn comment_literals(self) -> Option<crate::language::dialects::CommentLiterals> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.comment_literals is defined and value.comment_literals == "fsharp" %}Some(crate::language::dialects::CommentLiterals::FSharp){% else %}None{% endif %},
+                {{key}} => {% if value.comment_literals is defined and value.comment_literals == "fsharp" %}Some(crate::language::dialects::CommentLiterals::FSharp){% elif value.comment_literals is defined and value.comment_literals == "ocaml" %}Some(crate::language::dialects::CommentLiterals::OCaml){% else %}None{% endif %},
             {% endfor %}
         }
     }
