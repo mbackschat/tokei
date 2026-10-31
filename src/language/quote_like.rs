@@ -25,19 +25,27 @@ pub(crate) enum QuoteLikeSyntax {
     },
 }
 
-/// Whose character literals a `?` starts.
+/// Whose character literals a prefix and one character form, as Ruby's and
+/// Elixir's `?a` do.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum QuestionMarkSyntax {
+pub(crate) enum PrefixCharacterSyntax {
     Ruby,
     Elixir,
 }
 
-impl QuestionMarkSyntax {
-    /// Length of the character literal that the `?` at `lines[i]` starts.
+impl PrefixCharacterSyntax {
+    /// The byte that starts the literal.
+    pub(crate) fn prefix(self) -> u8 {
+        match self {
+            PrefixCharacterSyntax::Ruby | PrefixCharacterSyntax::Elixir => b'?',
+        }
+    }
+
+    /// Length of the character literal that the prefix at `lines[i]` starts.
     pub(crate) fn character_len(self, lines: &[u8], i: usize) -> Option<usize> {
         match self {
-            QuestionMarkSyntax::Ruby => ruby::character_len(lines, i),
-            QuestionMarkSyntax::Elixir => elixir::character_len(lines, i),
+            PrefixCharacterSyntax::Ruby => ruby::character_len(lines, i),
+            PrefixCharacterSyntax::Elixir => elixir::character_len(lines, i),
         }
     }
 }

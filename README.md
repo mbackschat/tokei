@@ -50,7 +50,7 @@ Engine changes, each with a regression file in `tests/data`:
 | Outside literals, an escape character before a line comment marker makes it text, as in make's `\#`. | `9f25025` | Not offered yet |
 | `run_opens` on an interpolation: a hole opener of one repeated byte opens at the end of a longer run, the bytes before it being text. | `fc99a62` | Not offered yet |
 | `regex_literals` options: `spans_lines`, a regular expression that may span lines; `operator_symbols`, `:/` as a symbol; `command_arguments`, a `/` or `%` literal after a method name and a space but before none. | `0b633d1` | Not offered yet |
-| `question_mark_characters`: `?` and one character or escape form a character literal, by Ruby's rule, where the `?` neither ends a name nor stands before whitespace, or by Elixir's, where it does not end a name. | `0b633d1`, `9c6d1c7` | Not offered yet |
+| `prefix_characters`: `?` and one character or escape form a character literal, by Ruby's rule, where the `?` neither ends a name nor stands before whitespace, or by Elixir's, where it does not end a name. | `0b633d1`, `9c6d1c7` | Not offered yet |
 | `code_tags`: a language read only between its code tags, such as PHP's `<?php` and `?>`; the text outside them is code, and a `?>` ends a line comment. | `1923467` | Not offered yet |
 | `identifier_quote_prefix`: a quote directly after an identifier opens as the declared opener with this prefix, such as Scala's `s"`. | `b298558` | Not offered yet |
 | `line_directives`: a line that starts at its first byte with one of these texts, such as R's `#line`, is a directive and counts as code. | `add99a7` | Not offered yet |

@@ -22,7 +22,7 @@ use super::embedding::{
 use super::heredoc::Heredoc;
 use super::interpolation::{Interpolation, MarkupExpressions, OpenHole};
 use super::line_splices::LineSplices;
-use super::quote_like::{delimited_len, QuestionMarkSyntax, QuoteLikeSyntax};
+use super::quote_like::{delimited_len, PrefixCharacterSyntax, QuoteLikeSyntax};
 use super::raw_delimiter::RawDelimiter;
 use super::regex_literal::{is_word_byte, regex_literal_len, RegexContext};
 use super::shebang::{shebang_len, ShebangSyntax};
@@ -183,7 +183,7 @@ pub(crate) struct SharedMatchers {
     pub regex_spans_lines: bool,
     pub regex_operator_symbols: bool,
     pub regex_command_arguments: bool,
-    pub question_mark_characters: Option<QuestionMarkSyntax>,
+    pub prefix_characters: Option<PrefixCharacterSyntax>,
     pub quotes_in_tags: bool,
     pub template_expressions: &'static [(&'static str, &'static str)],
     pub word_delimiters: &'static [u8],
@@ -329,8 +329,8 @@ impl SharedMatchers {
         for b in raw().flat_map(RawDelimiter::first_bytes) {
             opener_pairs.allow_any(b);
         }
-        if language.question_mark_characters().is_some() {
-            opener_pairs.allow_any(b'?');
+        if let Some(syntax) = language.prefix_characters() {
+            opener_pairs.allow_any(syntax.prefix());
         }
         if language.xml_literals() {
             opener_pairs.allow_any(b'<');
@@ -532,7 +532,7 @@ impl SharedMatchers {
             regex_spans_lines: language.regex_spans_lines(),
             regex_operator_symbols: language.regex_operator_symbols(),
             regex_command_arguments: language.regex_command_arguments(),
-            question_mark_characters: language.question_mark_characters(),
+            prefix_characters: language.prefix_characters(),
             quotes_in_tags: language.quotes_in_tags(),
             template_expressions: language.template_expressions(),
             word_delimiters: language.word_delimiters().as_bytes(),
@@ -1047,7 +1047,7 @@ impl SyntaxCounter {
 
                 if let Some(len) = self
                     .shared
-                    .question_mark_characters
+                    .prefix_characters
                     .filter(|_| self.is_plain_mode())
                     .and_then(|syntax| syntax.character_len(lines, i))
                 {

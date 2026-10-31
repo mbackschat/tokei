@@ -569,7 +569,7 @@
       "interpolations": [{"quote": "\\\"\\\"\\\"", "open": "#{", "close": "}", "nest": "{"}, {"quote": "\\\"", "open": "#{", "close": "}", "nest": "{"}, {"quote": "'''", "open": "#{", "close": "}", "nest": "{"}, {"quote": "'", "open": "#{", "close": "}", "nest": "{"}],
       "line_start_closers": ["\\\"\\\"\\\"", "'''"],
       "quote_like": "elixir_sigil",
-      "question_mark_characters": "elixir",
+      "prefix_characters": "elixir",
       "extensions": ["ex", "exs"]
     },
     "Elm": {
@@ -1755,7 +1755,7 @@
       "interpolations": [{"quote": "\\\"", "open": "#{", "close": "}", "nest": "{"}],
       "end_markers": ["__END__"],
       "quote_like": "ruby_percent",
-      "question_mark_characters": "ruby",
+      "prefix_characters": "ruby",
       "line_comment": ["#"],
       "multi_line_comments": [["=begin", "=end"]],
       "quotes": [["\\\"", "\\\""], ["'", "'"]],

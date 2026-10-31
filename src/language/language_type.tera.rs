@@ -587,14 +587,14 @@ impl LanguageType {
         }
     }
 
-    /// Returns whose rule makes `?` and one character a character literal, as
-    /// in Ruby and Elixir.
-    pub(crate) fn question_mark_characters(
+    /// Returns whose rule makes a prefix and one character a character
+    /// literal, as `?a` is in Ruby and Elixir.
+    pub(crate) fn prefix_characters(
         self,
-    ) -> Option<crate::language::quote_like::QuestionMarkSyntax> {
+    ) -> Option<crate::language::quote_like::PrefixCharacterSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.question_mark_characters is defined and value.question_mark_characters == "ruby" %}Some(crate::language::quote_like::QuestionMarkSyntax::Ruby){% elif value.question_mark_characters is defined and value.question_mark_characters == "elixir" %}Some(crate::language::quote_like::QuestionMarkSyntax::Elixir){% else %}None{% endif %},
+                {{key}} => {% if value.prefix_characters is defined and value.prefix_characters == "ruby" %}Some(crate::language::quote_like::PrefixCharacterSyntax::Ruby){% elif value.prefix_characters is defined and value.prefix_characters == "elixir" %}Some(crate::language::quote_like::PrefixCharacterSyntax::Elixir){% else %}None{% endif %},
             {% endfor %}
         }
     }
