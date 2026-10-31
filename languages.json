@@ -848,6 +848,8 @@
       "line_comment": ["#", "//"],
       "multi_line_comments": [["/*", "*/"]],
       "quotes": [["\\\"", "\\\""]],
+      "interpolations": [{"quote": "\\\"", "open": "${", "close": "}", "nest": "{", "literal": ["$${", "%%{"]}, {"quote": "\\\"", "open": "%{", "close": "}", "nest": "{"}],
+      "heredocs": [{"start": "<<", "indent_flags": "-", "spacing": "adjacent", "word": "identifier", "closer": "indented_line"}],
       "extensions": ["hcl", "tf", "tfvars"]
     },
     "Headache": {
