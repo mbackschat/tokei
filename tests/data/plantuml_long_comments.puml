@@ -1,0 +1,9 @@
+' 9 lines 5 code 4 comments 0 blanks
+@startuml
+/' a long comment
+that '/ does not close here
+but here '/
+A -> B /' an opener after text opens nothing
+B -> C
+/' one '/ C -> D
+@enduml

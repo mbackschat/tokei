@@ -21,6 +21,7 @@ pub(crate) mod ocaml;
 pub(crate) mod pascal;
 pub(crate) mod perl;
 pub(crate) mod php;
+pub(crate) mod plantuml;
 pub(crate) mod rpm;
 pub(crate) mod ruby;
 pub(crate) mod rust;

@@ -1,0 +1,8 @@
+' 8 lines 4 code 2 comments 2 blanks
+@startuml
+A -> B : 12" screen
+
+' a comment after an unbalanced quote
+!$separator = "\"
+
+@enduml
