@@ -6,6 +6,9 @@ leanlines/src/
 csharp/out/
 csharp/obj/
 csharp/bin/
+visualbasic/out/
+visualbasic/obj/
+visualbasic/bin/
 go/judge-linux
 swift/judge
 dart/.dart_tool/
