@@ -33,3 +33,5 @@ bicep/obj/
 bicep/bin/
 freemarker/lib/
 freemarker/out/
+velocity/lib/
+velocity/out/
