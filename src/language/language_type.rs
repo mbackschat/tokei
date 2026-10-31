@@ -10,7 +10,7 @@ use std::{
 use crate::{
     config::Config,
     language::{
-        dialects::{bitbake, cobol, fortran, just, liquid, markdown, pascal, plantuml, rpm},
+        dialects::{bitbake, cobol, fortran, haml, just, liquid, markdown, pascal, plantuml, rpm},
         line_splices::LineSplices,
         syntax::{line_end, FileContext, LanguageContext, LineClass, SyntaxCounter},
     },
@@ -323,6 +323,9 @@ impl LanguageType {
         }
         if self == Liquid {
             return liquid::parse(config, lines, stats, counted, on_line);
+        }
+        if self == Haml {
+            return haml::parse(config, lines, stats, counted, on_line);
         }
         let mut stepper = LineStep::new(b'\n', 0, lines.len());
         let splices_continue_lines = syntax.shared.line_splices == Some(LineSplices::C)

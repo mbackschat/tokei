@@ -9,6 +9,7 @@ pub(crate) mod elixir;
 pub(crate) mod erlang;
 pub(crate) mod fortran;
 pub(crate) mod fsharp;
+pub(crate) mod haml;
 pub(crate) mod haskell;
 pub(crate) mod jsx;
 pub(crate) mod julia;
