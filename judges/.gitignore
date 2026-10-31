@@ -35,3 +35,4 @@ freemarker/lib/
 freemarker/out/
 velocity/lib/
 velocity/out/
+zig/out/
