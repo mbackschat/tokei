@@ -180,10 +180,8 @@ impl Reader {
     /// Follows the words of a code line that open and close the comment
     /// paragraphs and turn on debugging lines.
     fn read_code(&mut self, text: &[u8]) {
-        let code = code_part(text);
-        let words = words(&code);
-        for (index, word) in words.iter().enumerate() {
-            let previous = index.checked_sub(1).map(|i| words[i]);
+        let mut previous: Option<&[u8]> = None;
+        for word in (CodeWords { text }) {
             if word.eq_ignore_ascii_case(b"PROGRAM-ID") {
                 self.comment_paragraphs_allowed = true;
             } else if word.eq_ignore_ascii_case(b"DIVISION") {
@@ -197,6 +195,7 @@ impl Reader {
             {
                 self.debugging = true;
             }
+            previous = Some(word);
         }
     }
 }
@@ -207,16 +206,21 @@ impl Reader {
 /// also marks free form, as fixed form leaves those columns to the sequence
 /// number and every measured file holding one is built with `cobc -free`.
 fn starts_free(text: &[u8]) -> bool {
-    let lines = || text.split(|b| *b == b'\n').map(expand_tabs);
+    let lines = || text.split(|b| *b == b'\n');
+    // A tab before the `*>` would take it to column 9.
     let early_comment = |line: &[u8]| {
         let spaces = line.iter().take_while(|b| **b == b' ').count();
         spaces < INDICATOR && line[spaces..].starts_with(b"*>")
     };
-    if lines().any(|line| early_comment(&line)) {
+    if lines().any(early_comment) {
         return true;
     }
     lines()
-        .find_map(|line| line.get(INDICATOR).copied())
+        .find_map(|line| {
+            expand_tabs(&line[..line.len().min(INDICATOR + 1)])
+                .get(INDICATOR)
+                .copied()
+        })
         .is_some_and(|indicator| !FIXED_INDICATORS.contains(&indicator))
 }
 
@@ -249,27 +253,38 @@ fn opens_comment_paragraph(text: &[u8]) -> bool {
         .any(|name| text[..len].eq_ignore_ascii_case(name))
 }
 
-/// `text` up to a floating comment, with its literals blanked out.
-fn code_part(text: &[u8]) -> Vec<u8> {
-    let mut code = Vec::with_capacity(text.len());
-    let mut quote = None;
-    let mut i = 0;
-    while i < text.len() {
-        let byte = text[i];
-        match quote {
-            Some(q) if byte == q && text.get(i + 1) == Some(&q) => i += 1,
-            Some(q) if byte == q => quote = None,
-            Some(_) => {}
-            None if byte == b'"' || byte == b'\'' => quote = Some(byte),
-            None if text[i..].starts_with(b"*>") => break,
-            None => code.push(byte),
+/// The words of a code line up to a floating comment, outside its literals;
+/// a doubled quote inside a literal closes and reopens it, which skips the
+/// same text.
+struct CodeWords<'a> {
+    text: &'a [u8],
+}
+
+impl<'a> Iterator for CodeWords<'a> {
+    type Item = &'a [u8];
+
+    fn next(&mut self) -> Option<&'a [u8]> {
+        loop {
+            let start = self
+                .text
+                .iter()
+                .position(|b| is_word_byte(*b) || *b == b'"' || *b == b'\'' || *b == b'*')?;
+            let text = &self.text[start..];
+            match text[0] {
+                quote @ (b'"' | b'\'') => {
+                    let close = text[1..].iter().position(|b| *b == quote);
+                    self.text = close.map_or(&[][..], |close| &text[close + 2..]);
+                }
+                b'*' if text.get(1) == Some(&b'>') => return None,
+                b'*' => self.text = &text[1..],
+                _ => {
+                    let len = text.iter().take_while(|b| is_word_byte(**b)).count();
+                    self.text = &text[len..];
+                    return Some(&text[..len]);
+                }
+            }
         }
-        if quote.is_some() {
-            code.push(b' ');
-        }
-        i += 1;
     }
-    code
 }
 
 fn words(text: &[u8]) -> Vec<&[u8]> {
