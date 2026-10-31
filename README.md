@@ -10,7 +10,34 @@
 [![Packaging status](https://repology.org/badge/tiny-repos/tokei.svg)](https://repology.org/project/tokei/versions)
 
 
-> **This is the [Locmetry](https://github.com/mbackschat/locmetry) fork of Tokei 15.0.0**, on branch `locmetry`. It corrects comments and blank lines that Tokei miscounts when a literal holds a comment marker or a quote, as recorded in Locmetry's [Tokei counting defects](https://github.com/mbackschat/locmetry/blob/main/docs/tokei-defects.md) and [fork plan](https://github.com/mbackschat/locmetry/blob/main/docs/plans/tokei-fork.md). Its version carries the build metadata `+locmetry.N`, raised with every change to counting. The rest of this README describes upstream Tokei.
+> **This is the [Locmetry](https://github.com/mbackschat/locmetry) fork of Tokei 15.0.0**, on branch `locmetry`. It corrects comments and blank lines that Tokei miscounts when a literal holds a comment marker or a quote, as recorded in Locmetry's [Tokei counting defects](https://github.com/mbackschat/locmetry/blob/main/docs/tokei-defects.md) and [fork plan](https://github.com/mbackschat/locmetry/blob/main/docs/plans/archive/tokei-fork.md). Its version carries the build metadata `+locmetry.N`, raised with every change to counting. The rest of this README describes upstream Tokei.
+
+## Why This Fork
+
+Tokei declares most languages by their comment markers and quote pairs and classifies each line by them. Measured against each language's own lexer or parser on public repositories, that declaration misreads every literal it does not know: a character literal such as `'"'`, a raw string such as Rust `r#"…"#`, a C# or Kotlin interpolation hole, a heredoc, a regular expression such as `/"/`, a YAML block scalar or an apostrophe in HTML text opens a string that never closes, and a comment marker inside a literal opens a comment. Each such misreading turns the comments and blanks after it into code, or code into comments, often for the rest of the file. Tokei also gives every file of an extension that several languages share to one of them, so MATLAB `.m` files count as Objective-C and Pascal `.pp` files as Puppet.
+
+Locmetry reports code, comment and blank lines as evidence, so these counts have to match what the language's compiler reads. Upstream Tokei has its issue tracker disabled; the corrections are offered upstream, one pull request per defect on request, in [discussion #1394](https://github.com/XAMPPRocky/tokei/discussions/1394).
+
+## What Changed
+
+- **A lexing engine that reads literals as languages define them.** New `languages.json` fields declare character literals, raw strings, interpolation holes, heredocs, regular expression literals, nested comments, quote-like operators and the like, so most languages stay declarations rather than code. Each field is listed in the engine table below.
+- **Language-specific readers for languages that are not token streams.** Markdown's fenced blocks are found by CommonMark's block structure, and RPM spec files, COBOL, BitBake, Just, PlantUML, Liquid and Haml are read whole, as their own tools read them, with embedded scripts classified in their own language.
+- **One rule for mixed lines.** A line counts as a comment only when it holds nothing but comments, so `/* a */ x;` is code; one Tokei rule is kept on purpose: a line that starts inside a block comment is a comment even when code follows its end.
+- **File attribution by content.** An extension that several languages share is decided by patterns over the file's text, starting from GitHub Linguist's heuristics, and build languages claim only their own file names, such as Autoconf's `configure.ac` instead of every `.in` template.
+- **Library additions.** `LanguageType::line_classes` returns each line's class, `LineClass`, for embedders that classify parts of a file; `LanguageType::from_path_with_bytes` and `parse_bytes` let a caller count a content-checked file from the bytes detection already read.
+- **Speed.** Every release must parse within 10% of upstream's time on each of 69 public repositories, by `judges/speed/check.py`; for release `15.0.0+locmetry.43`, 67 of them took half of upstream's time or less (measured 2026-10-31 on macOS), as the per-byte loop skips bytes that cannot start a token.
+
+Unchanged: the command line, configuration and output formats, and upstream's language list. Counts change only where upstream misread a file.
+
+## How It Is Verified
+
+Every correction is a commit with a regression file in `tests/data`, and every declaration cites the specification or reference lexer it follows, in the tables below. The [judges](judges/README.md) read the files of public repositories with each language's own lexer or parser, such as `rustc_lexer`, `javac`, Roslyn, the TypeScript parser or CPython's `tokenize`, and compare every line's class with the fork's; Locmetry's [step 6 record](https://github.com/mbackschat/locmetry/blob/main/docs/research/tokei-fork-step-6.md) lists the repositories, commits and results, and its [Tokei defects](https://github.com/mbackschat/locmetry/blob/main/docs/tokei-defects.md) names each defect with its effect. Languages without a judge yet are listed in Locmetry's [deferred work](https://github.com/mbackschat/locmetry/blob/main/docs/DEFERRED.md).
+
+The fork is not published on crates.io; depend on it by commit, as Locmetry does:
+
+```toml
+tokei = { git = "https://github.com/mbackschat/tokei", rev = "<commit>", default-features = false }
+```
 
 ## Changes From Upstream
 
