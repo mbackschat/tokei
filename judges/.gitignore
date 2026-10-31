@@ -26,3 +26,4 @@ fsharp/obj/
 fsharp/bin/
 ocaml/judge-linux
 hcl/judge-linux
+jsonnet/judge-linux
