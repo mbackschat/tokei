@@ -298,17 +298,17 @@
       "extensions": ["circom"]
     },
     "Clojure": {
-      "line_comment": [";"],
+      "line_comment": [";", "#!"],
       "quotes": [["\\\"", "\\\""]],
       "extensions": ["clj"]
     },
     "ClojureC": {
-      "line_comment": [";"],
+      "line_comment": [";", "#!"],
       "quotes": [["\\\"", "\\\""]],
       "extensions": ["cljc"]
     },
     "ClojureScript": {
-      "line_comment": [";"],
+      "line_comment": [";", "#!"],
       "quotes": [["\\\"", "\\\""]],
       "extensions": ["cljs"]
     },
