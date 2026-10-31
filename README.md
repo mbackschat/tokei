@@ -178,6 +178,7 @@ Declarations in `languages.json`, each grounded in the cited specification or re
 | Jsonnet | `\|\|\|` text blocks and `@"…"` and `@'…'` verbatim strings, whose doubled quote stands for a quote and whose backslash is text | `215dc41` | [Jsonnet language reference, Lexing](https://jsonnet.org/ref/spec.html#lexing); go-jsonnet v0.22.0 `internal/parser/lexer.go` |
 | Bicep | `'''` strings read without escapes and closed by the last three quotes of a run, as in `''''abc''''` | `ecf3ba1` | [Bicep data types, Strings](https://learn.microsoft.com/azure/azure-resource-manager/bicep/data-types#strings); `ScanMultilineString` in `src/Bicep.Core/Parsing/Lexer.cs`, Bicep v0.48.1 |
 | LD Script | `//` comments, which the C preprocessor that builds run linker scripts through reads, so `//*lib.a:…` opens no block comment | `a7acd1c` | C17 6.4.9 Comments; U-Boot `scripts/Makefile.lib` `cmd_cpp_lds`, Zephyr and NuttX linker script preprocessing |
+| Mustache | Quotes are text, since Mustache has no strings, so an apostrophe such as `it's` hides no comment or blank line | `afe278c` | [mustache(5)](https://mustache.github.io/mustache.5.html); [Mustache specification v1.4.3](https://github.com/mustache/spec/tree/v1.4.3/specs) |
 
 `locmetry-spike/` holds the development harness that compares these counts with tree-sitter on public repositories; it is not part of the crate.
 
