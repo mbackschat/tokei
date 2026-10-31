@@ -643,6 +643,18 @@ mod tests {
     }
 
     #[test]
+    fn just_reads_justfile_and_dot_justfile_in_any_case() {
+        // just 1.59.0, `JUSTFILE_NAMES` in `src/search.rs`, compared ignoring case.
+        for name in ["justfile", "Justfile", ".justfile", ".Justfile"] {
+            assert_eq!(
+                detect(name, "build:\n    cc main.c\n"),
+                Some(Just),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
     fn meson_reads_options_from_meson_options_since_1_1() {
         // https://mesonbuild.com/Build-options.html
         assert_eq!(

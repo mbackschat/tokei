@@ -1055,7 +1055,7 @@
       "env": ["just"],
       "line_comment": ["#"],
       "extensions": ["just"],
-      "filenames": ["justfile"]
+      "filenames": ["justfile", ".justfile"]
     },
     "K": {
       "name": "K",
