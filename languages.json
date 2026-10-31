@@ -200,7 +200,9 @@
     "Bicep" : {
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
-      "quotes": [["'", "'"], ["'''", "'''"]],
+      "quotes": [["'", "'"]],
+      "verbatim_quotes": [["'''", "'''"]],
+      "run_closers": ["'''"],
       "extensions": ["bicep", "bicepparam"]
     },
     "Bitbake": {
