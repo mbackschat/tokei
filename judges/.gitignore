@@ -24,3 +24,4 @@ dockerfile/judge-linux
 fsharp/out/
 fsharp/obj/
 fsharp/bin/
+ocaml/judge-linux
