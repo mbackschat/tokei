@@ -175,6 +175,7 @@ Declarations in `languages.json`, each grounded in the cited specification or re
 | Just | Lines read as just reads them: strings that span lines outside recipes, recipe lines as the shell reads each, and script recipes as the language of their `[script]` command, `script-interpreter` setting or `#!` line; `.justfile` counted | `8dfaf47`, `a069406` | [Just Programming Language manual](https://just.systems/man/en/), just 1.59.0 `src/lexer.rs` and `src/recipe.rs` |
 | HCL | `<<` and `<<-` heredocs, whose closing line holds only the marker, and `${…}` interpolations and `%{…}` directives in strings, except the `$${` and `%%{` escapes | `1281560` | [HCL Native Syntax Specification](https://github.com/hashicorp/hcl/blob/v2.25.0/hclsyntax/spec.md), Template Expressions; `hclsyntax/scan_tokens.rl` |
 | Nix | `''…''` strings with their `'''`, `''$` and `''\` escapes, `${…}` holes in both kinds of string, where `$$` is text, and identifiers such as `x''` that hold quotes | `559d1a4` | [Nix Reference Manual, String literals](https://nix.dev/manual/nix/2.35/language/string-literals); `src/libexpr/lexer.l`, Nix 2.35.4 |
+| Jsonnet | `\|\|\|` text blocks and `@"…"` and `@'…'` verbatim strings, whose doubled quote stands for a quote and whose backslash is text | `215dc41` | [Jsonnet language reference, Lexing](https://jsonnet.org/ref/spec.html#lexing); go-jsonnet v0.22.0 `internal/parser/lexer.go` |
 
 `locmetry-spike/` holds the development harness that compares these counts with tree-sitter on public repositories; it is not part of the crate.
 
