@@ -39,6 +39,16 @@ The fork is not published on crates.io; depend on it by commit, as LOCmetry does
 tokei = { git = "https://github.com/mbackschat/tokei", rev = "<commit>", default-features = false }
 ```
 
+## Releases
+
+Each change to counting is released as `15.0.0+locmetry.N`, with `N` raised by one:
+
+1. Pass the test suite and the speed gate, `python3 judges/speed/check.py` over the benchmark repositories.
+2. Set the version in `Cargo.toml`, `Cargo.lock`, `judges/speed/fork/Cargo.lock`, `judges/judgecmp/Cargo.lock` and `locmetry-spike/harness/Cargo.lock`, and commit it as `build: release 15.0.0+locmetry.N`.
+3. Tag that commit with the annotated tag `v15.0.0+locmetry.N` and push the branch and the tag. Releases are tagged from `15.0.0+locmetry.43` on, as LOCmetry's owner decided on 2026-11-01.
+
+There are no GitHub release pages or binaries; [CHANGES-FROM-UPSTREAM.md](CHANGES-FROM-UPSTREAM.md) lists the changes.
+
 ## Changes From Upstream
 
 [CHANGES-FROM-UPSTREAM.md](CHANGES-FROM-UPSTREAM.md) lists every engine change with its commit and upstream status, and every `languages.json` declaration with the specification or reference lexer it follows.
