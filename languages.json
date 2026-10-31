@@ -2201,8 +2201,7 @@
       "name": "Apache Velocity",
       "line_comment": ["##"],
       "multi_line_comments": [["#*", "*#"]],
-      "extensions": ["vm"],
-      "quotes": [["'", "'"], ["\\\"", "\\\""]]
+      "extensions": ["vm"]
     },
     "Verilog": {
       "line_comment": ["//"],

@@ -1,0 +1,9 @@
+## 9 lines 4 code 4 comments 1 blanks
+<p>Don't miss it</p>
+## a comment after an apostrophe
+
+#set( $x = "y" )
+<p>"quoted</p>
+#* a block
+comment *#
+$x ## trailing
