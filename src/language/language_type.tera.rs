@@ -1023,35 +1023,50 @@ impl LanguageType {
     /// `.spec` for RPM and PostgreSQL's isolation tests: the one whose
     /// patterns for that extension all match the file's text, if any.
     fn from_checked_extension(entry: &Path, extension: &str) -> Option<Self> {
-        static CHECKS: Lazy<Vec<(&str, LanguageType, Vec<regex::bytes::Regex>)>> = Lazy::new(|| {
-            let patterns = |sources: &[&str]| -> Vec<regex::bytes::Regex> {
-                sources
-                    .iter()
-                    .map(|source| {
-                        regex::bytes::RegexBuilder::new(source)
-                            .multi_line(true)
-                            .build()
-                            .expect("languages.json declares valid patterns")
-                    })
-                    .collect()
-            };
+        type Check = (
+            &'static str,
+            LanguageType,
+            &'static [&'static str],
+            once_cell::sync::OnceCell<Vec<regex::bytes::Regex>>,
+        );
+        // Each check compiles its patterns when its extension first comes
+        // up: compiling all of them took about 4 ms, the whole count of a
+        // small repository, before the first file of any extension was
+        // detected (measured 2026-10-31 on a one-file Jinja2 tree).
+        static CHECKS: Lazy<Vec<Check>> = Lazy::new(|| {
             vec![
                 {% for key, value in languages -%}
                     {%- if value.content_checked_extensions -%}
                         {%- for extension, sources in value.content_checked_extensions %}
-                ("{{extension}}", {{key}}, patterns(&[{% for source in sources %}r#"{{source}}"#, {% endfor %}])),
+                ("{{extension}}", {{key}}, &[{% for source in sources %}r#"{{source}}"#, {% endfor %}], once_cell::sync::OnceCell::new()),
                         {%- endfor %}
                     {%- endif -%}
                 {%- endfor %}
             ]
         });
+        let compile = |sources: &[&str]| -> Vec<regex::bytes::Regex> {
+            sources
+                .iter()
+                .map(|source| {
+                    regex::bytes::RegexBuilder::new(source)
+                        .multi_line(true)
+                        .build()
+                        .expect("languages.json declares valid patterns")
+                })
+                .collect()
+        };
 
         let mut checks = CHECKS.iter().filter(|(checked, ..)| *checked == extension).peekable();
         checks.peek()?;
         let text = std::fs::read(entry).ok()?;
         checks
-            .find(|(_, _, patterns)| patterns.iter().all(|pattern| pattern.is_match(&text)))
-            .map(|(_, language, _)| *language)
+            .find(|(_, _, sources, patterns)| {
+                patterns
+                    .get_or_init(|| compile(sources))
+                    .iter()
+                    .all(|pattern| pattern.is_match(&text))
+            })
+            .map(|(_, language, ..)| *language)
     }
 
     /// Get language from a file extension.
