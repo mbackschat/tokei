@@ -1335,7 +1335,6 @@
     },
     "Mustache": {
       "multi_line_comments": [["{{!", "}}"]],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["mustache"]
     },
     "Nextflow": {
