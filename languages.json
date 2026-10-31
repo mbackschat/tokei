@@ -147,10 +147,7 @@
     },
     "AvaloniaXaml": {
       "name": "AXAML",
-      "multi_line_comments": [["<!--", "-->"]],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "quotes_in_tags": true,
-      "text_sections": [["<![CDATA[", "]]>"]],
+      "syntax_of": "Xml",
       "extensions": ["axaml"]
     },
     "AWK": {
@@ -311,13 +308,11 @@
       "extensions": ["clj"]
     },
     "ClojureC": {
-      "line_comment": [";", "#!"],
-      "quotes": [["\\\"", "\\\""]],
+      "syntax_of": "Clojure",
       "extensions": ["cljc"]
     },
     "ClojureScript": {
-      "line_comment": [";", "#!"],
-      "quotes": [["\\\"", "\\\""]],
+      "syntax_of": "Clojure",
       "extensions": ["cljs"]
     },
     "CMake": {
@@ -521,10 +516,7 @@
     },
     "DotNetResource": {
       "name": ".NET Resource",
-      "multi_line_comments": [["<!--", "-->"]],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "quotes_in_tags": true,
-      "text_sections": [["<![CDATA[", "]]>"]],
+      "syntax_of": "Xml",
       "extensions": ["resx"]
     },
     "DreamMaker": {
@@ -1330,10 +1322,7 @@
     },
     "MsBuild": {
       "name": "MSBuild",
-      "multi_line_comments": [["<!--", "-->"]],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "quotes_in_tags": true,
-      "text_sections": [["<![CDATA[", "]]>"]],
+      "syntax_of": "Xml",
       "extensions": ["csproj", "vbproj", "fsproj", "props", "targets"]
     },
     "Mustache": {
@@ -1373,10 +1362,7 @@
     },
     "NuGetConfig": {
       "name": "NuGet Config",
-      "multi_line_comments": [["<!--", "-->"]],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "quotes_in_tags": true,
-      "text_sections": [["<![CDATA[", "]]>"]],
+      "syntax_of": "Xml",
       "filenames": ["nuget.config", "packages.config", "nugetdefaults.config"]
     },
     "Nushell": {
@@ -2246,10 +2232,7 @@
     },
     "VisualStudioProject": {
       "name": "Visual Studio Project",
-      "multi_line_comments": [["<!--", "-->"]],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "quotes_in_tags": true,
-      "text_sections": [["<![CDATA[", "]]>"]],
+      "syntax_of": "Xml",
       "extensions": ["vcproj", "vcxproj"]
     },
     "VisualStudioSolution": {
@@ -2318,10 +2301,7 @@
     },
     "XSL": {
       "name": "XSL",
-      "multi_line_comments": [["<!--", "-->"]],
-      "quotes": [["\\\"", "\\\""], ["'", "'"]],
-      "quotes_in_tags": true,
-      "text_sections": [["<![CDATA[", "]]>"]],
+      "syntax_of": "Xml",
       "extensions": ["xsl", "xslt"]
     },
     "Xtend": {

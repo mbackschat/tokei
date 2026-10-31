@@ -197,6 +197,14 @@ fn tag_name(text: &[u8]) -> &[u8] {
     &text[..len]
 }
 
+/// The tag name of `inner`, the text after a `{%`, past the optional `-` and
+/// whitespace before it, with its offset in `inner`.
+fn name_after_open(inner: &[u8]) -> (usize, &[u8]) {
+    let mut at = usize::from(inner.first() == Some(&b'-'));
+    at += inner[at..].iter().take_while(|b| b.is_whitespace()).count();
+    (at, tag_name(&inner[at..]))
+}
+
 /// `BlockBody::FullToken`: a tag's name and the range of its markup within
 /// the token, or `None` for a token Liquid rejects.
 fn full_token(token: &[u8]) -> Option<(&[u8], Range<usize>)> {
@@ -204,16 +212,11 @@ fn full_token(token: &[u8]) -> Option<(&[u8], Range<usize>)> {
         .len()
         .checked_sub(2)
         .filter(|_| token.ends_with(b"%}"))?;
-    let mut at = 2 + usize::from(token.get(2) == Some(&b'-'));
-    at += token[at..inner_end]
-        .iter()
-        .take_while(|b| b.is_whitespace())
-        .count();
-    let name = tag_name(&token[at..inner_end]);
+    let (name_at, name) = name_after_open(&token[2..inner_end]);
     if name.is_empty() {
         return None;
     }
-    at += name.len();
+    let mut at = 2 + name_at + name.len();
     at += token[at..inner_end]
         .iter()
         .take_while(|b| b.is_whitespace())
@@ -233,9 +236,7 @@ fn possibly_invalid_name(token: &[u8]) -> Option<&[u8]> {
         return None;
     }
     memchr::memmem::rfind_iter(token, b"{%").find_map(|open| {
-        let mut at = open + 2 + usize::from(token.get(open + 2) == Some(&b'-'));
-        at += token[at..].iter().take_while(|b| b.is_whitespace()).count();
-        let name = tag_name(&token[at..]);
+        let (_, name) = name_after_open(&token[open + 2..]);
         (!name.is_empty() && name != b"#").then_some(name)
     })
 }

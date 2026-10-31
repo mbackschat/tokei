@@ -74,9 +74,8 @@ struct Reader<'a> {
     holds: Vec<Holds>,
     /// Whether a recipe's colon has been read since the last body.
     pending: bool,
-    /// The `[script]` attribute read since the last body, with the offset of
-    /// its command list when it has one.
-    attribute: Option<Option<usize>>,
+    /// How a `[script]` attribute read since the last body runs it.
+    attribute: Option<Runner>,
     /// The offset of the `script-interpreter` setting's command list.
     setting: Option<usize>,
 }
@@ -211,7 +210,9 @@ impl<'a> Reader<'a> {
                             .get(7)
                             .is_some_and(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
                     {
-                        self.attribute = Some((rest.get(7) == Some(&b'(')).then_some(at + 8));
+                        self.attribute = Some(Runner::Script(
+                            (rest.get(7) == Some(&b'(')).then_some(at + 8),
+                        ));
                     }
                     at = self.token(at, &mut depth);
                 }
@@ -276,7 +277,7 @@ fn read(text: &[u8], lines: &[Range<usize>]) -> (Vec<LineClass>, Vec<Body>, Opti
             }
             // `Recipe::run_script` prefers an attribute to a `#!` line.
             let runner = match reader.attribute.take() {
-                Some(command) => Runner::Script(command),
+                Some(runner) => runner,
                 None if bytes[blanks..].starts_with(b"#!") => Runner::Shebang,
                 None => Runner::Lines,
             };
@@ -303,12 +304,14 @@ fn read(text: &[u8], lines: &[Range<usize>]) -> (Vec<LineClass>, Vec<Body>, Opti
 /// A body line's command after the sigils `Line::sigils` reads, each of
 /// `-`, `@` and `?` at most once.
 fn without_sigils(mut command: &[u8]) -> &[u8] {
-    let mut seen = Vec::with_capacity(3);
+    let mut seen = [0; 3];
+    let mut count = 0;
     while let Some(&sigil @ (b'-' | b'@' | b'?')) = command.first() {
-        if seen.contains(&sigil) {
+        if seen[..count].contains(&sigil) {
             break;
         }
-        seen.push(sigil);
+        seen[count] = sigil;
+        count += 1;
         command = &command[1..];
     }
     command
@@ -342,7 +345,7 @@ fn linewise_classes(text: &[u8], lines: &[Range<usize>], indentation: usize) -> 
 /// script; `{{{{` is an escaped `{{`.
 fn blank_interpolations(script: &mut [u8]) {
     let mut at = 0;
-    while let Some(found) = script[at..].windows(2).position(|pair| pair == b"{{") {
+    while let Some(found) = memchr::memmem::find(&script[at..], b"{{") {
         let start = at + found;
         if script[start..].starts_with(b"{{{{") {
             at = start + 4;

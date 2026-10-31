@@ -13,7 +13,7 @@ use crate::language::{language_type::LineReport, syntax::LineClass};
 use crate::utils::ext::{leading_blanks, SliceExt};
 use crate::{CodeStats, Config};
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy)]
 enum Block {
     Comment,
     Filter,
@@ -48,15 +48,14 @@ fn classes(text: &[u8], lines: &[Range<usize>]) -> Vec<LineClass> {
         }
         if let Some((marker, kind)) = block {
             if indent > marker {
-                let class = match kind {
-                    Block::Comment => LineClass::Comment,
-                    Block::Filter => LineClass::Code,
-                };
-                if kind == Block::Comment {
-                    let len = classes.len();
-                    classes[len - blanks..].fill(LineClass::Comment);
+                match kind {
+                    Block::Comment => {
+                        let len = classes.len();
+                        classes[len - blanks..].fill(LineClass::Comment);
+                        classes.push(LineClass::Comment);
+                    }
+                    Block::Filter => classes.push(LineClass::Code),
                 }
-                classes.push(class);
                 blanks = 0;
                 continue;
             }

@@ -45,7 +45,7 @@ pub(crate) fn parse(
 
 /// `COMMENT_LONG_START`: `/'` after blanks, with no `'/` on the line.
 fn opens_long_comment(line: &[u8]) -> bool {
-    skip_blanks(line).starts_with(b"/'") && !line.windows(2).any(|w| w == b"'/")
+    skip_blanks(line).starts_with(b"/'") && memchr::memmem::find(line, b"'/").is_none()
 }
 
 /// `COMMENT_SIMPLE`: `'` after blanks, or a line of nothing but `/' … '/`.

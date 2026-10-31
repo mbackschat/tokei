@@ -84,23 +84,31 @@ fn starts_with_name(line: &[u8], name: &[u8], ends: impl Fn(u8) -> bool) -> bool
             .map_or(true, |&next| matches!(next, b'\r' | b'\n') || ends(next))
 }
 
-/// The section a line starts, as `isPart` finds it: the language that runs
-/// it, or `None` for a text section.
-fn section(line: &[u8]) -> Option<Option<LanguageType>> {
+/// A section of a spec file.
+#[derive(Clone, Copy)]
+enum Section {
+    /// Lines rpm reads as text.
+    Text,
+    /// Lines the given interpreter runs.
+    Script(LanguageType),
+}
+
+/// The section a line starts, as `isPart` finds it.
+fn section(line: &[u8]) -> Option<Section> {
     let named = |names: &[&[u8]]| {
         names
             .iter()
             .any(|name| starts_with_name(line, name, |next| next.is_ascii_whitespace()))
     };
     if named(TEXT_PARTS) {
-        Some(None)
+        Some(Section::Text)
     } else if named(SCRIPT_PARTS) {
         let lua = line
             .split(|byte| byte.is_ascii_whitespace())
             .collect::<Vec<_>>()
             .windows(2)
             .any(|pair| pair[0] == b"-p" && pair[1] == b"<lua>");
-        Some(Some(if lua {
+        Some(Section::Script(if lua {
             LanguageType::Lua
         } else {
             LanguageType::Sh
@@ -178,7 +186,10 @@ pub(crate) fn parse(
                     classes.extend(script_classes(config, language, text, &lines[first..index]));
                 }
                 classes.push(LineClass::Code);
-                script = next.map(|language| (language, index + 1));
+                script = match next {
+                    Section::Text => None,
+                    Section::Script(language) => Some((language, index + 1)),
+                };
             }
             None if script.is_some() => {}
             None => classes.push(text_class(bytes)),

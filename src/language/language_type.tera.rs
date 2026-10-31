@@ -349,7 +349,7 @@ impl LanguageType {
     pub(crate) fn quote_like(self) -> Option<crate::language::quote_like::QuoteLikeSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.quote_like is defined and value.quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif value.quote_like is defined and value.quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% elif value.quote_like is defined and value.quote_like == "elixir_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ElixirSigil){% elif value.quote_like is defined and value.quote_like == "erlang_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ErlangSigil){% elif value.quote_like is defined and value.quote_like == "haskell_quasi_quote" %}Some(crate::language::quote_like::QuoteLikeSyntax::HaskellQuasiQuote){% elif value.quote_like is defined and value.quote_like == "make_reference" %}Some(crate::language::quote_like::QuoteLikeSyntax::MakeReference){% elif value.quote_like is defined and value.quote_like == "m4" %}Some(crate::language::quote_like::QuoteLikeSyntax::M4 { open: "`", close: "'" }){% elif value.quote_like is defined and value.quote_like == "m4_brackets" %}Some(crate::language::quote_like::QuoteLikeSyntax::M4 { open: "[", close: "]" }){% else %}None{% endif %},
+                {{key}} => {% set quote_like = value.quote_like | default(value="") %}{% if quote_like == "perl" %}Some(crate::language::quote_like::QuoteLikeSyntax::Perl){% elif quote_like == "ruby_percent" %}Some(crate::language::quote_like::QuoteLikeSyntax::RubyPercent){% elif quote_like == "elixir_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ElixirSigil){% elif quote_like == "erlang_sigil" %}Some(crate::language::quote_like::QuoteLikeSyntax::ErlangSigil){% elif quote_like == "haskell_quasi_quote" %}Some(crate::language::quote_like::QuoteLikeSyntax::HaskellQuasiQuote){% elif quote_like == "make_reference" %}Some(crate::language::quote_like::QuoteLikeSyntax::MakeReference){% elif quote_like == "m4" %}Some(crate::language::quote_like::QuoteLikeSyntax::M4 { open: "`", close: "'" }){% elif quote_like == "m4_brackets" %}Some(crate::language::quote_like::QuoteLikeSyntax::M4 { open: "[", close: "]" }){% else %}None{% endif %},
             {% endfor %}
         }
     }
@@ -631,7 +631,7 @@ impl LanguageType {
     ) -> Option<crate::language::quote_like::PrefixCharacterSyntax> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {% if value.prefix_characters is defined and value.prefix_characters == "ruby" %}Some(crate::language::quote_like::PrefixCharacterSyntax::Ruby){% elif value.prefix_characters is defined and value.prefix_characters == "elixir" %}Some(crate::language::quote_like::PrefixCharacterSyntax::Elixir){% elif value.prefix_characters is defined and value.prefix_characters == "erlang" %}Some(crate::language::quote_like::PrefixCharacterSyntax::Erlang){% else %}None{% endif %},
+                {{key}} => {% set prefix_characters = value.prefix_characters | default(value="") %}{% if prefix_characters == "ruby" %}Some(crate::language::quote_like::PrefixCharacterSyntax::Ruby){% elif prefix_characters == "elixir" %}Some(crate::language::quote_like::PrefixCharacterSyntax::Elixir){% elif prefix_characters == "erlang" %}Some(crate::language::quote_like::PrefixCharacterSyntax::Erlang){% else %}None{% endif %},
             {% endfor %}
         }
     }

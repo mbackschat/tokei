@@ -1281,40 +1281,6 @@ impl SyntaxCounter {
         AnalysisReport::Normal(ended_with_comments)
     }
 
-    /// Whether `text`, read from a position outside any comment or literal,
-    /// holds nothing but comments: block comments, each closed before the
-    /// next begins, optionally followed by a line comment or by a block
-    /// comment left open, as in `/* a */ // b`.
-    fn holds_only_comments(&self, mut text: &[u8]) -> bool {
-        loop {
-            text = self.shared.blank_symbols.trim_start(text);
-            if text.is_empty()
-                || self
-                    .shared
-                    .line_comments
-                    .iter()
-                    .any(|c| text.starts_with(c.as_bytes()))
-                || self.shared.starts_with_line_start_comment(text)
-            {
-                return true;
-            }
-            let Some(&(start, end)) = self
-                .shared
-                .any_multi_line_comments
-                .iter()
-                .find(|(start, _)| text.starts_with(start.as_bytes()))
-            else {
-                return false;
-            };
-            let nests = self.shared.allows_nested
-                || (self.comments_nest && self.shared.nested_comments.contains(&(start, end)));
-            match block_comment_len(text, start, end, nests) {
-                Some(len) => text = &text[len..],
-                None => return true,
-            }
-        }
-    }
-
     /// Performs a set of heuristics to determine whether a line is a comment or
     /// not. The procedure is as follows.
     ///
@@ -1331,8 +1297,7 @@ impl SyntaxCounter {
     ///    - Yes: When we found a doc quote and we started in comments.
     /// 3. No: When the line starts inside a literal.
     /// 4. Yes: When the line holds nothing but comments, so that code between
-    ///    or after comments makes it code; PlantUML, whose block comments are
-    ///    whole lines, keeps Tokei's text rules for them.
+    ///    or after comments makes it code.
     pub(crate) fn line_is_comment(
         &self,
         line: &[u8],
@@ -1341,37 +1306,6 @@ impl SyntaxCounter {
         started_in_comments: bool,
         started_in_literal: bool,
     ) -> bool {
-        let trimmed = line.trim();
-        let whole_line_is_comment = || {
-            // A line opening with a code token such as PHP's `#[` is not a
-            // comment, whatever comment marker that token starts with.
-            let opens_with_code = self
-                .shared
-                .code_tokens
-                .iter()
-                .any(|e| trimmed.starts_with(e.as_bytes()));
-            !opens_with_code
-                && (self
-                    .shared
-                    .any_multi_line_comments
-                    .iter()
-                    .any(|(start, end)| {
-                        trimmed.starts_with(start.as_bytes()) && trimmed.ends_with(end.as_bytes())
-                    })
-                    || self.holds_only_comments(trimmed))
-        };
-        let starts_with_comment = || {
-            let quote = match self.stack.last() {
-                Some(q) => q,
-                _ => return false,
-            };
-
-            self.shared
-                .any_multi_line_comments
-                .iter()
-                .any(|(start, end)| *end == quote.as_ref() && trimmed.starts_with(start.as_bytes()))
-        };
-
         // `Some(true)` in order to respect the current configuration.
         #[allow(clippy::if_same_then_else)]
         if self.quote.is_some() {
@@ -1395,10 +1329,6 @@ impl SyntaxCounter {
             // The line's first characters belong to a literal, so a comment
             // marker they spell, as in a raw string's `// …` line, is text.
             false
-        } else if self.shared.language == LanguageType::PlantUml {
-            // PlantUML's block comments are whole lines, so a line opening
-            // with `/'` and ending with `'/` is one, whatever lies between.
-            (whole_line_is_comment)() || started_in_comments || (starts_with_comment)()
         } else {
             // A line is a comment only when it holds nothing but comments, as
             // the owner decided on 2026-10-29.
@@ -1812,8 +1742,6 @@ impl SyntaxCounter {
         self.quote.is_some() || !self.shared.backslash_operator
     }
 
-    /// Inside an interpolating string, skips text that only looks like a hole
-    /// or is escaped, or suspends the string at the start of a hole.
     /// The interpolations of the string being read, if `window` can start a
     /// hole or a literal of one.
     fn hole_kinds(&self, window: &[u8]) -> Option<impl Iterator<Item = &'static Interpolation>> {
@@ -1840,6 +1768,8 @@ impl SyntaxCounter {
             .map(|literal| literal.len())
     }
 
+    /// Inside an interpolating string, skips text that only looks like a hole
+    /// or is escaped, or suspends the string at the start of a hole.
     fn parse_start_of_hole(&mut self, window: &[u8]) -> Option<usize> {
         let mut kinds = self.hole_kinds(window)?.peekable();
         kinds.peek()?;

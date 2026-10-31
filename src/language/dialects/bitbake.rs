@@ -93,6 +93,21 @@ fn statement_class(statement: &[u8]) -> LineClass {
     }
 }
 
+impl Body {
+    fn language(self) -> LanguageType {
+        match self {
+            Body::Braced(language, _) => language,
+            Body::Def(_) => LanguageType::Python,
+        }
+    }
+
+    fn start(self) -> usize {
+        match self {
+            Body::Braced(_, start) | Body::Def(start) => start,
+        }
+    }
+}
+
 /// The classes of a body's lines, as its interpreter reads them.
 fn body_classes(
     config: &Config,
@@ -131,12 +146,12 @@ pub(crate) fn parse(
                 continue;
             }
             Some(Body::Def(_)) if continues_def(stripped) => continue,
-            Some(Body::Def(start)) => {
+            Some(def) => {
                 classes.extend(body_classes(
                     config,
-                    LanguageType::Python,
+                    def.language(),
                     text,
-                    &lines[start..index],
+                    &lines[def.start()..index],
                 ));
                 body = None;
             }
@@ -161,14 +176,11 @@ pub(crate) fn parse(
         joined.clear();
     }
     match (body, first) {
-        (Some(Body::Braced(language, start)), _) => {
-            classes.extend(body_classes(config, language, text, &lines[start..]))
-        }
-        (Some(Body::Def(start)), _) => classes.extend(body_classes(
+        (Some(body), _) => classes.extend(body_classes(
             config,
-            LanguageType::Python,
+            body.language(),
             text,
-            &lines[start..],
+            &lines[body.start()..],
         )),
         (None, Some(start)) => {
             let class = statement_class(&joined);
