@@ -15,9 +15,8 @@ use super::dialects::rust::frontmatter_end;
 use super::dialects::sql::DollarQuote;
 use super::dialects::svelte::may_start_tag_comment;
 use super::dialects::yaml::may_start_block_scalar;
-use super::dialects::{
-    batch, elixir, erlang, fsharp, haskell, julia, m4, make, perl, ruby, visual_basic,
-};
+use super::dialects::CommentLiterals;
+use super::dialects::{batch, elixir, erlang, haskell, julia, m4, make, perl, ruby, visual_basic};
 use super::embedding::{
     RegexCache, RegexFamily, ENDING_LF_BLOCK_REGEX, END_SCRIPT, END_STYLE, END_TEMPLATE,
 };
@@ -142,7 +141,7 @@ pub(crate) struct SharedMatchers {
     pub line_comment_flags: &'static [u8],
     pub batch_remarks: bool,
     pub rem_comments: bool,
-    pub comment_literals: bool,
+    pub comment_literals: Option<CommentLiterals>,
     pub postfix_primes: bool,
     pub xml_literals: bool,
     pub line_start_closers: &'static [&'static str],
@@ -1915,8 +1914,7 @@ impl SyntaxCounter {
                 .or_else(|| {
                     self.shared
                         .comment_literals
-                        .then(|| fsharp::comment_literal_len(window))
-                        .flatten()
+                        .and_then(|literals| literals.len(window))
                 });
             if text_len.is_some() {
                 return text_len;

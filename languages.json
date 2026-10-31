@@ -682,7 +682,7 @@
       "multi_line_comments": [["(*", "*)"]],
       "quotes": [["\\\"", "\\\""]],
       "verbatim_quotes": [["\\\"\\\"\\\"", "\\\"\\\"\\\""], ["@\\\"", "\\\""], ["@$\\\"", "\\\""], ["``", "``"]],
-      "comment_literals": true,
+      "comment_literals": "fsharp",
       "shebang": "plain",
       "extensions": ["fs", "fsi", "fsx", "fsscript"]
     },

@@ -525,12 +525,12 @@ impl LanguageType {
         }
     }
 
-    /// Returns whether a block comment reads strings and character literals
-    /// as text, as `fsharp::comment_literal_len` reads them.
-    pub(crate) fn comment_literals(self) -> bool {
+    /// Returns whose rules tell the strings and character literals that a
+    /// block comment reads as text.
+    pub(crate) fn comment_literals(self) -> Option<crate::language::dialects::CommentLiterals> {
         match self {
             {% for key, value in languages -%}
-                {{key}} => {{ value.comment_literals | default(value=false) }},
+                {{key}} => {% if value.comment_literals is defined and value.comment_literals == "fsharp" %}Some(crate::language::dialects::CommentLiterals::FSharp){% else %}None{% endif %},
             {% endfor %}
         }
     }
