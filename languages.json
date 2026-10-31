@@ -1882,7 +1882,7 @@
       "name": "Solidity",
       "line_comment": ["//"],
       "multi_line_comments": [["/*", "*/"]],
-      "quotes": [["\\\"", "\\\""]],
+      "quotes": [["\\\"", "\\\""], ["'", "'"]],
       "extensions": ["sol"]
     },
     "SpecmanE": {
