@@ -28,3 +28,6 @@ ocaml/judge-linux
 hcl/judge-linux
 jsonnet/judge-linux
 cue/judge-linux
+bicep/out/
+bicep/obj/
+bicep/bin/
